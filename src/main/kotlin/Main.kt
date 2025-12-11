@@ -6,6 +6,9 @@ import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import java.io.File
+import kotlin.text.contains
+import kotlin.text.get
 
 fun main() {
     try {
@@ -50,6 +53,13 @@ fun main() {
             }
         }
 
+        val reverseCallGraph = mutableMapOf<String, MutableSet<String>>()
+        callGraph.forEach { (caller, callees) ->
+            callees.forEach { callee ->
+                reverseCallGraph.computeIfAbsent(callee) { mutableSetOf() }.add(caller)
+            }
+        }
+
         val modifiedMethods = featureMap.filter { (key, fn) ->
             val oldFn = developMap[key]
             oldFn == null || collectCalls(oldFn) != collectCalls(fn) || collectApi(oldFn) != collectApi(fn)
@@ -77,16 +87,27 @@ fun main() {
             }
             return chains
         }
+        val outputFile = File("api_changes.txt")
+
+// Создаём файл или очищаем, если уже существует
+        outputFile.writeText("API Changes Report\n\n")
 
         // 9️⃣ Выводим цепочки для изменённых методов
         modifiedMethods.forEach { methodKey ->
             val chains = traceToApi(methodKey)
-            if (chains.isEmpty()) println("No API uses $methodKey")
+            if (chains.isEmpty())
+                outputFile.appendText("No API uses $methodKey\n\n")
             else chains.forEach { chain ->
-                println(chain.joinToString(" -> "))
+                    // Пишем цепочку в виде дерева
+                    chain.forEachIndexed { index, step ->
+                        val indent = "  ".repeat(index)  // отступ для уровня
+                        outputFile.appendText("$indent$step\n")
+                    }
+                    outputFile.appendText("\n") // пустая строка между цепочками
+                }
             }
-        }
 
+        println("API changes report saved to ${outputFile.absolutePath}")
     } catch (e: Exception) {
         e.printStackTrace()
     }
