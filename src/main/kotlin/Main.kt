@@ -1,20 +1,10 @@
 package org.example
 
 import org.example.git.GitLoader
-import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
-import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
-import org.jetbrains.kotlin.com.intellij.openapi.Disposable
-import org.jetbrains.kotlin.com.intellij.openapi.project.Project
-import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.JVMConfigurationKeys
-import org.jetbrains.kotlin.config.JvmTarget
+import org.example.parser.PsiUtils
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
 fun main() {
@@ -28,14 +18,14 @@ fun main() {
         val featureFiles = GitLoader.loadFilesFromCommit(repoPath, branchCommit)
 
         // Создаём проект Kotlin с PSI
-        val project = createProject()
+        val project = PsiUtils.createProject()
 
         val developKtFiles = developFiles.entries.map { (name, content) ->
-            createPsiFile(project, name, content)
+            PsiUtils.createPsiFile(project, name, content)
         }
 
         val featureKtFiles = featureFiles.entries.map { (name, content) ->
-            createPsiFile(project, name, content)
+            PsiUtils.createPsiFile(project, name, content)
         }
 
         // Извлекаем методы
@@ -48,73 +38,58 @@ fun main() {
         val developMap = developMethods.associateBy { methodKey(it.containingKtFile, it) }
         val featureMap = featureMethods.associateBy { methodKey(it.containingKtFile, it) }
 
+        val allMethods = (developMethods + featureMethods).associateBy { methodKey(it.containingKtFile, it) }
 
-        // Сравнение методов
-        featureMap.forEach { (key, featureFn) ->
-            val developFn = developMap[key]
-
-            val newCalls = collectCalls(featureFn)
-            val newApi = collectApi(featureFn)
-
-            if (developFn == null) {
-                // Метод новый
-                println("=== Added method: $key ===")
-                println("Full calls: $newCalls")
-                println("API used: $newApi")
-            } else {
-                val oldCalls = collectCalls(developFn)
-                val oldApi = collectApi(developFn)
-
-                if (oldCalls != newCalls) {
-                    println("=== Modified method: $key ===")
-                    println("Old calls: $oldCalls")
-                    println("New calls: $newCalls")
-
-                    val addedApi = newApi - oldApi
-                    val removedApi = oldApi - newApi
-                    if (addedApi.isNotEmpty()) println("API added: $addedApi")
-                    if (removedApi.isNotEmpty()) println("API removed: $removedApi")
+        val callGraph = mutableMapOf<String, MutableSet<String>>()
+        allMethods.forEach { (key, fn) ->
+            collectCalls(fn).forEach { callText ->
+                allMethods.values.find { it.name != null && callText.contains(it.name!!) }?.let { callee ->
+                    val calleeKey = methodKey(callee.containingKtFile, callee)
+                    callGraph.computeIfAbsent(key) { mutableSetOf() }.add(calleeKey)
                 }
             }
         }
 
-        // Удалённые методы
-        developMap.forEach { (key, developFn) ->
-            if (key !in featureMap) {
-                val oldCalls = collectCalls(developFn)
-                val oldApi = collectApi(developFn)
-                println("=== Deleted method: $key ===")
-                println("Full calls: $oldCalls")
-                println("API used: $oldApi")
+        val modifiedMethods = featureMap.filter { (key, fn) ->
+            val oldFn = developMap[key]
+            oldFn == null || collectCalls(oldFn) != collectCalls(fn) || collectApi(oldFn) != collectApi(fn)
+        }.keys
+
+        fun traceToApi(methodKey: String, visited: MutableSet<String> = mutableSetOf()): List<List<String>> {
+            if (methodKey in visited) return emptyList()
+            visited.add(methodKey)
+
+            val fn = allMethods[methodKey] ?: return emptyList()
+
+            // Если это API-метод, цепочка заканчивается
+            if (isSpringApiMethod(fn)) return listOf(listOf(methodKey))
+
+            // Находим все методы, которые вызывают этот метод
+            val callers = callGraph.filter { it.value.contains(methodKey) }.keys
+            if (callers.isEmpty()) return listOf(listOf(methodKey))
+
+            val chains = mutableListOf<List<String>>()
+            callers.forEach { caller ->
+                val parentChains = traceToApi(caller, visited)
+                parentChains.forEach { chain ->
+                    chains.add(chain + methodKey)
+                }
+            }
+            return chains
+        }
+
+        // 9️⃣ Выводим цепочки для изменённых методов
+        modifiedMethods.forEach { methodKey ->
+            val chains = traceToApi(methodKey)
+            if (chains.isEmpty()) println("No API uses $methodKey")
+            else chains.forEach { chain ->
+                println(chain.joinToString(" -> "))
             }
         }
 
     } catch (e: Exception) {
         e.printStackTrace()
     }
-}
-
-fun createProject(): Project {
-    val disposable: Disposable = Disposer.newDisposable()
-
-    val configuration = CompilerConfiguration().apply {
-        put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
-        put(JVMConfigurationKeys.JVM_TARGET, JvmTarget.JVM_21)
-    }
-
-    val environment = KotlinCoreEnvironment.createForProduction(
-        disposable,
-        configuration,
-        EnvironmentConfigFiles.JVM_CONFIG_FILES
-    )
-
-    return environment.project
-}
-
-fun createPsiFile(project: Project, fileName: String, code: String): KtFile {
-    // Используем KtPsiFactory, чтобы создать KtFile в памяти
-    val psiFactory = KtPsiFactory(project, false)
-    return psiFactory.createFile(fileName, code)
 }
 
 
