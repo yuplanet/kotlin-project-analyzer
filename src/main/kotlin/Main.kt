@@ -79,12 +79,12 @@ fun main() {
 
         // 9️⃣ Выводим цепочки для изменённых методов
         modifiedMethods.forEach { methodKey ->
-            val chains = traceToApiInterfaceAware(methodKey, allMethods, callGraph, interfaceToImpl, mutableSetOf())
+            val chains = traceToApiFullStack(methodKey, allMethods, callGraph, interfaceToImpl, mutableSetOf())
             if (chains.isEmpty()) {
                 outputFile.appendText("No API uses $methodKey\n\n")
             } else {
                 chains.forEach { chain ->
-                    outputFile.appendText(chain.joinToString(" -> ") { step ->
+                    outputFile.appendText(chain.asReversed().joinToString(" -> ") { step ->
                         step.substringAfterLast('/') // или после последнего ::, чтобы убрать путь
                     })
                     outputFile.appendText("\n")
@@ -119,7 +119,62 @@ fun buildInterfaceToImplMap(ktFiles: List<KtFile>): Map<String, List<String>> {
         }
     }
     return map
+}fun traceToApiFullStack(
+    methodKey: String,
+    allMethods: Map<String, KtNamedFunction>,
+    callGraph: Map<String, Set<String>>,
+    interfaceToImpl: Map<String, List<String>>,
+    visited: MutableSet<String> = mutableSetOf()
+): List<List<String>> {
+    if (methodKey in visited) return emptyList()
+    visited.add(methodKey)
+
+    val fn = allMethods[methodKey] ?: return emptyList()
+    val methodName = fn.name ?: return listOf(listOf(methodKey))
+
+    // Если метод API, начинаем цепочку с него
+    val isApi = isSpringApiMethod(fn)
+    val callees = callGraph[methodKey] ?: emptySet()
+
+    if (callees.isEmpty()) {
+        return listOf(listOf(methodKey))
+    }
+
+    val chains = mutableListOf<List<String>>()
+    for (calleeKey in callees) {
+        val calleeFn = allMethods[calleeKey] ?: continue
+
+        // Если вызываем интерфейс, подставляем реализации
+        val calleeClassName = calleeFn.getStrictParentOfType<KtClassOrObject>()?.name
+        val nextKeys = mutableListOf(calleeKey)
+        interfaceToImpl[calleeClassName]?.let { implList ->
+            val implKeys = implList.mapNotNull { implName ->
+                allMethods.entries.find { it.value.getStrictParentOfType<KtClassOrObject>()?.name == implName }?.key
+            }
+            nextKeys.addAll(implKeys)
+        }
+
+        nextKeys.forEach { nextKey ->
+            val childChains = traceToApiFullStack(nextKey, allMethods, callGraph, interfaceToImpl, visited)
+            if (childChains.isEmpty()) {
+                chains.add(listOf(methodKey, nextKey))
+            } else {
+                childChains.forEach { chain ->
+                    chains.add(listOf(methodKey) + chain)
+                }
+            }
+        }
+    }
+
+    return if (isApi && chains.isEmpty()) {
+        listOf(listOf(methodKey))
+    } else {
+        chains
+    }
 }
+
+
+
 fun traceToApiInterfaceAware(
     methodKey: String,
     allMethods: Map<String, KtNamedFunction>,
@@ -149,11 +204,12 @@ fun traceToApiInterfaceAware(
 
     val chains = mutableListOf<List<String>>()
     callers.forEach { caller ->
-        val parentChains = traceToApiInterfaceAware(caller, allMethods, callGraph, interfaceToImpl, visited.toMutableSet())
+        val parentChains = traceToApiFullStack(caller, allMethods, callGraph, interfaceToImpl, visited)
         parentChains.forEach { chain ->
             chains.add(chain + methodKey)
         }
     }
+
     return chains
 }
 
