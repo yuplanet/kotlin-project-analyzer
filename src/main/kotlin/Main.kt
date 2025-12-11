@@ -65,28 +65,6 @@ fun main() {
             oldFn == null || collectCalls(oldFn) != collectCalls(fn) || collectApi(oldFn) != collectApi(fn)
         }.keys
 
-        fun traceToApi(methodKey: String, visited: MutableSet<String> = mutableSetOf()): List<List<String>> {
-            if (methodKey in visited) return emptyList()
-            visited.add(methodKey)
-
-            val fn = allMethods[methodKey] ?: return emptyList()
-
-            // Если это API-метод, цепочка заканчивается
-            if (isSpringApiMethod(fn)) return listOf(listOf(methodKey))
-
-            // Находим все методы, которые вызывают этот метод
-            val callers = callGraph.filter { it.value.contains(methodKey) }.keys
-            if (callers.isEmpty()) return listOf(listOf(methodKey))
-
-            val chains = mutableListOf<List<String>>()
-            callers.forEach { caller ->
-                val parentChains = traceToApi(caller, visited)
-                parentChains.forEach { chain ->
-                    chains.add(chain + methodKey)
-                }
-            }
-            return chains
-        }
 
         val outputFile = File("api_changes.txt")
 
