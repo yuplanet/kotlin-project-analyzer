@@ -18,7 +18,10 @@ fun main() {
 
         // Загружаем файлы из Git
         val developFiles = GitLoader.loadFilesFromCommit(repoPath, mainCommit)
+            .filterKeys { !it.startsWith("src/test") }
+
         val featureFiles = GitLoader.loadFilesFromCommit(repoPath, branchCommit)
+            .filterKeys { !it.startsWith("src/test") }
 
         // Создаём проект Kotlin с PSI
         val project = PsiUtils.createProject()
@@ -87,7 +90,6 @@ fun main() {
                 }
             }
         }
-
 
         println("API changes report saved to ${outputFile.absolutePath}")
     } catch (e: Exception) {
