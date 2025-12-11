@@ -87,6 +87,7 @@ fun main() {
             }
             return chains
         }
+
         val outputFile = File("api_changes.txt")
 
 // Создаём файл или очищаем, если уже существует
@@ -94,10 +95,11 @@ fun main() {
 
         // 9️⃣ Выводим цепочки для изменённых методов
         modifiedMethods.forEach { methodKey ->
-            val chains = traceToApi(methodKey)
-            if (chains.isEmpty())
+            val chains = traceToApiByMethodName(methodKey, allMethods, callGraph)
+            if (chains.isEmpty()) {
                 outputFile.appendText("No API uses $methodKey\n\n")
-            else chains.forEach { chain ->
+            } else {
+                chains.forEach { chain ->
                     // Пишем цепочку в виде дерева
                     chain.forEachIndexed { index, step ->
                         val indent = "  ".repeat(index)  // отступ для уровня
@@ -106,11 +108,50 @@ fun main() {
                     outputFile.appendText("\n") // пустая строка между цепочками
                 }
             }
+        }
+
 
         println("API changes report saved to ${outputFile.absolutePath}")
     } catch (e: Exception) {
         e.printStackTrace()
     }
+}
+
+fun traceToApiByMethodName(
+    methodKey: String,
+    allMethods: Map<String, KtNamedFunction>,
+    callGraph: Map<String, Set<String>>,
+    visited: MutableSet<String> = mutableSetOf()
+): List<List<String>> {
+    if (methodKey in visited) return emptyList()
+    visited.add(methodKey)
+
+    val fn = allMethods[methodKey] ?: return emptyList()
+    val methodName = fn.name ?: return emptyList()
+
+    // Если метод является Spring API, цепочка заканчивается
+    if (isSpringApiMethod(fn)) return listOf(listOf(methodKey))
+
+    // Находим все методы, которые вызывают этот метод по имени
+    val callers = callGraph.filter { (_, callees) ->
+        callees.any { calleeKey ->
+            val calleeFn = allMethods[calleeKey]
+            calleeFn?.name == methodName
+        }
+    }.keys
+
+    // Если никто не вызывает метод, цепочка оканчивается текущим методом
+    if (callers.isEmpty()) return listOf(listOf(methodKey))
+
+    val chains = mutableListOf<List<String>>()
+    callers.forEach { caller ->
+        val parentChains = traceToApiByMethodName(caller, allMethods, callGraph, visited.toMutableSet())
+        parentChains.forEach { chain ->
+            chains.add(chain + methodKey)
+        }
+    }
+
+    return chains
 }
 
 
@@ -154,11 +195,3 @@ fun buildCallChain(fn: KtNamedFunction, methodMap: Map<String, KtNamedFunction>,
     }
     return chain
 }
-
-
-data class FunctionInfo(
-    val name: String,
-    val file: KtFile,
-    val node: KtNamedFunction,
-    val calls: List<String>
-)
