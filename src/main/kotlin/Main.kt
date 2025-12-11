@@ -3,9 +3,11 @@ package org.example
 import org.example.git.GitLoader
 import org.example.parser.PsiUtils
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import java.io.File
 import kotlin.text.contains
 import kotlin.text.get
@@ -33,6 +35,7 @@ fun main() {
         val featureKtFiles = featureFiles.entries.map { (name, content) ->
             PsiUtils.createPsiFile(project, name, content)
         }
+        val interfaceToImpl = buildInterfaceToImplMap(featureKtFiles)
 
         // Извлекаем методы
         val developMethods = extractMethods(developKtFiles)
@@ -76,20 +79,20 @@ fun main() {
 
         // 9️⃣ Выводим цепочки для изменённых методов
         modifiedMethods.forEach { methodKey ->
-            val chains = traceToApiByMethodName(methodKey, allMethods, callGraph)
+            val chains = traceToApiInterfaceAware(methodKey, allMethods, callGraph, interfaceToImpl, mutableSetOf())
             if (chains.isEmpty()) {
                 outputFile.appendText("No API uses $methodKey\n\n")
             } else {
                 chains.forEach { chain ->
-                    // Пишем цепочку в виде дерева
-                    chain.forEachIndexed { index, step ->
-                        val indent = "  ".repeat(index)  // отступ для уровня
-                        outputFile.appendText("$indent$step\n")
-                    }
-                    outputFile.appendText("\n") // пустая строка между цепочками
+                    outputFile.appendText(chain.joinToString(" -> ") { step ->
+                        step.substringAfterLast('/') // или после последнего ::, чтобы убрать путь
+                    })
+                    outputFile.appendText("\n")
                 }
+                outputFile.appendText("\n")
             }
         }
+
 
         println("API changes report saved to ${outputFile.absolutePath}")
     } catch (e: Exception) {
@@ -97,40 +100,60 @@ fun main() {
     }
 }
 
-fun traceToApiByMethodName(
+fun buildInterfaceToImplMap(ktFiles: List<KtFile>): Map<String, List<String>> {
+    val beans = ktFiles
+        .flatMap { it.collectDescendantsOfType<KtClassOrObject> { true } }
+        .filter { clazz ->
+            clazz.annotationEntries.any {
+                val ann = it.shortName?.asString()
+                ann in listOf("Service", "Repository", "Component")
+            }
+        }
+
+    val map = mutableMapOf<String, MutableList<String>>()
+    beans.forEach { impl ->
+        impl.superTypeListEntries.mapNotNull { superType ->
+            superType.typeAsUserType?.referencedName?.let { iface ->
+                map.computeIfAbsent(iface) { mutableListOf() }.add(impl.name!!)
+            }
+        }
+    }
+    return map
+}
+fun traceToApiInterfaceAware(
     methodKey: String,
     allMethods: Map<String, KtNamedFunction>,
     callGraph: Map<String, Set<String>>,
+    interfaceToImpl: Map<String, List<String>>,
     visited: MutableSet<String> = mutableSetOf()
 ): List<List<String>> {
     if (methodKey in visited) return emptyList()
     visited.add(methodKey)
 
     val fn = allMethods[methodKey] ?: return emptyList()
-    val methodName = fn.name ?: return emptyList()
-
-    // Если метод является Spring API, цепочка заканчивается
     if (isSpringApiMethod(fn)) return listOf(listOf(methodKey))
 
-    // Находим все методы, которые вызывают этот метод по имени
+    val methodName = fn.name ?: return listOf(listOf(methodKey))
+
     val callers = callGraph.filter { (_, callees) ->
         callees.any { calleeKey ->
             val calleeFn = allMethods[calleeKey]
-            calleeFn?.name == methodName
+            calleeFn?.name == methodName ||
+                    (calleeFn != null &&
+                            interfaceToImpl[calleeFn.getStrictParentOfType<KtClassOrObject>()?.name ?: ""]
+                                ?.contains(fn.getStrictParentOfType<KtClassOrObject>()?.name ?: "") == true)
         }
     }.keys
 
-    // Если никто не вызывает метод, цепочка оканчивается текущим методом
     if (callers.isEmpty()) return listOf(listOf(methodKey))
 
     val chains = mutableListOf<List<String>>()
     callers.forEach { caller ->
-        val parentChains = traceToApiByMethodName(caller, allMethods, callGraph, visited.toMutableSet())
+        val parentChains = traceToApiInterfaceAware(caller, allMethods, callGraph, interfaceToImpl, visited.toMutableSet())
         parentChains.forEach { chain ->
             chains.add(chain + methodKey)
         }
     }
-
     return chains
 }
 
