@@ -23,9 +23,11 @@ fun main() {
         val mainCommit = "develop"
         val branchCommit = "feature/xxxx"
 
+        // Загружаем файлы из Git
         val developFiles = GitLoader.loadFilesFromCommit(repoPath, mainCommit)
         val featureFiles = GitLoader.loadFilesFromCommit(repoPath, branchCommit)
 
+        // Создаём проект Kotlin с PSI
         val project = createProject()
 
         val developKtFiles = developFiles.entries.map { (name, content) ->
@@ -36,34 +38,56 @@ fun main() {
             createPsiFile(project, name, content)
         }
 
+        // Извлекаем методы
         val developMethods = extractMethods(developKtFiles)
         val featureMethods = extractMethods(featureKtFiles)
 
-        val developCalls = developMethods.associateBy { it.name ?: "<anonymous>" }
-        val featureCalls = featureMethods.associateBy { it.name ?: "<anonymous>" }
+        // Используем уникальные ключи для методов: fileName::methodName
+        fun methodKey(file: KtFile, fn: KtNamedFunction) = "${file.name}::${fn.name ?: "<anonymous>"}"
 
-        featureCalls.forEach { (name, featureFn) ->
-            val developFn = developCalls[name]
+        val developMap = developMethods.associateBy { methodKey(it.containingKtFile, it) }
+        val featureMap = featureMethods.associateBy { methodKey(it.containingKtFile, it) }
+
+
+        // Сравнение методов
+        featureMap.forEach { (key, featureFn) ->
+            val developFn = developMap[key]
+
+            val newCalls = collectCalls(featureFn)
+            val newApi = collectApi(featureFn)
 
             if (developFn == null) {
                 // Метод новый
-                println("Added method: $name")
+                println("=== Added method: $key ===")
+                println("Full calls: $newCalls")
+                println("API used: $newApi")
             } else {
-                // Метод существует в обеих ветках, сравниваем вызовы
                 val oldCalls = collectCalls(developFn)
-                val newCalls = collectCalls(featureFn)
+                val oldApi = collectApi(developFn)
+
                 if (oldCalls != newCalls) {
-                    println("Modified method '$name': $oldCalls -> $newCalls")
+                    println("=== Modified method: $key ===")
+                    println("Old calls: $oldCalls")
+                    println("New calls: $newCalls")
+
+                    val addedApi = newApi - oldApi
+                    val removedApi = oldApi - newApi
+                    if (addedApi.isNotEmpty()) println("API added: $addedApi")
+                    if (removedApi.isNotEmpty()) println("API removed: $removedApi")
                 }
             }
         }
 
-        developCalls.forEach { (name, developFn) ->
-            if (name !in featureCalls) {
-                println("Deleted method: $name")
+        // Удалённые методы
+        developMap.forEach { (key, developFn) ->
+            if (key !in featureMap) {
+                val oldCalls = collectCalls(developFn)
+                val oldApi = collectApi(developFn)
+                println("=== Deleted method: $key ===")
+                println("Full calls: $oldCalls")
+                println("API used: $oldApi")
             }
         }
-
 
     } catch (e: Exception) {
         e.printStackTrace()
@@ -110,6 +134,30 @@ fun collectApi(fn: KtNamedFunction): List<String> =
         ?.collectDescendantsOfType<KtCallExpression> { true }
         ?.mapNotNull { it.calleeExpression?.text } ?: emptyList()
 
+fun isSpringApiMethod(fn: KtNamedFunction): Boolean {
+    return fn.annotationEntries.any {
+        val text = it.shortName?.asString() ?: ""
+        text in listOf("GetMapping", "PostMapping", "PutMapping", "DeleteMapping", "PatchMapping", "RequestMapping")
+    }
+}
+
+fun buildCallChain(fn: KtNamedFunction, methodMap: Map<String, KtNamedFunction>, visited: MutableSet<String> = mutableSetOf()): List<String> {
+    val key = "${fn.containingKtFile.name}::${fn.name ?: "<anonymous>"}"
+    if (key in visited) return emptyList()
+    visited.add(key)
+
+    val calls = collectCalls(fn)
+    val chain = mutableListOf<String>()
+    for (call in calls) {
+        // Находим метод в нашем проекте
+        val targetFn = methodMap.values.find { it.name == call || it.name?.let { n -> call.contains(n) } == true }
+        if (targetFn != null) {
+            chain.add("${key} -> ${targetFn.name}")
+            chain.addAll(buildCallChain(targetFn, methodMap, visited))
+        }
+    }
+    return chain
+}
 
 
 data class FunctionInfo(
