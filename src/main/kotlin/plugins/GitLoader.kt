@@ -1,4 +1,4 @@
-package org.example.git
+package org.example.plugins
 
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
@@ -31,4 +31,6 @@ object GitLoader {
         }
         return files
     }
+
+
 }
