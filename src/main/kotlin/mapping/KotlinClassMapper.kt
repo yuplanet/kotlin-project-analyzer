@@ -1,11 +1,13 @@
 package org.example.mapping
 
 import org.example.core.PsiExtractor
+import org.example.data.FieldReference
 import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
 import org.example.data.ParamReference
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
@@ -22,50 +24,68 @@ object KotlinClassMapper {
         val kotlinClasses = mutableListOf<KotlinClass>()
 
         for (cls in classes) {
+            val filePath = ktFile.virtualFile?.path ?: ktFile.name
 
-            val kclass = KotlinClass(cls, ktFile.name, ktFile.name)
+            val kclass = KotlinClass(cls, filePath)
 
             // Берём все функции класса и companion object
             val functions = PsiExtractor.getClassMethods(cls)
 
-            // Генерируем KotlinMethod с уникальными ID
-            val methods = mutableListOf<KotlinMethod>()
-
-            var currentId = 0
-            for (fn in functions) {
-                val method = KotlinMethod(
-                    Id = currentId,
-                    Function = fn
+            val methods = functions.map { fn ->
+                KotlinMethod(
+                    fullName = methodKey(fn),
+                    function = fn
                 )
-                methods.add(method)
-                currentId++
-            }
-            val fields = cls.declarations
-                .filterIsInstance<KtProperty>()
-                .toList()
+            }.toMutableList()
 
-            val paramRefs = mutableListOf<ParamReference>()
-            currentId = 0
-            for (field in fields) {
-                val paramRef = ParamReference(
-                    Id = currentId,
-                    Property = field
-                )
-                paramRefs.add(paramRef)
-                currentId++
-            }
 
-            kclass.FunctionCalls.addAll(methods)
-            kclass.FieldsReferences.addAll(paramRefs)
+            val fields = cls.declarations.filterIsInstance<KtProperty>()
+            val params = cls.primaryConstructorParameters
 
-            kclass.Functions = methods.associateBy { it.Id }.mapValues { it.value.Function }
-            kclass.Fields = paramRefs.associateBy { it.Id }.mapValues { it.value.Property }
+            val fieldRefs = fields.map {FieldReference(it)}
+            val paramRefs = params.map { ParamReference(it) }
+
+            kclass.functionCalls.addAll(methods)
+            kclass.fieldReferences.addAll(fieldRefs)
+            kclass.parameterReferences.addAll(paramRefs)
+
+            kclass.functions = methods.associateBy { it.fullName }.mapValues { it.value.function }
+            kclass.fields = fields.toMutableList()
+            kclass.parameters = params.toMutableList()
 
             kotlinClasses.add(kclass)
         }
         return kotlinClasses
     }
 
+
+    fun methodKey(fn: KtNamedFunction): String {
+        // 1. Имя метода
+        val name = fn.name ?: "__no_name__"
+
+        // 2. Тип расширения (если extension-функция)
+        val receiverType = fn.receiverTypeReference?.text?.let { "$it." } ?: ""
+
+        // 3. Параметры метода
+        val params = fn.valueParameters.joinToString(",") { it.typeReference?.text ?: "Any" }
+
+        // 4. Имя класса, если есть
+        val className = fn.getContainingClassName()
+
+        return "$className::$receiverType$name($params)"
+    }
+
+    // Вспомогательная функция для получения имени класса или top-level
+    fun KtNamedFunction.getContainingClassName(): String {
+        var parent = this.parent
+        while (parent != null) {
+            if (parent is KtClassOrObject) {
+                return parent.name ?: "__anonymous__"
+            }
+            parent = parent.parent
+        }
+        return "__top_level__"
+    }
 
     /**
      * Преобразует список KtFile в список KotlinClass

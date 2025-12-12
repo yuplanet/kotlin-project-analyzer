@@ -5,10 +5,10 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 data class KotlinMethod(
 
     /**
-     * Id Метода
+     * <путь_к_файлу>.<имя_класса>::<имя_метода> ( параметры )
      */
-    val Id: Int,
-    val Function: KtNamedFunction,
+    val fullName: String,
+    val function: KtNamedFunction,
 
-    val CallRecords: MutableList<CallMethod> = mutableListOf()
+    val callRecords: MutableList<CallMethod> = mutableListOf()
 )

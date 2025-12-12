@@ -2,28 +2,28 @@ package org.example.data
 
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 
 class KotlinClass {
 
-    var Class: KtClassOrObject
+    var ktClassObject: KtClassOrObject
 
-    var Path: String
+    var path: String
 
-    var Name: String
+    var fields: MutableList<KtProperty> = mutableListOf()
+    var parameters: MutableList<KtParameter> = mutableListOf()
 
-    var Fields: Map<Int, KtProperty> = mapOf()
+    var fieldReferences: MutableList<FieldReference> = mutableListOf()
+    var parameterReferences: MutableList<ParamReference> = mutableListOf()
 
-    var FieldsReferences: MutableList<ParamReference> = mutableListOf()
+    var functions: Map<String, KtNamedFunction> = mapOf()
 
-    var Functions: Map<Int, KtNamedFunction> = mapOf()
+    val functionCalls: MutableList<KotlinMethod> = mutableListOf()
 
-    val FunctionCalls: MutableList<KotlinMethod> = mutableListOf()
-
-    constructor(Class: KtClassOrObject, name: String, Path: String) {
-        this.Class = Class
-        this.Path = Path
-        this.Name = name
+    constructor(ktClass: KtClassOrObject, path: String) {
+        this.ktClassObject = ktClass
+        this.path = path
     }
 
     //Interface
