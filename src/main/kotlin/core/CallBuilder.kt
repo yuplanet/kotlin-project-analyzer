@@ -2,6 +2,7 @@ package org.example.core
 
 import org.example.data.CallMethod
 import org.example.data.KotlinClass
+import org.example.data.ParamReference
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
@@ -10,54 +11,98 @@ import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 object CallBuilder {
 
     fun buildCallRecordsSimple(allClasses: List<KotlinClass>) {
-
         for (cls in allClasses) {
+            analyzeFunctionCalls(cls, allClasses)
+            analyzeFieldReferences(cls, allClasses)
+        }
 
-            // имена полей класса
-            val fieldNames = cls.Fields.mapNotNull { it.name }
+    }
 
-            for (method in cls.Methods) {
+    fun analyzeFunctionCalls(cls: KotlinClass, allClasses: List<KotlinClass>) {
+        val allMethods = allClasses.flatMap { it.FunctionCalls }
 
-                // ищем вызовы вида repo.getUser()
-                val dotCalls = method.function
-                    .collectDescendantsOfType<KtDotQualifiedExpression>()
+        for (method in cls.FunctionCalls){
+            val dotCalls = method.Function.collectDescendantsOfType<KtDotQualifiedExpression>()
+            for (expr in dotCalls) {
 
-                for (expr in dotCalls) {
+                val receiver = expr.receiverExpression as? KtNameReferenceExpression
+                val selector = expr.selectorExpression as? KtCallExpression
 
-                    val receiver = expr.receiverExpression as? KtNameReferenceExpression
-                    val selector = expr.selectorExpression as? KtCallExpression
+                if (receiver == null || selector == null)
+                    continue
 
-                    if (receiver != null && selector != null) {
+                val receiverName = receiver.getReferencedName()
 
-                        val receiverName = receiver.getReferencedName()
+                // Ищем поле по имени (ГОРАЗДО проще, чем твой fieldNamesToId)
+                val fieldEntry = cls.Fields.entries.firstOrNull { it.value.name == receiverName }
+                    ?: continue
 
-                        if (receiverName in fieldNames) {
+                val calledMethodName = selector.calleeExpression?.text ?: continue
 
-                            val calledMethodName =
-                                selector.calleeExpression?.text ?: continue
+                // Находим метод по имени
+                val target = allMethods.find { it.Function.name == calledMethodName }
+                    ?: continue
 
-                            // ищем среди всех методов проекта по имени
-                            val targetMethod = allClasses
-                                .flatMap { it.Methods }
-                                .find { it.function.name == calledMethodName }
+                val parentClass = allClasses.first { it.FunctionCalls.contains(target) }
 
-                            if (targetMethod != null) {
-
-                                val parentClass = allClasses
-                                    .first { it.Methods.contains(targetMethod) }
-
-                                method.CallRecords.add(
-                                    CallMethod(
-                                        CallMethodId = targetMethod.Id,
-                                        callParentClass = parentClass
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
+                method.CallRecords.add(
+                    CallMethod(
+                        CallMethodId = target.Id,
+                        callMethodParentClass = parentClass
+                    )
+                )
             }
         }
     }
 
+    fun analyzeFieldReferences(cls: KotlinClass, allClasses: List<KotlinClass>) {
+
+        val allMethods = allClasses.flatMap { it.FunctionCalls }
+
+        for ((fieldId, prop) in cls.Fields) {
+            val propName = prop.name ?: continue
+
+            // Найдём или создадим ParamReference
+            val paramRef = cls.FieldsReferences
+                .firstOrNull { it.Id == fieldId }
+                ?: ParamReference(fieldId, prop).also {
+                    cls.FieldsReferences.add(it)
+                }
+
+            for (method in allMethods) {
+
+                val calls = method.Function.collectDescendantsOfType<KtCallExpression>()
+
+                // проверяем, встречается ли propName среди аргументов
+                val used = calls.any { call ->
+                    call.valueArguments.any { arg ->
+                        val argExpr = arg.getArgumentExpression()
+
+                        when (argExpr) {
+                            is KtNameReferenceExpression ->
+                                argExpr.getReferencedName() == propName
+
+                            is KtDotQualifiedExpression -> {
+                                val last = argExpr.selectorExpression as? KtNameReferenceExpression
+                                last?.getReferencedName() == propName
+                            }
+
+                            else -> false
+                        }
+                    }
+                }
+
+                if (used) {
+                    val parentClass = allClasses.first { it.FunctionCalls.contains(method) }
+
+                    paramRef.CallRecord.add(
+                        CallMethod(
+                            CallMethodId = method.Id,
+                            callMethodParentClass = parentClass
+                        )
+                    )
+                }
+            }
+        }
+    }
 }

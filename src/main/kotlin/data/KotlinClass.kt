@@ -5,9 +5,12 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
 
 class KotlinClass {
-    var KtClass: KtClassOrObject
+
+    var Class: KtClassOrObject
+
     var Path: String
-    var name: String
+
+    var Name: String
 
     var Fields: Map<Int, KtProperty> = mapOf()
 
@@ -17,10 +20,10 @@ class KotlinClass {
 
     val FunctionCalls: MutableList<KotlinMethod> = mutableListOf()
 
-    constructor(ktClass: KtClassOrObject, name: String, Path: String) {
-        this.KtClass = ktClass
+    constructor(Class: KtClassOrObject, name: String, Path: String) {
+        this.Class = Class
         this.Path = Path
-        this.name = name
+        this.Name = name
     }
 
     //Interface

@@ -3,8 +3,8 @@ package org.example.data
 import org.jetbrains.kotlin.psi.KtProperty
 
 data class ParamReference (
-    var ParamId: Int,
-    var KtProperty: KtProperty,
+    var Id: Int,
+    var Property: KtProperty,
 
-    var CallRecord: CallMethod
+    var CallRecord: MutableList<CallMethod> = mutableListOf()
 )
