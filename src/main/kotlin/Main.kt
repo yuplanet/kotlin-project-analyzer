@@ -2,17 +2,13 @@ package org.example
 
 import org.example.core.CallBuilder
 import org.example.core.DifferenceAnalyzer
-import org.example.plugins.GitLoader
 import org.example.core.PsiExtractor
+import org.example.data.CallMethod
+import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
 import org.example.mapping.KotlinClassMapper
-import org.jetbrains.kotlin.psi.KtCallExpression
-import org.jetbrains.kotlin.psi.KtClassOrObject
-import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
-import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
+import org.example.plugins.GitLoader
 import java.io.File
-import kotlin.text.contains
 
 fun main() {
     try {
@@ -54,7 +50,7 @@ fun main() {
         val builder = StringBuilder()
         for (method in analyzer.changed) {
             builder.appendLine("=== Call chain for changed method: ${method.fullName} ===")
-            appendCallChain(method, builder)
+            appendCallChain(method, builder, developClasses + featureClasses)
             builder.appendLine()
         }
 
@@ -78,18 +74,36 @@ fun saveMethodsToFile(methods: List<KotlinMethod>, outputPath: String) {
 fun appendCallChain(
     method: KotlinMethod,
     builder: StringBuilder,
+    allClasses: List<KotlinClass>,
     indent: String = "",
     visited: MutableSet<String> = mutableSetOf()
 ) {
-    if (method.fullName in visited) return  // избегаем циклов
+    if (method.fullName in visited) return
     visited.add(method.fullName)
 
     builder.appendLine("$indent${method.fullName}")
 
-    for (caller in method.callRecords) {
+    // Берём текущий класс метода
+    val cls = allClasses.firstOrNull { it.functionCalls.contains(method) } ?: return
+
+    // Собираем всех "звонящих" методов
+    val allCallers = mutableListOf<CallMethod>()
+    allCallers.addAll(method.callRecords)
+
+    // Добавляем методы интерфейсов
+    for (iface in cls.implementedInterfaces) {
+        val ifaceKotlinClass = allClasses.firstOrNull { it.ktClassObject == iface } ?: continue
+        val ifaceMethod = ifaceKotlinClass.functionCalls.firstOrNull { it.fullName == method.fullName }
+        if (ifaceMethod != null) {
+            allCallers.addAll(ifaceMethod.callRecords)
+        }
+    }
+
+    // Рекурсивно вызываем для всех звонящих
+    for (caller in allCallers) {
         val callerMethod = caller.callMethodParentClass.functionCalls
             .firstOrNull { it.fullName == caller.callMethodFullName } ?: continue
 
-        appendCallChain(callerMethod, builder, indent + "  ", visited)
+        appendCallChain(callerMethod, builder, allClasses, indent + "  ", visited)
     }
 }
