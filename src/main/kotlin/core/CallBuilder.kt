@@ -12,9 +12,37 @@ object CallBuilder {
     fun buildCallRecordsSimple(allClasses: List<KotlinClass>) {
         for (cls in allClasses) {
             analyzeFunctionCalls(allClasses)
-                //analyzeClassMembersReferences(cls, allClasses)
+            buildReverseCallRecords(allClasses)
         }
     }
+
+    fun buildReverseCallRecords(allClasses: List<KotlinClass>) {
+        // 1. Глобальный индекс всех методов: fullName -> KotlinMethod
+        val allMethodsByFullName: Map<String, KotlinMethod> =
+            allClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
+
+        // 2. Для каждого метода очищаем обратные ссылки
+        allClasses.flatMap { it.functionCalls }.forEach { it.callRecords.clear() }
+
+        // 3. Проходим по каждому методу и его вызовам
+        for (cls in allClasses) {
+            for (method in cls.functionCalls) {
+                for (call in method.callRecords) {
+                    // call.callMethodFullName — это метод, который был вызван
+                    val calledMethod = allMethodsByFullName[call.callMethodFullName] ?: continue
+
+                    // Добавляем текущий метод в callRecords вызываемого метода
+                    calledMethod.callRecords.add(
+                        CallMethod(
+                            callMethodFullName = method.fullName,
+                            callMethodParentClass = cls
+                        )
+                    )
+                }
+            }
+        }
+    }
+
 
     fun analyzeFunctionCalls(allClasses: List<KotlinClass>) {
 

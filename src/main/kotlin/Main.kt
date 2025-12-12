@@ -50,6 +50,16 @@ fun main() {
         saveMethodsToFile(analyzer.removed, "removed_methods.txt")
         saveMethodsToFile(analyzer.changed, "changed_methods.txt")
 
+        val outputPath = "changed_methods_chains.txt"
+        val builder = StringBuilder()
+        for (method in analyzer.changed) {
+            builder.appendLine("=== Call chain for changed method: ${method.fullName} ===")
+            appendCallChain(method, builder)
+            builder.appendLine()
+        }
+
+        File(outputPath).writeText(builder.toString())
+
     } catch (e: Exception) {
         e.printStackTrace()
     }
@@ -63,4 +73,23 @@ fun saveMethodsToFile(methods: List<KotlinMethod>, outputPath: String) {
     }
 
     File(outputPath).writeText(builder.toString())
+}
+
+fun appendCallChain(
+    method: KotlinMethod,
+    builder: StringBuilder,
+    indent: String = "",
+    visited: MutableSet<String> = mutableSetOf()
+) {
+    if (method.fullName in visited) return  // избегаем циклов
+    visited.add(method.fullName)
+
+    builder.appendLine("$indent${method.fullName}")
+
+    for (caller in method.callRecords) {
+        val callerMethod = caller.callMethodParentClass.functionCalls
+            .firstOrNull { it.fullName == caller.callMethodFullName } ?: continue
+
+        appendCallChain(callerMethod, builder, indent + "  ", visited)
+    }
 }
