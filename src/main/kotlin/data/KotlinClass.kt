@@ -9,6 +9,8 @@ class KotlinClass {
 
     var ktClassObject: KtClassOrObject
 
+    var implementedInterfaces: List<KtClassOrObject> = listOf()
+
     var path: String
 
     var fields: MutableList<KtProperty> = mutableListOf()

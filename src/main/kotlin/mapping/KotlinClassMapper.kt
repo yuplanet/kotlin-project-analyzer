@@ -9,6 +9,8 @@ import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
+import org.jetbrains.kotlin.psi.KtSuperTypeEntry
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
 object KotlinClassMapper {
@@ -52,6 +54,19 @@ object KotlinClassMapper {
             kclass.functions = methods.associateBy { it.fullName }.mapValues { it.value.function }
             kclass.fields = fields.toMutableList()
             kclass.parameters = params.toMutableList()
+
+            kclass.implementedInterfaces = cls.superTypeListEntries.mapNotNull { entry ->
+                val typeName = when (entry) {
+                    is KtSuperTypeEntry -> entry.typeReference?.text
+                    is KtSuperTypeCallEntry -> entry.typeReference?.text
+                    else -> null
+                } ?: return@mapNotNull null
+
+                // Здесь можно оставить только имя или попробовать найти KtClassOrObject
+                // Если все классы еще не загружены, просто сохраняем имя как KtClassOrObject-обертку
+                // Для упрощения оставим KtClassOrObject = null, потом можно сопоставить по имени
+                null
+            }
 
             kotlinClasses.add(kclass)
         }
