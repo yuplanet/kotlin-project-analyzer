@@ -73,7 +73,7 @@ class DiffGraphBuilder(val projectLoader: i_projectLoader,) {
     }
 
     private fun OutputResult(){
-        resultPresenter.writeCallChainToFile(diffResult)
+        resultPresenter.writeCallChainToFile(diffResult, featureClasses)
     }
 }
 

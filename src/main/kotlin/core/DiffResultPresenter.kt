@@ -1,7 +1,6 @@
 package org.example.core
 
 import org.example.core.interfaces.i_diffResultPresenter
-import org.example.data.CallMethod
 import org.example.data.DiffResult
 import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
@@ -9,11 +8,12 @@ import java.io.File
 
 class DiffResultPresenter : i_diffResultPresenter{
 
-    override fun writeCallChainToFile(result: DiffResult){
-        outResults(result)
+    override fun writeCallChainToFile(result: DiffResult, allClasses: List<KotlinClass>){
+
+        outResults(result, allClasses)
     }
 
-    private fun outResults(result: DiffResult) {
+    private fun outResults(result: DiffResult, allClasses: List<KotlinClass>) {
         saveMethodsToFile(result.added, "added_methods.txt")
         saveMethodsToFile(result.removed, "removed_methods.txt")
         saveMethodsToFile(result.changed, "changed_methods.txt")
@@ -22,7 +22,7 @@ class DiffResultPresenter : i_diffResultPresenter{
         val builder = StringBuilder()
         for (method in result.changed) {
             builder.appendLine("=== Call chain for changed method: ${method.fullName} ===")
-            appendCallChain(method, builder, listOf())
+            appendCallChain(method, builder, allClasses)
             builder.appendLine()
         }
 
@@ -43,37 +43,30 @@ class DiffResultPresenter : i_diffResultPresenter{
     fun appendCallChain(
         method: KotlinMethod,
         builder: StringBuilder,
-        allClasses: List<KotlinClass>,
+        allClasses: List<KotlinClass>,  // добавляем сюда
         indent: String = "",
         visited: MutableSet<String> = mutableSetOf()
-    ) {
-        if (method.fullName in visited) return
-        visited.add(method.fullName)
+    )
+    {
+        if (!visited.add(method.fullName)) return
 
         builder.appendLine("$indent${method.fullName}")
 
-        // Берём текущий класс метода
-        val cls = allClasses.firstOrNull { it.functionCalls.contains(method) } ?: return
+        // идём ТОЛЬКО по reverse-графу
+        for (reverseCall in method.reverseCallRecords) {
 
-        // Собираем всех "звонящих" методов
-        val allCallers = mutableListOf<CallMethod>()
-        allCallers.addAll(method.callRecords)
+            val callerMethod = reverseCall.callerMethodParentClass
+                .functionCalls
+                .firstOrNull { it.fullName == reverseCall.callerMethodFullName }
+                ?: continue
 
-        // Добавляем методы интерфейсов
-        for (iface in cls.implementedInterfaces) {
-            val ifaceKotlinClass = allClasses.firstOrNull { it.ktClassObject == iface } ?: continue
-            val ifaceMethod = ifaceKotlinClass.functionCalls.firstOrNull { it.fullName == method.fullName }
-            if (ifaceMethod != null) {
-                allCallers.addAll(ifaceMethod.callRecords)
-            }
-        }
-
-        // Рекурсивно вызываем для всех звонящих
-        for (caller in allCallers) {
-            val callerMethod = caller.callMethodParentClass.functionCalls
-                .firstOrNull { it.fullName == caller.callMethodFullName } ?: continue
-
-            appendCallChain(callerMethod, builder, allClasses, indent + "  ", visited)
+            appendCallChain(
+                callerMethod,
+                builder,
+                allClasses,
+                indent + "  ",
+                visited
+            )
         }
     }
 }
