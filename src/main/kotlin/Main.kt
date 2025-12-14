@@ -1,8 +1,10 @@
 package org.example
 
 import org.example.core.CallBuilder
+import org.example.core.DiffGraphBuilder
 import org.example.core.DifferenceAnalyzer
 import org.example.core.PsiExtractor
+import org.example.core.interfaces.i_projectLoader
 import org.example.data.CallMethod
 import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
@@ -16,29 +18,14 @@ fun main() {
         val mainCommit = "develop"
         val branchCommit = "feature/xxxx"
 
-        // Загружаем файлы из Git
-        val developFiles = GitLoader.loadFilesFromCommit(repoPath, mainCommit)
-            .filterKeys { !it.startsWith("src/test") }
 
-        val featureFiles = GitLoader.loadFilesFromCommit(repoPath, branchCommit)
-            .filterKeys { !it.startsWith("src/test") }
+        val projectLoader : i_projectLoader = GitLoader()
+
+
+        val diffGraphBuilder = DiffGraphBuilder(projectLoader)
 
         // Создаём проект Kotlin с PSI
-        val project = PsiExtractor.createProject()
 
-        val developKtFiles = developFiles.entries.map { (name, content) ->
-            PsiExtractor.createPsiFile(project, name, content)
-        }
-
-        val featureKtFiles = featureFiles.entries.map { (name, content) ->
-            PsiExtractor.createPsiFile(project, name, content)
-        }
-
-        val developClasses = KotlinClassMapper.mapKtFilesToClasses(developKtFiles)
-        val featureClasses = KotlinClassMapper.mapKtFilesToClasses(featureKtFiles)
-
-        CallBuilder.buildCallRecordsSimple(developClasses)
-        CallBuilder.buildCallRecordsSimple(featureClasses)
         val differenceAnalyzer = DifferenceAnalyzer(developClasses, featureClasses)
         val analyzer = differenceAnalyzer.compare()
 

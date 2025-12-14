@@ -3,10 +3,15 @@ package org.example.plugins
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import org.eclipse.jgit.treewalk.TreeWalk
+import org.example.core.interfaces.i_projectLoader
 import java.io.File
 
-object GitLoader {
-    fun loadFilesFromCommit(repoPath: String, commit: String): Map<String, String> {
+class GitLoader: i_projectLoader {
+
+    override fun loadProjectFilesFromCommit(
+        repoPath: String,
+        commit: String
+    ): Map<String, String> {
         val builder = FileRepositoryBuilder()
         val repo: Repository = builder.setGitDir(File("$repoPath/.git"))
             .readEnvironment()
@@ -31,6 +36,4 @@ object GitLoader {
         }
         return files
     }
-
-
 }
