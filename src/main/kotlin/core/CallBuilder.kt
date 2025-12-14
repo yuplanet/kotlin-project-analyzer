@@ -30,28 +30,26 @@ object CallBuilder {
         val allMethodsByFullName: Map<String, KotlinMethod> =
             allClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
-        // 2. Для каждого метода очищаем обратные ссылки
-        allClasses.flatMap { it.functionCalls }.forEach { it.callRecords.clear() }
+        // 2. Очищаем обратные ссылки у всех методов
+        allClasses.flatMap { it.functionCalls }.forEach { it.reverseCallRecords.clear() }
 
-        // 3. Проходим по каждому методу и его вызовам
+        // 3. Проходим по каждому методу и его прямым вызовам
         for (cls in allClasses) {
             for (method in cls.functionCalls) {
                 for (call in method.callRecords) {
-                    // call.callMethodFullName — это метод, который был вызван
                     val calledMethod = allMethodsByFullName[call.callMethodFullName] ?: continue
 
-                    // Добавляем текущий метод в callRecords вызываемого метода
-                    calledMethod.callRecords.add(
-                        CallMethod(
-                            callMethodFullName = method.fullName,
-                            callMethodParentClass = cls
+                    // Добавляем текущий метод в reverseCallRecords вызываемого метода
+                    calledMethod.reverseCallRecords.add(
+                        ReverseCallMethod(
+                            callerMethodFullName = method.fullName,
+                            callerMethodParentClass = cls
                         )
                     )
                 }
             }
         }
     }
-
 
     fun analyzeFunctionCalls(allClasses: List<KotlinClass>) {
 
@@ -100,11 +98,8 @@ object CallBuilder {
                     // ----------- Строим полный ключ вызываемого метода -----------
 
                     // Параметры вызова (типов тут не узнать → Any)
-                    val argParams = selector.valueArguments
-                        .joinToString(",") { "Any" }
-
-                    val argParams3 = resolveArgumentTypes(selector, allFields, fn)
-
+                    val argParams: String = resolveArgumentTypes(selector, allFields, fn)
+                        .joinToString(",")
 
                     val calledFullName =
                         "${targetClass.ktClassObject.name}::$calledMethodName($argParams)"
@@ -124,7 +119,6 @@ object CallBuilder {
             }
         }
     }
-
 
     fun resolveArgumentTypes(
         selector: KtCallExpression,

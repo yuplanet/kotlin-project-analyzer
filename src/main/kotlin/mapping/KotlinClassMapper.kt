@@ -5,6 +5,7 @@ import org.example.data.FieldReference
 import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
 import org.example.data.ParamReference
+import org.example.data.ReverseCallMethod
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -40,7 +41,6 @@ object KotlinClassMapper {
                 )
             }.toMutableList()
 
-
             val fields = cls.declarations.filterIsInstance<KtProperty>()
             val params = cls.primaryConstructorParameters
 
@@ -48,6 +48,7 @@ object KotlinClassMapper {
             val paramRefs = params.map { ParamReference(it) }
 
             kclass.functionCalls.addAll(methods)
+
             kclass.fieldReferences.addAll(fieldRefs)
             kclass.parameterReferences.addAll(paramRefs)
 

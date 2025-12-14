@@ -25,9 +25,6 @@ class KotlinClass {
     var functions: Map<String, KtNamedFunction> = mapOf()
 
     val functionCalls: MutableList<KotlinMethod> = mutableListOf()
-    val reverseFunctionCalls: MutableList<KotlinMethod> = mutableListOf()
-
-
 
     constructor(ktClass: KtClassOrObject, path: String) {
         this.ktClassObject = ktClass

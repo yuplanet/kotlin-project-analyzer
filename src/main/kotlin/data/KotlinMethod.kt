@@ -10,5 +10,6 @@ data class KotlinMethod(
     val fullName: String,
     val function: KtNamedFunction,
 
-    val callRecords: MutableList<CallMethod> = mutableListOf()
+    val callRecords: MutableList<CallMethod> = mutableListOf(),
+    val reverseCallRecords: MutableList<ReverseCallMethod> = mutableListOf()
 )
