@@ -31,7 +31,6 @@ class DiffGraphBuilder(val projectLoader: i_projectLoader,) {
 
         analyzeDifference()
         //4 analizy
-
         //3 filter
 
         //4 out

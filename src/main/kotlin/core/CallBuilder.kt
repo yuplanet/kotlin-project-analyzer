@@ -3,17 +3,26 @@ package org.example.core
 import org.example.data.*
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
+import org.jetbrains.kotlin.psi.KtConstantExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
+import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
 object CallBuilder {
 
     fun buildCallRecordsSimple(allClasses: List<KotlinClass>) {
-        for (cls in allClasses) {
-            analyzeFunctionCalls(allClasses)
-            buildReverseCallRecords(allClasses)
-        }
+
+        //1 calls
+        //2reverse calls
+
+        analyzeFunctionCalls(allClasses)
+        buildReverseCallRecords(allClasses)
+
+        //3fields
+        //reversefields
+
     }
 
     fun buildReverseCallRecords(allClasses: List<KotlinClass>) {
@@ -94,6 +103,9 @@ object CallBuilder {
                     val argParams = selector.valueArguments
                         .joinToString(",") { "Any" }
 
+                    val argParams3 = resolveArgumentTypes(selector, allFields, fn)
+
+
                     val calledFullName =
                         "${targetClass.ktClassObject.name}::$calledMethodName($argParams)"
 
@@ -113,86 +125,43 @@ object CallBuilder {
         }
     }
 
-    fun analyzeClassMembersReferences(targetClass: KotlinClass, allClasses: List<KotlinClass>) {
 
-        val className = targetClass.ktClassObject.name ?: return
+    fun resolveArgumentTypes(
+        selector: KtCallExpression,
+        allFields: Map<String, KtCallableDeclaration>,
+        fn: KtNamedFunction
+    ): List<String> {
+        return selector.valueArguments.map { arg ->
+            val expr = arg.getArgumentExpression()
+            when (expr) {
+                is KtNameReferenceExpression -> {
+                    val name = expr.getReferencedName()
 
-        // --- 1. Обрабатываем поля ---
-        targetClass.fields.forEach { field ->
+                    // 1. Сначала проверяем параметры метода
+                    val paramType = fn.valueParameters.find { it.name == name }?.typeReference?.text
+                    if (paramType != null) return@map paramType
 
-            val instanceNames = mutableSetOf("this")
+                    // 2. Проверяем поля класса
+                    val fieldType = allFields[name]?.typeReference?.text
+                    if (fieldType != null) return@map fieldType
 
-            // Находим параметры методов во всех классах, которые ссылаются на targetClass
-            for (cls in allClasses) {
-                for (method in cls.functionCalls) {
-                    method.function.valueParameters.forEach { param ->
-                        val type = param.typeReference?.text ?: return@forEach
-                        if (type.contains(className)) instanceNames += param.name!!
+                    // 3. Если не нашли — Any
+                    name // или "Any" если хочешь совсем безопасно
+                }
+                is KtCallExpression -> {
+                    // Если передан вызов метода, пока можно использовать имя метода
+                    expr.calleeExpression?.text ?: "Any"
+                }
+                is KtConstantExpression, is KtStringTemplateExpression -> {
+                    // Литералы
+                    when (expr) {
+                        is KtConstantExpression -> expr.node.elementType.toString() // Int, Boolean и т.д.
+                        else -> "String"
                     }
                 }
-            }
-
-            // Ищем все dot-qualified вызовы
-            for (cls in allClasses) {
-                for (method in cls.functionCalls) {
-                    val dotCalls = method.function.collectDescendantsOfType<KtDotQualifiedExpression>()
-                    dotCallsLoop@ for (expr in dotCalls) {
-                        val text = expr.text
-                        for (instance in instanceNames) {
-                            val pattern = "$instance.${field.name}"
-                            if (text.contains(pattern)) {
-                                val ref = targetClass.fieldReferences
-                                    .firstOrNull { it.property == field }
-                                    ?: FieldReference(field).also { targetClass.fieldReferences += it }
-
-                                ref.callRecord += CallMethod(
-                                    callMethodFullName = method.fullName,
-                                    callMethodParentClass = cls
-                                )
-                                continue@dotCallsLoop
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- 2. Обрабатываем параметры конструктора ---
-        targetClass.parameters.forEach { param ->
-
-            val instanceNames = mutableSetOf("this")
-
-            for (cls in allClasses) {
-                for (method in cls.functionCalls) {
-                    method.function.valueParameters.forEach { p ->
-                        val type = p.typeReference?.text ?: return@forEach
-                        if (type.contains(className)) instanceNames += p.name!!
-                    }
-                }
-            }
-
-            for (cls in allClasses) {
-                for (method in cls.functionCalls) {
-                    val dotCalls = method.function.collectDescendantsOfType<KtDotQualifiedExpression>()
-                    dotCallsLoop@ for (expr in dotCalls) {
-                        val text = expr.text
-                        for (instance in instanceNames) {
-                            val pattern = "$instance.${param.name}"
-                            if (text.contains(pattern)) {
-                                val ref = targetClass.parameterReferences
-                                    .firstOrNull { it.property == param }
-                                    ?: ParamReference(param).also { targetClass.parameterReferences += it }
-
-                                ref.callRecord += CallMethod(
-                                    callMethodFullName = method.fullName,
-                                    callMethodParentClass = cls
-                                )
-                                continue@dotCallsLoop
-                            }
-                        }
-                    }
-                }
+                else -> "Any"
             }
         }
     }
+
 }

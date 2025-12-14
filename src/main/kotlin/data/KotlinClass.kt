@@ -19,9 +19,15 @@ class KotlinClass {
     var fieldReferences: MutableList<FieldReference> = mutableListOf()
     var parameterReferences: MutableList<ParamReference> = mutableListOf()
 
+    var reverseFieldReferences: MutableList<FieldReference> = mutableListOf()
+    var reverseParameterReferences: MutableList<ParamReference> = mutableListOf()
+
     var functions: Map<String, KtNamedFunction> = mapOf()
 
     val functionCalls: MutableList<KotlinMethod> = mutableListOf()
+    val reverseFunctionCalls: MutableList<KotlinMethod> = mutableListOf()
+
+
 
     constructor(ktClass: KtClassOrObject, path: String) {
         this.ktClassObject = ktClass

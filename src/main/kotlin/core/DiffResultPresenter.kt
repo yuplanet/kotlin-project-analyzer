@@ -22,7 +22,7 @@ class DiffResultPresenter : i_diffResultPresenter{
         val builder = StringBuilder()
         for (method in result.changed) {
             builder.appendLine("=== Call chain for changed method: ${method.fullName} ===")
-            appendCallChain(method, builder, developClasses + featureClasses)
+            appendCallChain(method, builder, listOf())
             builder.appendLine()
         }
 
