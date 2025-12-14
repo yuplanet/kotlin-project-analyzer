@@ -1,51 +1,57 @@
 package org.example.core
 
+import org.example.core.interfaces.i_projectDifferenceAnalyzer
 import org.example.data.DiffResult
 import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
 
-class DifferenceAnalyzer (
-        private val developClasses: List<KotlinClass>,
-        private val featureClasses: List<KotlinClass>
-    ) {
+class DifferenceAnalyzer : i_projectDifferenceAnalyzer {
+        private var developClasses: List<KotlinClass> = listOf()
+        private var featureClasses: List<KotlinClass> = listOf()
         /**
          * Сравнивает develop и feature и возвращает DiffResult
          */
-        fun compare(): DiffResult {
-            // 1. Строим карты методов по fullName
-            val developMethodsByFullName: Map<String, KotlinMethod> =
-                developClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
+    override fun analyzeProjectDifferences(
+        mainProject: List<KotlinClass>,
+        branchProject: List<KotlinClass>
+    ): DiffResult {
+        developClasses = mainProject
+        featureClasses = branchProject
 
-            val featureMethodsByFullName: Map<String, KotlinMethod> =
-                featureClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
+        // 1. Строим карты методов по fullName
+        val developMethodsByFullName: Map<String, KotlinMethod> =
+            developClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
-            // 2. Найдём добавленные методы
-            val addedMethods = featureMethodsByFullName.keys
-                .filter { it !in developMethodsByFullName.keys }
-                .map { featureMethodsByFullName[it]!! }
+        val featureMethodsByFullName: Map<String, KotlinMethod> =
+            featureClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
-            // 3. Найдём удалённые методы
-            val removedMethods = developMethodsByFullName.keys
-                .filter { it !in featureMethodsByFullName.keys }
-                .map { developMethodsByFullName[it]!! }
+        // 2. Найдём добавленные методы
+        val addedMethods = featureMethodsByFullName.keys
+            .filter { it !in developMethodsByFullName.keys }
+            .map { featureMethodsByFullName[it]!! }
 
-            // 4. Найдём изменённые методы
-            val changedMethods = featureMethodsByFullName.keys
-                .filter { it in developMethodsByFullName.keys }
-                .mapNotNull { fullName ->
-                    val devMethod = developMethodsByFullName[fullName]!!
-                    val featMethod = featureMethodsByFullName[fullName]!!
+        // 3. Найдём удалённые методы
+        val removedMethods = developMethodsByFullName.keys
+            .filter { it !in featureMethodsByFullName.keys }
+            .map { developMethodsByFullName[it]!! }
 
-                    val devBody = devMethod.function.bodyExpression?.text
-                    val featBody = featMethod.function.bodyExpression?.text
+        // 4. Найдём изменённые методы
+        val changedMethods = featureMethodsByFullName.keys
+            .filter { it in developMethodsByFullName.keys }
+            .mapNotNull { fullName ->
+                val devMethod = developMethodsByFullName[fullName]!!
+                val featMethod = featureMethodsByFullName[fullName]!!
 
-                    if (devBody != featBody) featMethod else null
-                }
+                val devBody = devMethod.function.bodyExpression?.text
+                val featBody = featMethod.function.bodyExpression?.text
 
-            return DiffResult(
-                added = addedMethods,
-                removed = removedMethods,
-                changed = changedMethods
-            )
-        }
+                if (devBody != featBody) featMethod else null
+            }
+
+        return DiffResult(
+            added = addedMethods,
+            removed = removedMethods,
+            changed = changedMethods
+        )
+    }
 }
