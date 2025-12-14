@@ -40,7 +40,48 @@ class DiffResultPresenter : i_diffResultPresenter {
         File(outputPath).writeText(builder.toString())
     }
 
+
     fun appendCallChain(
+        method: KotlinMethod,
+        builder: StringBuilder,
+        allClasses: List<KotlinClass>,
+        indent: String = "",
+        visited: MutableSet<String> = mutableSetOf()
+    ) {
+        if (!visited.add(method.fullName)) return
+
+        builder.appendLine("$indent${method.fullName}")
+
+        // Получаем класс метода
+        val cls = allClasses.firstOrNull { it.functionCalls.contains(method) } ?: return
+
+        // Собираем список методов с одинаковым именем: текущий + все родители
+        val methodShortName = method.fullName.substringAfter("::")
+        val allRelevantMethods = mutableListOf<KotlinMethod>()
+
+        // Текущий класс
+        cls.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }
+
+        // Родители
+        for (parent in cls.superClasses) {
+            parent.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }
+        }
+
+        // Пробегаем по всем найденным методам и их reverseCallRecords
+        for (m in allRelevantMethods) {
+            for (reverseCall in m.reverseCallRecords) {
+                val callerMethod = reverseCall.callerMethodParentClass
+                    .functionCalls
+                    .firstOrNull { it.fullName == reverseCall.callerMethodFullName }
+                    ?: continue
+
+                appendCallChain(callerMethod, builder, allClasses, indent + "  ", visited)
+            }
+        }
+    }
+
+
+    fun appendCallChain2(
         method: KotlinMethod,
         builder: StringBuilder,
         allClasses: List<KotlinClass>,  // добавляем сюда
