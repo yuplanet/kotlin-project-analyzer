@@ -6,9 +6,9 @@ import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
 import java.io.File
 
-class DiffResultPresenter : i_diffResultPresenter{
+class DiffResultPresenter : i_diffResultPresenter {
 
-    override fun writeCallChainToFile(result: DiffResult, allClasses: List<KotlinClass>){
+    override fun writeCallChainToFile(result: DiffResult, allClasses: List<KotlinClass>) {
 
         outResults(result, allClasses)
     }
@@ -46,8 +46,7 @@ class DiffResultPresenter : i_diffResultPresenter{
         allClasses: List<KotlinClass>,  // добавляем сюда
         indent: String = "",
         visited: MutableSet<String> = mutableSetOf()
-    )
-    {
+    ) {
         if (!visited.add(method.fullName)) return
 
         builder.appendLine("$indent${method.fullName}")
@@ -67,6 +66,16 @@ class DiffResultPresenter : i_diffResultPresenter{
                 indent + "  ",
                 visited
             )
+        }
+
+        // 2. Поиск метода в родительских классах
+        val cls = allClasses.firstOrNull { it.functionCalls.contains(method) } ?: return
+        for (parent in cls.superClasses) {
+            val parentMethod = parent.functionCalls
+                .firstOrNull { it.fullName.substringAfter("::") == method.fullName.substringAfter("::") }
+                ?: continue
+
+            appendCallChain(parentMethod, builder, allClasses, indent + "  ", visited)
         }
     }
 }

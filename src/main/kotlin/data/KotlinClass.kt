@@ -9,7 +9,7 @@ class KotlinClass {
 
     var ktClassObject: KtClassOrObject
 
-    var implementedInterfaces: List<KtClassOrObject> = listOf()
+    var superClasses: List<KotlinClass> = listOf()
 
     var path: String
 

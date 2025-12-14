@@ -5,7 +5,6 @@ import org.example.data.FieldReference
 import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
 import org.example.data.ParamReference
-import org.example.data.ReverseCallMethod
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -13,6 +12,7 @@ import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
 import org.jetbrains.kotlin.psi.KtSuperTypeEntry
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import kotlin.collections.plus
 
 object KotlinClassMapper {
 
@@ -56,21 +56,9 @@ object KotlinClassMapper {
             kclass.fields = fields.toMutableList()
             kclass.parameters = params.toMutableList()
 
-            kclass.implementedInterfaces = cls.superTypeListEntries.mapNotNull { entry ->
-                val typeName = when (entry) {
-                    is KtSuperTypeEntry -> entry.typeReference?.text
-                    is KtSuperTypeCallEntry -> entry.typeReference?.text
-                    else -> null
-                } ?: return@mapNotNull null
-
-                // Здесь можно оставить только имя или попробовать найти KtClassOrObject
-                // Если все классы еще не загружены, просто сохраняем имя как KtClassOrObject-обертку
-                // Для упрощения оставим KtClassOrObject = null, потом можно сопоставить по имени
-                null
-            }
-
             kotlinClasses.add(kclass)
         }
+
         return kotlinClasses
     }
 
@@ -107,8 +95,36 @@ object KotlinClassMapper {
      * Преобразует список KtFile в список KotlinClass
      */
     fun mapKtFilesToClasses(ktFiles: List<KtFile>): List<KotlinClass> {
-        return ktFiles.flatMap { ktFile ->
+
+        val allClasses  = ktFiles.flatMap { ktFile ->
             mapKtFileToClasses(ktFile)
         }
+
+
+        val classesByName: Map<String, KotlinClass> =
+            allClasses.associateBy { it.ktClassObject.name ?: "__anonymous__" }
+
+        // 4. Проставляем родителей (на всех уровнях)
+        for (kclass in allClasses) {
+            val visitedParents = mutableSetOf<KotlinClass>()
+            fun collectParents(clsObj: KtClassOrObject) {
+                clsObj.superTypeListEntries.forEach { entry ->
+                    val typeName = when (entry) {
+                        is KtSuperTypeEntry -> entry.typeReference?.text
+                        is KtSuperTypeCallEntry -> entry.typeReference?.text
+                        else -> null
+                    } ?: return@forEach
+
+                    val parentClass = classesByName[typeName] ?: return@forEach
+                    if (visitedParents.add(parentClass)) {
+                        kclass.superClasses = kclass.superClasses + parentClass
+                        collectParents(parentClass.ktClassObject) // рекурсивно добавляем родителей
+                    }
+                }
+            }
+            collectParents(kclass.ktClassObject)
+        }
+
+        return allClasses
     }
 }
