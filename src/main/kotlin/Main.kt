@@ -1,6 +1,6 @@
 package org.example
 
-import org.example.core.DiffGraphBuilder
+import org.example.core.GraphBuilder
 import org.example.core.interfaces.i_projectLoader
 import org.example.plugins.GitLoader
 
@@ -12,7 +12,7 @@ fun main() {
 
 
         val projectLoader: i_projectLoader = GitLoader()
-        val diffGraphBuilder = DiffGraphBuilder(projectLoader)
+        val diffGraphBuilder = GraphBuilder(projectLoader)
         diffGraphBuilder.BuildGraph(repoPath = repoPath, mainCommit = mainCommit, branchCommit = branchCommit)
 
     } catch (e: Exception) {

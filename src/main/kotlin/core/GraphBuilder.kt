@@ -1,22 +1,25 @@
 package org.example.core
 
+import org.example.core.interfaces.i_dependencyChainBuilder
 import org.example.core.interfaces.i_diffResultPresenter
 import org.example.core.interfaces.i_projectDifferenceAnalyzer
 import org.example.core.interfaces.i_projectLoader
+import org.example.data.CallChainNode
 import org.example.data.DiffResult
 import org.example.data.KotlinClass
 import org.example.mapping.KotlinClassMapper
-import org.jetbrains.jps.cache.model.OutputLoadResult
 
-class DiffGraphBuilder(val projectLoader: i_projectLoader,) {
+class GraphBuilder(val projectLoader: i_projectLoader,) {
 
     private val projectDifferenceAnalyzer: i_projectDifferenceAnalyzer = DifferenceAnalyzer()
     private val resultPresenter: i_diffResultPresenter = DiffResultPresenter()
+    private val dependencyChainBuilder: i_dependencyChainBuilder = DependencyChainBuilder()
 
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
 
     private var diffResult = DiffResult(listOf(), listOf(), listOf())
+    private var callChain: List<CallChainNode> = listOf()
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
@@ -28,10 +31,11 @@ class DiffGraphBuilder(val projectLoader: i_projectLoader,) {
         //2 proccess all call links
         collectMethodCalls(developClasses)
         collectMethodCalls(featureClasses)
+        //4 analizy
 
         analyzeDifference()
-        //4 analizy
         //3 filter
+        generateChains()
 
         //4 out
         OutputResult()
@@ -73,7 +77,12 @@ class DiffGraphBuilder(val projectLoader: i_projectLoader,) {
     }
 
     private fun OutputResult(){
-        resultPresenter.writeCallChainToFile(diffResult, featureClasses)
+        resultPresenter.writeCallChainToFile(callChain)
+    }
+
+
+    private fun generateChains(){
+        callChain = dependencyChainBuilder.generateChangedChains(diffResult.changed,featureClasses)
     }
 }
 

@@ -1,122 +1,37 @@
 package org.example.core
 
 import org.example.core.interfaces.i_diffResultPresenter
-import org.example.data.DiffResult
-import org.example.data.KotlinClass
-import org.example.data.KotlinMethod
+import org.example.data.CallChainNode
 import java.io.File
 
 class DiffResultPresenter : i_diffResultPresenter {
 
-    override fun writeCallChainToFile(result: DiffResult, allClasses: List<KotlinClass>) {
-
-        outResults(result, allClasses)
-    }
-
-    private fun outResults(result: DiffResult, allClasses: List<KotlinClass>) {
-        saveMethodsToFile(result.added, "added_methods.txt")
-        saveMethodsToFile(result.removed, "removed_methods.txt")
-        saveMethodsToFile(result.changed, "changed_methods.txt")
-
-        val outputPath = "changed_methods_chains.txt"
-        val builder = StringBuilder()
-        for (method in result.changed) {
-            builder.appendLine("=== Call chain for changed method: ${method.fullName} ===")
-            appendCallChain(method, builder, allClasses)
-            builder.appendLine()
-        }
-
-        File(outputPath).writeText(builder.toString())
-    }
-
-
-    fun saveMethodsToFile(methods: List<KotlinMethod>, outputPath: String) {
+    override fun writeCallChainToFile(result: List<CallChainNode>) {
         val builder = StringBuilder()
 
-        for (method in methods) {
-            builder.appendLine(method.fullName)
+        result.forEach { root ->
+            buildLinearChain(root, builder)
+            builder.appendLine() // пустая строка между цепями
         }
 
-        File(outputPath).writeText(builder.toString())
+        File("changed_methods.txt").writeText(builder.toString())
     }
 
-
-    fun appendCallChain(
-        method: KotlinMethod,
+    /**
+     * Строит линейный вывод цепочки: Root -> El1 -> El1Child1 -> ...
+     */
+    private fun buildLinearChain(
+        node: CallChainNode,
         builder: StringBuilder,
-        allClasses: List<KotlinClass>,
-        indent: String = "",
         visited: MutableSet<String> = mutableSetOf()
     ) {
-        if (!visited.add(method.fullName)) return
+        if (!visited.add(node.fullName)) return
 
-        builder.appendLine("$indent${method.fullName}")
+        builder.append(node.fullName)
 
-        // Получаем класс метода
-        val cls = allClasses.firstOrNull { it.functionCalls.contains(method) } ?: return
-
-        // Собираем список методов с одинаковым именем: текущий + все родители
-        val methodShortName = method.fullName.substringAfter("::")
-        val allRelevantMethods = mutableListOf<KotlinMethod>()
-
-        // Текущий класс
-        cls.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }
-
-        // Родители
-        for (parent in cls.superClasses) {
-            parent.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }
-        }
-
-        // Пробегаем по всем найденным методам и их reverseCallRecords
-        for (m in allRelevantMethods) {
-            for (reverseCall in m.reverseCallRecords) {
-                val callerMethod = reverseCall.callerMethodParentClass
-                    .functionCalls
-                    .firstOrNull { it.fullName == reverseCall.callerMethodFullName }
-                    ?: continue
-
-                appendCallChain(callerMethod, builder, allClasses, indent + "  ", visited)
-            }
-        }
-    }
-
-
-    fun appendCallChain2(
-        method: KotlinMethod,
-        builder: StringBuilder,
-        allClasses: List<KotlinClass>,  // добавляем сюда
-        indent: String = "",
-        visited: MutableSet<String> = mutableSetOf()
-    ) {
-        if (!visited.add(method.fullName)) return
-
-        builder.appendLine("$indent${method.fullName}")
-
-        // идём ТОЛЬКО по reverse-графу
-        for (reverseCall in method.reverseCallRecords) {
-
-            val callerMethod = reverseCall.callerMethodParentClass
-                .functionCalls
-                .firstOrNull { it.fullName == reverseCall.callerMethodFullName }
-                ?: continue
-
-            appendCallChain(
-                callerMethod,
-                builder,
-                allClasses,
-                indent + "  ",
-                visited
-            )
-        }
-
-        // 2. Поиск метода в родительских классах
-        val cls = allClasses.firstOrNull { it.functionCalls.contains(method) } ?: return
-        for (parent in cls.superClasses) {
-            val parentMethod = parent.functionCalls
-                .firstOrNull { it.fullName.substringAfter("::") == method.fullName.substringAfter("::") }
-                ?: continue
-
-            appendCallChain(parentMethod, builder, allClasses, indent + "  ", visited)
+        node.nextCalls.forEach { child ->
+            builder.append(" -> ")
+            buildLinearChain(child, builder, visited)
         }
     }
 }
