@@ -1,6 +1,7 @@
 package org.example.core
 
 import org.example.data.*
+import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
 import org.jetbrains.kotlin.psi.KtConstantExpression
@@ -113,6 +114,56 @@ object CallBuilder {
                         CallMethod(
                             callMethodFullName = targetMethod.fullName,
                             callMethodParentClass = targetClass
+                        )
+                    )
+                }
+
+                // ----------- 2. Вызовы методов текущего класса без this -----------
+                // Берём только тело функции
+
+                val body = fn.bodyExpression ?: continue
+                val simpleCalls = body.collectDescendantsOfType<KtCallExpression>()
+                    // исключаем аннотации
+                    .filter { it.parent !is KtAnnotationEntry }
+
+                for (callExpr in simpleCalls) {
+                    // 1️⃣ только внутренние вызовы
+                    val callee = callExpr.calleeExpression
+                    if (callee !is KtNameReferenceExpression) continue
+
+                    val calledMethodName = callee.text
+                    val argCount = callExpr.valueArguments.size
+
+                    // 2️⃣ ищем метод по имени и количеству аргументов
+                    val targetMethod = cls.functionCalls
+                        .firstOrNull {
+                            // вытаскиваем имя метода из fullName
+                            it.fullName.substringAfter("::").substringBefore("(") == calledMethodName &&
+                                    it.fullName.substringAfter("(").substringBefore(")")
+                                        .split(",")
+                                        .filter { it.isNotBlank() }
+                                        .size == argCount
+                        }
+                        ?: continue
+
+
+                    // 3️⃣ типы БЕРЁМ ИЗ СИГНАТУРЫ МЕТОДА
+                    val argParams =
+                        targetMethod.fullName
+                            .substringAfter("(")
+                            .substringBefore(")")
+
+                    val calledFullName =
+                        "${cls.ktClassObject.name}::$calledMethodName($argParams)"
+
+                    if(calledFullName.contains("RcsService")){
+                        println(calledFullName)
+                    }
+
+                    method.callRecords.add(
+                        CallMethod(
+                            callMethodFullName = targetMethod.fullName,
+                            callMethodParentClass = cls
                         )
                     )
                 }
