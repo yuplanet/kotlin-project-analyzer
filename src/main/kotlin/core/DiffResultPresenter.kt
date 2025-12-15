@@ -10,28 +10,37 @@ class DiffResultPresenter : i_diffResultPresenter {
         val builder = StringBuilder()
 
         result.forEach { root ->
-            buildLinearChain(root, builder)
+            buildLinearChains(root, builder)
             builder.appendLine() // пустая строка между цепями
         }
-
         File("changed_methods.txt").writeText(builder.toString())
     }
 
     /**
-     * Строит линейный вывод цепочки: Root -> El1 -> El1Child1 -> ...
+     * Рекурсивно обходит цепь и выводит все ветки в виде отдельных линейных цепочек
+     * Root -> El1 -> El1Child1
      */
-    private fun buildLinearChain(
+    private fun buildLinearChains(
         node: CallChainNode,
         builder: StringBuilder,
-        visited: MutableSet<String> = mutableSetOf()
+        visited: MutableSet<String> = mutableSetOf(),
+        path: List<String> = emptyList()
     ) {
         if (!visited.add(node.fullName)) return
 
-        builder.append(node.fullName)
+        // Формируем текущий путь
+        val currentPath = path + node.fullName
 
-        node.nextCalls.forEach { child ->
-            builder.append(" -> ")
-            buildLinearChain(child, builder, visited)
+        // Если нет дочерних вызовов — печатаем путь
+        val validNext = node.nextCalls.filter { it.fullName.isNotBlank() }
+        if (validNext.isEmpty()) {
+            builder.appendLine(currentPath.joinToString(" -> "))
+            return
+        }
+
+        // Рекурсивно для всех веток
+        validNext.forEach { child ->
+            buildLinearChains(child, builder, visited.toMutableSet(), currentPath)
         }
     }
 }
