@@ -1,10 +1,11 @@
 package org.example.core
 
-import org.example.core.interfaces.i_methodCallResolver
+import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.data.*
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
+import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtConstantExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
@@ -13,25 +14,43 @@ import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import java.io.File
 
-class MethodCallResolver : i_methodCallResolver {
+class ClassReferenceBuilder : IClassReferenceBuilder {
 
-    override fun resolve(allClasses: List<KotlinClass>) {
-        //1 calls
-        //2reverse calls
+    private var projectClasses = listOf<KotlinClass>()
 
-        analyzeFunctionCalls(allClasses)
-        buildReverseCallRecords(allClasses)
-
-        //3fields
-        //reversefields
-        dumpClassesAndMethods(allClasses)
-
+    override fun initialize(_projectClasses: List<KotlinClass>) {
+        projectClasses = _projectClasses
     }
 
-    private fun dumpClassesAndMethods(allClasses: List<KotlinClass>) {
+    override fun bindAll() {
+        // build method straight and reverse calls
+        bindMethodCalls()
+        dumpClassesAndMethods(projectClasses)
+
+        // build parameter straight and reverse calls
+        bindParameterCalls()
+
+        // build field straight and reverse calls
+        bindParameterCalls()
+    }
+
+    override fun bindMethodCalls() {
+        analyzeFunctionCalls()
+        buildReverseCallRecords()
+    }
+
+    override fun bindFieldCalls() {
+        TODO("Not yet implemented")
+    }
+
+    override fun bindParameterCalls() {
+        TODO("Not yet implemented")
+    }
+
+    private fun dumpClassesAndMethods(projectClasses: List<KotlinClass>) {
         val builder = StringBuilder()
 
-        allClasses.forEach { cls ->
+        projectClasses.forEach { cls ->
             val className = cls.ktClassObject.fqName?.asString()
                 ?: cls.ktClassObject.name
                 ?: "<anonymous>"
@@ -67,16 +86,16 @@ class MethodCallResolver : i_methodCallResolver {
     }
 
 
-    fun buildReverseCallRecords(allClasses: List<KotlinClass>) {
+    fun buildReverseCallRecords() {
         // 1. Глобальный индекс всех методов: fullName -> KotlinMethod
         val allMethodsByFullName: Map<String, KotlinMethod> =
-            allClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
+            projectClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
         // 2. Очищаем обратные ссылки у всех методов
-        allClasses.flatMap { it.functionCalls }.forEach { it.reverseCallRecords.clear() }
+        projectClasses.flatMap { it.functionCalls }.forEach { it.reverseCallRecords.clear() }
 
         // 3. Проходим по каждому методу и его прямым вызовам
-        for (cls in allClasses) {
+        for (cls in projectClasses) {
             for (method in cls.functionCalls) {
                 for (call in method.callRecords) {
                     val calledMethod = allMethodsByFullName[call.callMethodFullName] ?: continue
@@ -93,8 +112,8 @@ class MethodCallResolver : i_methodCallResolver {
         }
     }
 
-    fun findClassByReceiver(allClasses: List<KotlinClass>, receiverName: String): KotlinClass? {
-        return allClasses.firstOrNull { cls ->
+    fun findClassByReceiver(projectClasses: List<KotlinClass>, receiverName: String): KotlinClass? {
+        return projectClasses.firstOrNull { cls ->
             cls.fields.any { it.name == receiverName } ||
                     cls.parameters.any { it.name == receiverName } ||
                     cls.superClasses.any { superCls ->
@@ -105,17 +124,17 @@ class MethodCallResolver : i_methodCallResolver {
     }
 
 
-    fun analyzeFunctionCalls(allClasses: List<KotlinClass>) {
+    fun analyzeFunctionCalls() {
 
         // Глобальный индекс всех методов: fullName -> KotlinMethod
         val allMethodsByFullName: Map<String, KotlinMethod> =
-            allClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
+            projectClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
         // Глобальный индекс классов по имени
         val classesByName: Map<String, KotlinClass> =
-            allClasses.associateBy { it.ktClassObject.name ?: "__anonymous__" }
+            projectClasses.associateBy { it.ktClassObject.name ?: "__anonymous__" }
 
-        for (cls in allClasses) {
+        for (cls in projectClasses) {
             val allFields: Map<String, KtCallableDeclaration> =
                 (cls.fields.asSequence().map { it as KtCallableDeclaration } +
                         cls.parameters.asSequence().map { it as KtCallableDeclaration })
@@ -149,7 +168,7 @@ class MethodCallResolver : i_methodCallResolver {
                     // какой у него тип?
                     val fieldType = fieldDecl.typeReference?.text ?: continue@callLoop
 
-                    //val targetClass = findClassByReceiver(allClasses, receiverName) ?: continue@callLoop
+                    //val targetClass = findClassByReceiver(projectClasses, receiverName) ?: continue@callLoop
 
                     // находим класс по имени типа
                     val targetClass = classesByName[fieldType] ?: continue@callLoop
@@ -279,4 +298,10 @@ class MethodCallResolver : i_methodCallResolver {
             }
         }
     }
+
+
+
+    
+
+
 }

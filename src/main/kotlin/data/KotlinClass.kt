@@ -16,11 +16,8 @@ class KotlinClass {
     var fields: MutableList<KtProperty> = mutableListOf()
     var parameters: MutableList<KtParameter> = mutableListOf()
 
-    var fieldReferences: MutableList<FieldReference> = mutableListOf()
-    var parameterReferences: MutableList<ParamReference> = mutableListOf()
-
-    var reverseFieldReferences: MutableList<FieldReference> = mutableListOf()
-    var reverseParameterReferences: MutableList<ParamReference> = mutableListOf()
+    var classFields: MutableList<ClassField> = mutableListOf()
+    var parameterReferences: MutableList<ClassProperty> = mutableListOf()
 
     var functions: Map<String, KtNamedFunction> = mapOf()
 
@@ -30,6 +27,4 @@ class KotlinClass {
         this.ktClassObject = ktClass
         this.path = path
     }
-
-    //Interface
 }

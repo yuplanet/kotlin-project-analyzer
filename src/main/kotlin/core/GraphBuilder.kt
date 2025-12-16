@@ -2,7 +2,7 @@ package org.example.core
 
 import org.example.core.interfaces.i_dependencyChainBuilder
 import org.example.core.interfaces.i_diffResultPresenter
-import org.example.core.interfaces.i_methodCallResolver
+import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.i_projectDifferenceAnalyzer
 import org.example.core.interfaces.i_projectLoader
 import org.example.data.CallChainNode
@@ -15,7 +15,7 @@ class GraphBuilder(val projectLoader: i_projectLoader,) {
     private val projectDifferenceAnalyzer: i_projectDifferenceAnalyzer = DifferenceAnalyzer()
     private val resultPresenter: i_diffResultPresenter = DiffResultPresenter()
     private val dependencyChainBuilder: i_dependencyChainBuilder = DependencyChainBuilder()
-    private val callResolver: i_methodCallResolver = MethodCallResolver()
+    private val callResolver: IClassReferenceBuilder = ClassReferenceBuilder()
 
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
@@ -25,7 +25,14 @@ class GraphBuilder(val projectLoader: i_projectLoader,) {
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
+        // 1 load
+        // 2 build references
+        // 3 analyze difference
+        // 4 generate impart chains
+        // 5 output
+
         //clear inside state
+        clearState()
 
         //1 load
         loadProject(repoPath, mainCommit, branchCommit)
@@ -70,8 +77,9 @@ class GraphBuilder(val projectLoader: i_projectLoader,) {
     }
 
     private fun collectMethodCalls(allClasses: List<KotlinClass>) {
-        callResolver.resolve(developClasses)
-        callResolver.resolve(featureClasses)
+
+        callResolver.initialize(allClasses)
+        callResolver.bindAll()
     }
 
     private fun analyzeDifference() {
@@ -85,6 +93,10 @@ class GraphBuilder(val projectLoader: i_projectLoader,) {
 
     private fun generateChains(){
         callChain = dependencyChainBuilder.generateChangedChains(diffResult.changed,featureClasses)
+    }
+
+    private fun clearState(){
+
     }
 }
 

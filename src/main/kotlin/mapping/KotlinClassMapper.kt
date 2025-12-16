@@ -1,10 +1,10 @@
 package org.example.mapping
 
 import org.example.core.PsiExtractor
-import org.example.data.FieldReference
+import org.example.data.ClassField
 import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
-import org.example.data.ParamReference
+import org.example.data.ClassProperty
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -44,12 +44,12 @@ object KotlinClassMapper {
             val fields = cls.declarations.filterIsInstance<KtProperty>()
             val params = cls.primaryConstructorParameters
 
-            val fieldRefs = fields.map {FieldReference(it)}
-            val paramRefs = params.map { ParamReference(it) }
+            val fieldRefs = fields.map {ClassField(it)}
+            val paramRefs = params.map { ClassProperty(it) }
 
             kclass.functionCalls.addAll(methods)
 
-            kclass.fieldReferences.addAll(fieldRefs)
+            kclass.classFields.addAll(fieldRefs)
             kclass.parameterReferences.addAll(paramRefs)
 
             kclass.functions = methods.associateBy { it.fullName }.mapValues { it.value.function }
