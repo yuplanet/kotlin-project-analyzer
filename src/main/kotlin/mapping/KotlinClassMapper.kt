@@ -8,6 +8,7 @@ import org.example.data.symbol.ClassParameter
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
 import org.jetbrains.kotlin.psi.KtSuperTypeEntry
@@ -37,8 +38,10 @@ object KotlinClassMapper {
             val namedFunctions = PsiExtractor.getClassMethods(cls)
             val functions = namedFunctions.map {
                 ClassMethod(
+                    name = it.name ?: "__no_name__",
                     fullName = methodKey(it),
-                    function = it
+                    function = it,
+                    parameters = buildParameterMap(it)
                 )
             }.toMutableList()
 
@@ -79,7 +82,10 @@ object KotlinClassMapper {
         // 4. Имя класса, если есть
         val className = fn.getContainingClassName()
 
-        return "$className::$receiverType$name($params)"
+        // 5. Тип возвращаемого значения
+        val returnType = fn.typeReference?.text ?: "Unit"
+
+        return "$className::$receiverType$name($params):$returnType"
     }
 
     // Вспомогательная функция для получения имени класса или top-level
@@ -93,6 +99,15 @@ object KotlinClassMapper {
         }
         return "__top_level__"
     }
+
+    fun buildParameterMap(fn: KtNamedFunction): Map<String, KtParameter> {
+        return fn.valueParameters.associate { param ->
+            val name = param.typeReference?.text ?: "Any"
+            val type = param
+            name to type
+        }
+    }
+
 
     /**
      * Преобразует список KtFile в список KotlinClass

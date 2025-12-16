@@ -144,9 +144,6 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
             for (method in cls.functionCalls) {
                 val fn = method.function
 
-                if(method.fullName.contains("sendScheduledEnvelopeNotification"))
-                    print(1)
-
                 // Находим все выражения вида a.b(), obj.service.doWork(), и т.д.
                 val dotCalls = fn.collectDescendantsOfType<KtDotQualifiedExpression>()
 
@@ -169,13 +166,10 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     // какой у него тип?
                     val fieldType = fieldDecl.typeReference?.text ?: continue@callLoop
 
-                    //val targetClass = findClassByReceiver(projectClasses, receiverName) ?: continue@callLoop
-
                     // находим класс по имени типа
                     val targetClass = classesByName[fieldType] ?: continue@callLoop
 
                     // ----------- Строим полный ключ вызываемого метода -----------
-
                     // Параметры вызова (типов тут не узнать → Any)
                     val argParams: String = resolveArgumentTypes(selector, allFields, fn)
                         .joinToString(",")
@@ -184,8 +178,9 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                         "${targetClass.ktClassObject.name}::$calledMethodName($argParams)"
 
                     // Находим метод среди всех методов проекта
-                    val targetMethod = allMethodsByFullName[calledFullName]
-                        ?: continue@callLoop
+                    val targetMethod = allMethodsByFullName.values.find { method ->
+                        method.fullName.contains(calledFullName)
+                    } ?: continue@callLoop
 
                     // Добавляем в callRecords текущего метода
                     method.callRecords.add(
@@ -198,7 +193,6 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
                 // ----------- 2. Вызовы методов текущего класса без this -----------
                 // Берём только тело функции
-
                 val body = fn.bodyExpression ?: continue
                 val simpleCalls = body.collectDescendantsOfType<KtCallExpression>()
                     // исключаем аннотации
@@ -211,32 +205,19 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
                     val calledMethodName = callee.text
                     val argCount = callExpr.valueArguments.size
+                    // что такое a ?
 
-                    // 2️⃣ ищем метод по имени и количеству аргументов
-                    val targetMethod = cls.functionCalls
-                        .firstOrNull {
-                            // вытаскиваем имя метода из fullName
-                            it.fullName.substringAfter("::").substringBefore("(") == calledMethodName &&
-                                    it.fullName.substringAfter("(").substringBefore(")")
-                                        .split(",")
-                                        .filter { it.isNotBlank() }
-                                        .size == argCount
-                        }
-                        ?: continue
+                    val allFields: Map<String, KtCallableDeclaration> =
+                        (cls.properties.asSequence().map { it as KtCallableDeclaration } +
+                                cls.parameters.asSequence().map { it as KtCallableDeclaration })
+                            .associateBy { it.name ?: "__no_name__" }
 
+                    var methodArgs = resolveArgumentTypes(callExpr, allFields,fn)
 
-                    // 3️⃣ типы БЕРЁМ ИЗ СИГНАТУРЫ МЕТОДА
-                    val argParams =
-                        targetMethod.fullName
-                            .substringAfter("(")
-                            .substringBefore(")")
-
-                    val calledFullName =
-                        "${cls.ktClassObject.name}::$calledMethodName($argParams)"
-
-                    if(calledFullName.contains("RcsService")){
-                        println(calledFullName)
-                    }
+                    val targetMethod = cls.functionCalls.firstOrNull { m ->
+                        m.name == calledMethodName &&
+                                m.parameters.values.map { it.typeReference?.text ?: "Any" } == methodArgs
+                    } ?: continue
 
                     method.callRecords.add(
                         MethodCallReference(
@@ -299,10 +280,4 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
             }
         }
     }
-
-
-
-    
-
-
 }
