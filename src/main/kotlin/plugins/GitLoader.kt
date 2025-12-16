@@ -3,10 +3,10 @@ package org.example.plugins
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import org.eclipse.jgit.treewalk.TreeWalk
-import org.example.core.interfaces.i_projectLoader
+import org.example.core.interfaces.IProjectLoader
 import java.io.File
 
-class GitLoader: i_projectLoader {
+class GitLoader: IProjectLoader {
 
     override fun loadProjectFilesFromCommit(
         repoPath: String,

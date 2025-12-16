@@ -1,8 +1,8 @@
-package org.example.data
+package org.example.data.chain
 
 import org.jetbrains.kotlin.psi.KtNamedFunction
 
-data class CallChainNode (
+data class MethodCallNode (
     /**
      * <путь_к_файлу>.<имя_класса>::<имя_метода> ( параметры )
      */
@@ -10,5 +10,5 @@ data class CallChainNode (
     val function: KtNamedFunction,
     val updates: String,
 
-    val nextCalls: MutableList<CallChainNode>  = mutableListOf()
+    val nextCalls: MutableList<MethodCallNode>  = mutableListOf()
 )

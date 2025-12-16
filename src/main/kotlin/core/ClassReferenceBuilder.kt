@@ -1,11 +1,12 @@
 package org.example.core
 
 import org.example.core.interfaces.IClassReferenceBuilder
-import org.example.data.*
+import org.example.data.reference.MethodCallReference
+import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.ClassMethod
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
-import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtConstantExpression
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
@@ -66,7 +67,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     if (method.callRecords.isNotEmpty()) {
                         builder.appendLine("    calls:")
                         method.callRecords.forEach { call ->
-                            builder.appendLine("      -> ${call.callMethodFullName}")
+                            builder.appendLine("      -> ${call.fullName}")
                         }
                     }
 
@@ -74,7 +75,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     if (method.reverseCallRecords.isNotEmpty()) {
                         builder.appendLine("    callers:")
                         method.reverseCallRecords.forEach { reverse ->
-                            builder.appendLine("      <- ${reverse.callerMethodFullName}")
+                            builder.appendLine("      <- ${reverse.fullName}")
                         }
                     }
                 }
@@ -88,7 +89,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
     fun buildReverseCallRecords() {
         // 1. Глобальный индекс всех методов: fullName -> KotlinMethod
-        val allMethodsByFullName: Map<String, KotlinMethod> =
+        val allMethodsByFullName: Map<String, ClassMethod> =
             projectClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
         // 2. Очищаем обратные ссылки у всех методов
@@ -98,13 +99,13 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
         for (cls in projectClasses) {
             for (method in cls.functionCalls) {
                 for (call in method.callRecords) {
-                    val calledMethod = allMethodsByFullName[call.callMethodFullName] ?: continue
+                    val calledMethod = allMethodsByFullName[call.fullName] ?: continue
 
                     // Добавляем текущий метод в reverseCallRecords вызываемого метода
                     calledMethod.reverseCallRecords.add(
-                        ReverseCallMethod(
-                            callerMethodFullName = method.fullName,
-                            callerMethodParentClass = cls
+                        MethodCallReference(
+                            fullName = method.fullName,
+                            parentClass = cls
                         )
                     )
                 }
@@ -114,10 +115,10 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
     fun findClassByReceiver(projectClasses: List<KotlinClass>, receiverName: String): KotlinClass? {
         return projectClasses.firstOrNull { cls ->
-            cls.fields.any { it.name == receiverName } ||
+            cls.properties.any { it.name == receiverName } ||
                     cls.parameters.any { it.name == receiverName } ||
                     cls.superClasses.any { superCls ->
-                        superCls.fields.any { it.name == receiverName } ||
+                        superCls.properties.any { it.name == receiverName } ||
                                 superCls.parameters.any { it.name == receiverName }
                     }
         }
@@ -127,7 +128,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
     fun analyzeFunctionCalls() {
 
         // Глобальный индекс всех методов: fullName -> KotlinMethod
-        val allMethodsByFullName: Map<String, KotlinMethod> =
+        val allMethodsByFullName: Map<String, ClassMethod> =
             projectClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
         // Глобальный индекс классов по имени
@@ -136,7 +137,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
         for (cls in projectClasses) {
             val allFields: Map<String, KtCallableDeclaration> =
-                (cls.fields.asSequence().map { it as KtCallableDeclaration } +
+                (cls.properties.asSequence().map { it as KtCallableDeclaration } +
                         cls.parameters.asSequence().map { it as KtCallableDeclaration })
                     .associateBy { it.name ?: "__no_name__" }
 
@@ -188,9 +189,9 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
                     // Добавляем в callRecords текущего метода
                     method.callRecords.add(
-                        CallMethod(
-                            callMethodFullName = targetMethod.fullName,
-                            callMethodParentClass = targetClass
+                        MethodCallReference(
+                            fullName = targetMethod.fullName,
+                            parentClass = targetClass
                         )
                     )
                 }
@@ -238,9 +239,9 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     }
 
                     method.callRecords.add(
-                        CallMethod(
-                            callMethodFullName = targetMethod.fullName,
-                            callMethodParentClass = cls
+                        MethodCallReference(
+                            fullName = targetMethod.fullName,
+                            parentClass = cls
                         )
                     )
                 }

@@ -1,39 +1,39 @@
 package org.example.core
 
-import org.example.core.interfaces.i_dependencyChainBuilder
-import org.example.data.CallChainNode
-import org.example.data.KotlinClass
-import org.example.data.KotlinMethod
+import org.example.core.interfaces.IDependencyChainBuilder
+import org.example.data.chain.MethodCallNode
+import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.ClassMethod
 
-class DependencyChainBuilder: i_dependencyChainBuilder {
+class DependencyChainBuilder: IDependencyChainBuilder {
     override fun generateChangedChains(
-        methods: List<KotlinMethod>,
+        methods: List<ClassMethod>,
         allClasses: List<KotlinClass>,
-    ): List<CallChainNode> {
+    ): List<MethodCallNode> {
         return methods.map { method ->
             generateChain(method, allClasses)
         }
     }
 
     override fun generateChain(
-        rootMethod: KotlinMethod,
+        rootMethod: ClassMethod,
         allClasses: List<KotlinClass>
-    ): CallChainNode {
+    ): MethodCallNode {
         val visited = mutableSetOf<String>()
         return buildChain(rootMethod, allClasses, visited)
     }
 
     private fun buildChain(
-        method: KotlinMethod,
+        method: ClassMethod,
         allClasses: List<KotlinClass>,
         visited: MutableSet<String>
-    ): CallChainNode {
+    ): MethodCallNode {
         if (!visited.add(method.fullName)) {
             // Уже обработан, возвращаем пустое звено (или null, если nullable)
-            return CallChainNode(method.fullName, method.function, "", mutableListOf())
+            return MethodCallNode(method.fullName, method.function, "", mutableListOf())
         }
 
-        val node = CallChainNode(
+        val node = MethodCallNode(
             fullName = method.fullName,
             function = method.function,
             updates = "",
@@ -45,7 +45,7 @@ class DependencyChainBuilder: i_dependencyChainBuilder {
 
         // Собираем список методов с одинаковым именем: текущий + все родители
         val methodShortName = method.fullName.substringAfter("::")
-        val allRelevantMethods = mutableListOf<KotlinMethod>()
+        val allRelevantMethods = mutableListOf<ClassMethod>()
 
         // Текущий класс
         cls.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }
@@ -62,9 +62,9 @@ class DependencyChainBuilder: i_dependencyChainBuilder {
         // Пробегаем по всем найденным методам и их reverseCallRecords
         for (m in allRelevantMethods) {
             for (reverseCall in m.reverseCallRecords) {
-                val callerMethod = reverseCall.callerMethodParentClass
+                val callerMethod = reverseCall.parentClass
                     .functionCalls
-                    .firstOrNull { it.fullName == reverseCall.callerMethodFullName }
+                    .firstOrNull { it.fullName == reverseCall.fullName }
                     ?: continue
 
                 val childNode = buildChain(callerMethod, allClasses, visited)

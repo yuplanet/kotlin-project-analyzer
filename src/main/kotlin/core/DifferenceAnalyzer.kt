@@ -1,11 +1,11 @@
 package org.example.core
 
-import org.example.core.interfaces.i_projectDifferenceAnalyzer
-import org.example.data.DiffResult
-import org.example.data.KotlinClass
-import org.example.data.KotlinMethod
+import org.example.core.interfaces.IProjectDifferenceAnalyzer
+import org.example.data.analyzer.ProjectDiffResult
+import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.ClassMethod
 
-class DifferenceAnalyzer : i_projectDifferenceAnalyzer {
+class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
         private var developClasses: List<KotlinClass> = listOf()
         private var featureClasses: List<KotlinClass> = listOf()
         /**
@@ -14,15 +14,15 @@ class DifferenceAnalyzer : i_projectDifferenceAnalyzer {
     override fun analyzeProjectDifferences(
         mainProject: List<KotlinClass>,
         branchProject: List<KotlinClass>
-    ): DiffResult {
+    ): ProjectDiffResult {
         developClasses = mainProject
         featureClasses = branchProject
 
         // 1. Строим карты методов по fullName
-        val developMethodsByFullName: Map<String, KotlinMethod> =
+        val developMethodsByFullName: Map<String, ClassMethod> =
             developClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
-        val featureMethodsByFullName: Map<String, KotlinMethod> =
+        val featureMethodsByFullName: Map<String, ClassMethod> =
             featureClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
         // 2. Найдём добавленные методы
@@ -48,7 +48,7 @@ class DifferenceAnalyzer : i_projectDifferenceAnalyzer {
                 if (devBody != featBody) featMethod else null
             }
 
-        return DiffResult(
+        return ProjectDiffResult(
             added = addedMethods,
             removed = removedMethods,
             changed = changedMethods

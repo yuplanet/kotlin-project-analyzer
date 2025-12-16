@@ -1,6 +1,6 @@
 package org.example.core.interfaces
 
-interface i_projectLoader {
+interface IProjectLoader {
 
     fun loadProjectFilesFromCommit(repoPath: String, commit: String): Map<String, String>
 }

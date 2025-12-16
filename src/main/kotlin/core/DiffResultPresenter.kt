@@ -1,12 +1,12 @@
 package org.example.core
 
-import org.example.core.interfaces.i_diffResultPresenter
-import org.example.data.CallChainNode
+import org.example.core.interfaces.IDiffResultPresenter
+import org.example.data.chain.MethodCallNode
 import java.io.File
 
-class DiffResultPresenter : i_diffResultPresenter {
+class DiffResultPresenter : IDiffResultPresenter {
 
-    override fun writeCallChainToFile(result: List<CallChainNode>) {
+    override fun writeCallChainToFile(result: List<MethodCallNode>) {
         val builder = StringBuilder()
 
         result.forEach { root ->
@@ -21,7 +21,7 @@ class DiffResultPresenter : i_diffResultPresenter {
      * Root -> El1 -> El1Child1
      */
     private fun buildLinearChains(
-        node: CallChainNode,
+        node: MethodCallNode,
         builder: StringBuilder,
         visited: MutableSet<String> = mutableSetOf(),
         path: List<String> = emptyList()

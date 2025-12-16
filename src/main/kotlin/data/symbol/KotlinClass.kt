@@ -1,4 +1,4 @@
-package org.example.data
+package org.example.data.symbol
 
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -11,20 +11,22 @@ class KotlinClass {
 
     var superClasses: List<KotlinClass> = listOf()
 
+
+    var name: String
     var path: String
 
-    var fields: MutableList<KtProperty> = mutableListOf()
+    var properties: MutableList<KtProperty> = mutableListOf()
     var parameters: MutableList<KtParameter> = mutableListOf()
 
-    var classFields: MutableList<ClassField> = mutableListOf()
-    var parameterReferences: MutableList<ClassProperty> = mutableListOf()
+    var propertyReferences: MutableList<ClassProperty> = mutableListOf()
+    var parameterReferences: MutableList<ClassParameter> = mutableListOf()
 
     var functions: Map<String, KtNamedFunction> = mapOf()
+    val functionCalls: MutableList<ClassMethod> = mutableListOf()
 
-    val functionCalls: MutableList<KotlinMethod> = mutableListOf()
-
-    constructor(ktClass: KtClassOrObject, path: String) {
+    constructor(ktClass: KtClassOrObject, path: String, name: String) {
         this.ktClassObject = ktClass
         this.path = path
+        this.name = name
     }
 }

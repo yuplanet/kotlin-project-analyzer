@@ -1,10 +1,10 @@
 package org.example.mapping
 
 import org.example.core.PsiExtractor
-import org.example.data.ClassField
-import org.example.data.KotlinClass
-import org.example.data.KotlinMethod
-import org.example.data.ClassProperty
+import org.example.data.symbol.ClassProperty
+import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.ClassMethod
+import org.example.data.symbol.ClassParameter
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -27,36 +27,39 @@ object KotlinClassMapper {
         val kotlinClasses = mutableListOf<KotlinClass>()
 
         for (cls in classes) {
-            val filePath = ktFile.virtualFile?.path ?: ktFile.name
+            val filePath = ktFile.name
+            val className = filePath.substringAfterLast("/").substringBeforeLast(".kt")
 
-            val kclass = KotlinClass(cls, filePath)
+            val ktClass = KotlinClass(cls, filePath, className)
 
             // Берём все функции класса и companion object
-            val functions = PsiExtractor.getClassMethods(cls)
-
-            val methods = functions.map { fn ->
-                KotlinMethod(
-                    fullName = methodKey(fn),
-                    function = fn
+            //1 functions
+            val namedFunctions = PsiExtractor.getClassMethods(cls)
+            val functions = namedFunctions.map {
+                ClassMethod(
+                    fullName = methodKey(it),
+                    function = it
                 )
             }.toMutableList()
 
-            val fields = cls.declarations.filterIsInstance<KtProperty>()
-            val params = cls.primaryConstructorParameters
+            ktClass.functionCalls.addAll(functions)
+            ktClass.functions = functions.associateBy { it.fullName }.mapValues { it.value.function }
 
-            val fieldRefs = fields.map {ClassField(it)}
-            val paramRefs = params.map { ClassProperty(it) }
 
-            kclass.functionCalls.addAll(methods)
+            // мапи поля и параметры(то же самое что и поля) класса
+            val properties = cls.declarations.filterIsInstance<KtProperty>()
+            val parameters = cls.primaryConstructorParameters
 
-            kclass.classFields.addAll(fieldRefs)
-            kclass.parameterReferences.addAll(paramRefs)
+            val fieldRefs = properties.map { ClassProperty(it) }
+            val paramRefs = parameters.map { ClassParameter(it) }
 
-            kclass.functions = methods.associateBy { it.fullName }.mapValues { it.value.function }
-            kclass.fields = fields.toMutableList()
-            kclass.parameters = params.toMutableList()
+            ktClass.propertyReferences.addAll(fieldRefs)
+            ktClass.parameterReferences.addAll(paramRefs)
 
-            kotlinClasses.add(kclass)
+            ktClass.properties = properties.toMutableList()
+            ktClass.parameters = parameters.toMutableList()
+
+            kotlinClasses.add(ktClass)
         }
 
         return kotlinClasses

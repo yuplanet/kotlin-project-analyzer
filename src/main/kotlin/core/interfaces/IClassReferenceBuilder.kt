@@ -1,6 +1,6 @@
 package org.example.core.interfaces
 
-import org.example.data.KotlinClass
+import org.example.data.symbol.KotlinClass
 
 interface IClassReferenceBuilder {
 

@@ -1,27 +1,23 @@
 package org.example.core
 
-import org.example.core.interfaces.i_dependencyChainBuilder
-import org.example.core.interfaces.i_diffResultPresenter
-import org.example.core.interfaces.IClassReferenceBuilder
-import org.example.core.interfaces.i_projectDifferenceAnalyzer
-import org.example.core.interfaces.i_projectLoader
-import org.example.data.CallChainNode
-import org.example.data.DiffResult
-import org.example.data.KotlinClass
+import org.example.core.interfaces.*
+import org.example.data.chain.MethodCallNode
+import org.example.data.analyzer.ProjectDiffResult
+import org.example.data.symbol.KotlinClass
 import org.example.mapping.KotlinClassMapper
 
-class GraphBuilder(val projectLoader: i_projectLoader,) {
+class GraphBuilder(val projectLoader: IProjectLoader,) {
 
-    private val projectDifferenceAnalyzer: i_projectDifferenceAnalyzer = DifferenceAnalyzer()
-    private val resultPresenter: i_diffResultPresenter = DiffResultPresenter()
-    private val dependencyChainBuilder: i_dependencyChainBuilder = DependencyChainBuilder()
+    private val projectDifferenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
+    private val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
+    private val dependencyChainBuilder: org.example.core.interfaces.IDependencyChainBuilder = DependencyChainBuilder()
     private val callResolver: IClassReferenceBuilder = ClassReferenceBuilder()
 
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
 
-    private var diffResult = DiffResult(listOf(), listOf(), listOf())
-    private var callChain: List<CallChainNode> = listOf()
+    private var diffResult = ProjectDiffResult(listOf(), listOf(), listOf())
+    private var callChain: List<MethodCallNode> = listOf()
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
@@ -40,8 +36,8 @@ class GraphBuilder(val projectLoader: i_projectLoader,) {
         //2 proccess all call links
         collectMethodCalls(developClasses)
         collectMethodCalls(featureClasses)
-        //4 analizy
 
+        //4 analizy
         analyzeDifference()
         //3 filter
         generateChains()
@@ -95,8 +91,12 @@ class GraphBuilder(val projectLoader: i_projectLoader,) {
         callChain = dependencyChainBuilder.generateChangedChains(diffResult.changed,featureClasses)
     }
 
-    private fun clearState(){
+    private fun clearState() {
+        developClasses = listOf()
+        featureClasses = listOf()
 
+        diffResult = ProjectDiffResult(listOf(), listOf(), listOf())
+        callChain = listOf()
     }
 }
 
