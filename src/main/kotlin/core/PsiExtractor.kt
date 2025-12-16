@@ -15,6 +15,11 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtPsiFactory
 
+
+/**
+* Класс по распаковен файлов txt на KtFile, KtClass, KtFunc
+*
+*/
 object PsiExtractor {
     fun createProject(): Project {
         val disposable: Disposable = Disposer.newDisposable()

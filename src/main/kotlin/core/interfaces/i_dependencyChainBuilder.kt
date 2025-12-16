@@ -5,14 +5,7 @@ import org.example.data.KotlinClass
 import org.example.data.KotlinMethod
 
 interface i_dependencyChainBuilder {
-    fun generateChain(
-        rootMethod: KotlinMethod,
-        allClasses: List<KotlinClass>
-    ): CallChainNode
+    fun generateChain(rootMethod: KotlinMethod, allClasses: List<KotlinClass>): CallChainNode
 
-
-    fun generateChangedChains(
-    methods: List<KotlinMethod>,
-    allClasses: List<KotlinClass>,
-    ): List<CallChainNode>
+    fun generateChangedChains(methods: List<KotlinMethod>, allClasses: List<KotlinClass>): List<CallChainNode>
 }

@@ -50,6 +50,10 @@ class DependencyChainBuilder: i_dependencyChainBuilder {
         // Текущий класс
         cls.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }
 
+
+        if(method.fullName.contains("RcsService"))
+            print(1)
+
         // Родители
         for (parent in cls.superClasses) {
             parent.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }

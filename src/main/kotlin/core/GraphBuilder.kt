@@ -2,6 +2,7 @@ package org.example.core
 
 import org.example.core.interfaces.i_dependencyChainBuilder
 import org.example.core.interfaces.i_diffResultPresenter
+import org.example.core.interfaces.i_methodCallResolver
 import org.example.core.interfaces.i_projectDifferenceAnalyzer
 import org.example.core.interfaces.i_projectLoader
 import org.example.data.CallChainNode
@@ -14,6 +15,7 @@ class GraphBuilder(val projectLoader: i_projectLoader,) {
     private val projectDifferenceAnalyzer: i_projectDifferenceAnalyzer = DifferenceAnalyzer()
     private val resultPresenter: i_diffResultPresenter = DiffResultPresenter()
     private val dependencyChainBuilder: i_dependencyChainBuilder = DependencyChainBuilder()
+    private val callResolver: i_methodCallResolver = MethodCallResolver()
 
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
@@ -68,8 +70,8 @@ class GraphBuilder(val projectLoader: i_projectLoader,) {
     }
 
     private fun collectMethodCalls(allClasses: List<KotlinClass>) {
-        CallBuilder.buildCallRecordsSimple(developClasses)
-        CallBuilder.buildCallRecordsSimple(featureClasses)
+        callResolver.resolve(developClasses)
+        callResolver.resolve(featureClasses)
     }
 
     private fun analyzeDifference() {

@@ -1,5 +1,6 @@
 package org.example.core
 
+import org.example.core.interfaces.i_methodCallResolver
 import org.example.data.*
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtCallExpression
@@ -10,11 +11,11 @@ import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import java.io.File
 
-object CallBuilder {
+class MethodCallResolver : i_methodCallResolver {
 
-    fun buildCallRecordsSimple(allClasses: List<KotlinClass>) {
-
+    override fun resolve(allClasses: List<KotlinClass>) {
         //1 calls
         //2reverse calls
 
@@ -23,8 +24,48 @@ object CallBuilder {
 
         //3fields
         //reversefields
+        dumpClassesAndMethods(allClasses)
 
     }
+
+    private fun dumpClassesAndMethods(allClasses: List<KotlinClass>) {
+        val builder = StringBuilder()
+
+        allClasses.forEach { cls ->
+            val className = cls.ktClassObject.fqName?.asString()
+                ?: cls.ktClassObject.name
+                ?: "<anonymous>"
+
+            builder.appendLine("Class: $className")
+
+            cls.functionCalls
+                .sortedBy { it.fullName }
+                .forEach { method ->
+                    builder.appendLine("  Method: ${method.fullName}")
+
+                    // ---- calls (кого вызывает этот метод)
+                    if (method.callRecords.isNotEmpty()) {
+                        builder.appendLine("    calls:")
+                        method.callRecords.forEach { call ->
+                            builder.appendLine("      -> ${call.callMethodFullName}")
+                        }
+                    }
+
+                    // ---- callers (кто вызывает этот метод)
+                    if (method.reverseCallRecords.isNotEmpty()) {
+                        builder.appendLine("    callers:")
+                        method.reverseCallRecords.forEach { reverse ->
+                            builder.appendLine("      <- ${reverse.callerMethodFullName}")
+                        }
+                    }
+                }
+
+            builder.appendLine()
+        }
+
+        File("class_methods_dump.txt").writeText(builder.toString())
+    }
+
 
     fun buildReverseCallRecords(allClasses: List<KotlinClass>) {
         // 1. Глобальный индекс всех методов: fullName -> KotlinMethod
