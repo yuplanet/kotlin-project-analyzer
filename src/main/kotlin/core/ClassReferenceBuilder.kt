@@ -4,6 +4,8 @@ import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.data.reference.MethodCallReference
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.ClassMethod
+import org.example.data.symbol.ClassParameter
+import org.example.data.symbol.ClassProperty
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
@@ -36,16 +38,79 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
     }
 
     override fun bindMethodCalls() {
+
+        //Methods
         analyzeFunctionCalls()
         buildReverseCallRecords()
+
+
+        //properties
+        bindPropertyCalls()
+
+
+        //parameter
+        bindParameterCalls()
     }
 
-    override fun bindFieldCalls() {
-        TODO("Not yet implemented")
+    override fun bindPropertyCalls() {
+        for (cls in projectClasses) {
+            val fieldsByName = cls.properties.associateBy { it.name ?: "__no_name__" }
+
+            for (method in cls.functionCalls) {
+                val fn = method.function
+                val body = fn.bodyExpression ?: continue
+
+                val nameRefs = body.collectDescendantsOfType<KtNameReferenceExpression>()
+
+                for (ref in nameRefs) {
+                    val propName = ref.getReferencedName()
+                    val property = fieldsByName[propName] ?: continue
+
+                    // Находим или создаём ClassProperty для этого свойства
+                    val classProperty = cls.propertyReferences.firstOrNull { it.property == property }
+                        ?: ClassProperty(property = property).also { cls.propertyReferences.add(it) }
+
+                    // Добавляем ссылку на метод, который использует это свойство
+                    classProperty.callRecord.add(
+                        MethodCallReference(
+                            fullName = method.fullName,
+                            parentClass = cls
+                        )
+                    )
+                }
+            }
+        }
     }
 
     override fun bindParameterCalls() {
-        TODO("Not yet implemented")
+        for (cls in projectClasses) {
+            // Индекс параметров по имени
+            val paramsByName = cls.parameters.associateBy { it.name ?: "__no_name__" }
+
+            for (method in cls.functionCalls) {
+                val fn = method.function
+                val body = fn.bodyExpression ?: continue
+
+                val nameRefs = body.collectDescendantsOfType<KtNameReferenceExpression>()
+
+                for (ref in nameRefs) {
+                    val paramName = ref.getReferencedName()
+                    val parameter = paramsByName[paramName] ?: continue
+
+                    // Находим или создаём ClassParameter
+                    val classParam = cls.parameterReferences.firstOrNull { it.property == parameter }
+                        ?: ClassParameter(property = parameter).also { cls.parameterReferences.add(it) }
+
+                    // Добавляем ссылку на метод, который использует этот параметр
+                    classParam.callRecord.add(
+                        MethodCallReference(
+                            fullName = method.fullName,
+                            parentClass = cls
+                        )
+                    )
+                }
+            }
+        }
     }
 
     private fun dumpClassesAndMethods(projectClasses: List<KotlinClass>) {
@@ -204,9 +269,6 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     if (callee !is KtNameReferenceExpression) continue
 
                     val calledMethodName = callee.text
-                    val argCount = callExpr.valueArguments.size
-                    // что такое a ?
-
                     val allFields: Map<String, KtCallableDeclaration> =
                         (cls.properties.asSequence().map { it as KtCallableDeclaration } +
                                 cls.parameters.asSequence().map { it as KtCallableDeclaration })

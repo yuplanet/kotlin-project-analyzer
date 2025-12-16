@@ -6,5 +6,4 @@ import org.jetbrains.kotlin.psi.KtProperty
 data class ClassProperty (
     var property: KtProperty,
     var callRecord: MutableList<MethodCallReference> = mutableListOf(),
-    var reverseCallRecords: MutableList<MethodCallReference> = mutableListOf()
 )

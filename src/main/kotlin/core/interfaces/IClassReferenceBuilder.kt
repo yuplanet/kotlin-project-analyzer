@@ -7,6 +7,6 @@ interface IClassReferenceBuilder {
     fun initialize(allClasses: List<KotlinClass>)
     fun bindAll()
     fun bindMethodCalls()
-    fun bindFieldCalls()
+    fun bindPropertyCalls()
     fun bindParameterCalls()
 }
