@@ -88,7 +88,7 @@ class GraphBuilder(val projectLoader: IProjectLoader,) {
 
 
     private fun generateChains(){
-        callChain = dependencyChainBuilder.generateChangedChains(diffResult.changed,featureClasses)
+        callChain = dependencyChainBuilder.generateChangedChains(diffResult.changedMethods,featureClasses)
     }
 
     private fun clearState() {
