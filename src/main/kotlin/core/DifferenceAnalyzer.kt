@@ -2,12 +2,15 @@ package org.example.core
 
 import org.example.core.interfaces.IProjectDifferenceAnalyzer
 import org.example.data.analyzer.ProjectDiffResult
-import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.ClassMethod
+import org.example.data.symbol.KotlinClass
 
 class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
         private var developClasses: List<KotlinClass> = listOf()
         private var featureClasses: List<KotlinClass> = listOf()
+
+
+    private var result = ProjectDiffResult()
         /**
          * Сравнивает develop и feature и возвращает DiffResult
          */
@@ -15,9 +18,21 @@ class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
         mainProject: List<KotlinClass>,
         branchProject: List<KotlinClass>
     ): ProjectDiffResult {
-        developClasses = mainProject
-        featureClasses = branchProject
 
+            developClasses = mainProject
+            featureClasses = branchProject
+
+            result = ProjectDiffResult()
+
+
+            analyzeMethods()
+
+            return result
+        }
+
+
+
+    fun analyzeMethods(){
         // 1. Строим карты методов по fullName
         val developMethodsByFullName: Map<String, ClassMethod> =
             developClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
@@ -48,10 +63,15 @@ class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
                 if (devBody != featBody) featMethod else null
             }
 
-        return ProjectDiffResult(
-            added = addedMethods,
-            removed = removedMethods,
-            changed = changedMethods
-        )
+
+        result.addedMethods = addedMethods
+        result.changedMethods = changedMethods
+        result.removedMethods = removedMethods
+
+    }
+
+
+    fun analyzeParameters(){
+
     }
 }
