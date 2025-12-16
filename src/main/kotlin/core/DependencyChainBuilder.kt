@@ -10,9 +10,13 @@ class DependencyChainBuilder: IDependencyChainBuilder {
         methods: List<ClassMethod>,
         allClasses: List<KotlinClass>,
     ): List<MethodCallNode> {
-        return methods.map { method ->
-            generateChain(method, allClasses)
-        }
+
+        val chain =
+            methods.map { method ->
+                generateChain(method, allClasses)
+            }
+
+        return chain
     }
 
     override fun generateChain(
@@ -48,15 +52,11 @@ class DependencyChainBuilder: IDependencyChainBuilder {
         val allRelevantMethods = mutableListOf<ClassMethod>()
 
         // Текущий класс
-        cls.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }
-
-
-        if(method.fullName.contains("RcsService"))
-            print(1)
+        allRelevantMethods += cls.functionCalls.filter { it.fullName.endsWith("::$methodShortName") }
 
         // Родители
         for (parent in cls.superClasses) {
-            parent.functionCalls.firstOrNull { it.fullName.endsWith("::$methodShortName") }?.let { allRelevantMethods.add(it) }
+            allRelevantMethods += parent.functionCalls.filter { it.fullName.endsWith("::$methodShortName") }
         }
 
         // Пробегаем по всем найденным методам и их reverseCallRecords

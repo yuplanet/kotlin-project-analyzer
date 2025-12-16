@@ -8,8 +8,6 @@ import org.example.data.symbol.KotlinClass
 class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
         private var developClasses: List<KotlinClass> = listOf()
         private var featureClasses: List<KotlinClass> = listOf()
-
-
     private var result = ProjectDiffResult()
         /**
          * Сравнивает develop и feature и возвращает DiffResult
@@ -21,9 +19,6 @@ class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
 
             developClasses = mainProject
             featureClasses = branchProject
-
-            result = ProjectDiffResult()
-
 
             analyzeMethods()
 

@@ -13,6 +13,7 @@ class DiffResultPresenter : IDiffResultPresenter {
             buildLinearChains(root, builder)
             builder.appendLine() // пустая строка между цепями
         }
+        var a = builder.toString()
         File("changed_methods.txt").writeText(builder.toString())
     }
 

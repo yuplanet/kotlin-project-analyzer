@@ -21,35 +21,27 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
     private var projectClasses = listOf<KotlinClass>()
 
-    override fun initialize(_projectClasses: List<KotlinClass>) {
-        projectClasses = _projectClasses
+    override fun initialize(allClasses: List<KotlinClass>) {
+        projectClasses = allClasses
     }
 
     override fun bindAll() {
-        // build method straight and reverse calls
-        bindMethodCalls()
-        dumpClassesAndMethods(projectClasses)
-
-        // build parameter straight and reverse calls
-        bindParameterCalls()
-
-        // build field straight and reverse calls
-        bindParameterCalls()
-    }
-
-    override fun bindMethodCalls() {
-
         //Methods
         analyzeFunctionCalls()
         buildReverseCallRecords()
-
+        dumpClassesAndMethods(projectClasses,"class_methods_dump2.txt")
 
         //properties
         bindPropertyCalls()
 
-
         //parameter
         bindParameterCalls()
+        dumpClassesAndMethods(projectClasses, "class_methods_dump2.txt")
+    }
+
+    override fun bindMethodCalls() {
+
+
     }
 
     override fun bindPropertyCalls() {
@@ -113,7 +105,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
         }
     }
 
-    private fun dumpClassesAndMethods(projectClasses: List<KotlinClass>) {
+    private fun dumpClassesAndMethods(projectClasses: List<KotlinClass>, filename: String) {
         val builder = StringBuilder()
 
         projectClasses.forEach { cls ->
@@ -148,7 +140,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
             builder.appendLine()
         }
 
-        File("class_methods_dump.txt").writeText(builder.toString())
+        File(filename).writeText(builder.toString())
     }
 
 
@@ -165,7 +157,6 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
             for (method in cls.functionCalls) {
                 for (call in method.callRecords) {
                     val calledMethod = allMethodsByFullName[call.fullName] ?: continue
-
                     // Добавляем текущий метод в reverseCallRecords вызываемого метода
                     calledMethod.reverseCallRecords.add(
                         MethodCallReference(

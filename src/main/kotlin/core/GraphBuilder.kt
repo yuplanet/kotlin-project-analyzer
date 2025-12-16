@@ -41,9 +41,6 @@ class GraphBuilder(val projectLoader: IProjectLoader,) {
         analyzeDifference()
         //3 filter
         generateChains()
-
-        //4 out
-        OutputResult()
     }
 
     private fun loadProject(repoPath: String, mainCommit: String, branchCommit: String) {
