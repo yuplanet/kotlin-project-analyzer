@@ -93,6 +93,18 @@ class MethodCallResolver : i_methodCallResolver {
         }
     }
 
+    fun findClassByReceiver(allClasses: List<KotlinClass>, receiverName: String): KotlinClass? {
+        return allClasses.firstOrNull { cls ->
+            cls.fields.any { it.name == receiverName } ||
+                    cls.parameters.any { it.name == receiverName } ||
+                    cls.superClasses.any { superCls ->
+                        superCls.fields.any { it.name == receiverName } ||
+                                superCls.parameters.any { it.name == receiverName }
+                    }
+        }
+    }
+
+
     fun analyzeFunctionCalls(allClasses: List<KotlinClass>) {
 
         // Глобальный индекс всех методов: fullName -> KotlinMethod
@@ -111,6 +123,9 @@ class MethodCallResolver : i_methodCallResolver {
 
             for (method in cls.functionCalls) {
                 val fn = method.function
+
+                if(method.fullName.contains("sendScheduledEnvelopeNotification"))
+                    print(1)
 
                 // Находим все выражения вида a.b(), obj.service.doWork(), и т.д.
                 val dotCalls = fn.collectDescendantsOfType<KtDotQualifiedExpression>()
@@ -133,6 +148,8 @@ class MethodCallResolver : i_methodCallResolver {
 
                     // какой у него тип?
                     val fieldType = fieldDecl.typeReference?.text ?: continue@callLoop
+
+                    //val targetClass = findClassByReceiver(allClasses, receiverName) ?: continue@callLoop
 
                     // находим класс по имени типа
                     val targetClass = classesByName[fieldType] ?: continue@callLoop
@@ -220,6 +237,12 @@ class MethodCallResolver : i_methodCallResolver {
         return selector.valueArguments.map { arg ->
             val expr = arg.getArgumentExpression()
             when (expr) {
+                 is KtDotQualifiedExpression -> {
+                    // Пример: EnvelopeStatus.SCHEDULED
+                    val typeName = expr.receiverExpression.text
+                    if (typeName.isNotBlank()) typeName else "Any"
+                }
+
                 is KtNameReferenceExpression -> {
                     val name = expr.getReferencedName()
 
@@ -232,6 +255,13 @@ class MethodCallResolver : i_methodCallResolver {
                     if (fieldType != null) return@map fieldType
 
                     // 3. Если не нашли — Any
+                    val parent = expr.parent
+                    if (parent is KtDotQualifiedExpression) {
+                        val enumType = parent.receiverExpression.text
+                        if (enumType.isNotBlank()) return@map enumType
+                    }
+
+                    // 4️⃣ По умолчанию Any
                     name // или "Any" если хочешь совсем безопасно
                 }
                 is KtCallExpression -> {
