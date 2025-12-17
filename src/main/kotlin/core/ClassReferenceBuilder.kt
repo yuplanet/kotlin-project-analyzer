@@ -3,6 +3,7 @@ package org.example.core
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.utils.Searcher
 import org.example.data.reference.MethodCallReference
+import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
@@ -201,10 +202,21 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
                     val calledMethodName = callee.text
 
-                    var methodArgs = resolveArgumentTypes(callExpr, classFields,fn)
+                    if(calledMethodName.contains("checkPhoneNumber"))
+                        print(1)
 
-                    val targetMethod = searcher.finMethodByClassByMethodNameByParams(cls.name, calledMethodName, methodArgs)
-                        ?: continue
+                    var methodArgs = resolveArgumentTypes(callExpr, classFields, fn)
+
+                    var targetMethod: ClassMethod? = null// searcher.finMethodByClassByMethodNameByParams(cls.name, calledMethodName, methodArgs)
+
+                    if(targetMethod == null){
+                        val methods =
+                          searcher.findByClassNameByMethodName(cls.name, calledMethodName)
+
+                        targetMethod = methods?.firstOrNull { it.parameters.size == methodArgs.size }
+                    }
+
+                    targetMethod  ?: continue
 
                     method.callRecords.add(
                         MethodCallReference(

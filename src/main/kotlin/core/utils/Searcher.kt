@@ -42,6 +42,19 @@ class Searcher(_allClasses: List<KotlinClass>) {
         }
     }
 
+    fun findByClassNameByMethodName(className: String, methodName: String): List<ClassMethod>? {
+        val key = className.hashCode()
+        val candidates = classSimpleNameDictionary[key] ?: emptyList()
+
+        val targetClass = candidates.firstOrNull { it.ktClassObject.name == className } ?: return null
+
+        val matchedMethod = targetClass.functionCalls.filter { method ->
+            method.function.name == methodName
+        }
+
+        return matchedMethod
+    }
+
 
     fun findByClassName(className: String): KotlinClass? {
         val key = className.hashCode()
