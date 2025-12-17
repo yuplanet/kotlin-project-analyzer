@@ -10,7 +10,7 @@ class GraphBuilder(val projectLoader: IProjectLoader,) {
 
     private val projectDifferenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
     private val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
-    private val dependencyChainBuilder: org.example.core.interfaces.IDependencyChainBuilder = DependencyChainBuilder()
+    private val dependencyChainBuilder = DependencyChainBuilder()
     private val callResolver: IClassReferenceBuilder = ClassReferenceBuilder()
 
     private var developClasses: List<KotlinClass> = listOf()
@@ -71,8 +71,7 @@ class GraphBuilder(val projectLoader: IProjectLoader,) {
 
     private fun collectMethodCalls(allClasses: List<KotlinClass>) {
 
-        callResolver.initialize(allClasses)
-        callResolver.bindAll()
+        callResolver.bindAll(allClasses)
     }
 
     private fun analyzeDifference() {

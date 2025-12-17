@@ -28,8 +28,9 @@ object KotlinClassMapper {
         val kotlinClasses = mutableListOf<KotlinClass>()
 
         for (cls in classes) {
+
             val filePath = ktFile.name
-            val className = filePath.substringAfterLast("/").substringBeforeLast(".kt")
+            val className = cls.name?: filePath.substringAfterLast("/").substringBeforeLast(".kt")
 
             val ktClass = KotlinClass(cls, filePath, className)
 
@@ -41,7 +42,7 @@ object KotlinClassMapper {
                     name = it.name ?: "__no_name__",
                     fullName = methodKey(it),
                     function = it,
-                    parameters = buildParameterMap(it)
+                    parameters = it.valueParameters
                 )
             }.toMutableList()
 
@@ -100,15 +101,6 @@ object KotlinClassMapper {
         return "__top_level__"
     }
 
-    fun buildParameterMap(fn: KtNamedFunction): Map<String, KtParameter> {
-        return fn.valueParameters.associate { param ->
-            val name = param.typeReference?.text ?: "Any"
-            val type = param
-            name to type
-        }
-    }
-
-
     /**
      * Преобразует список KtFile в список KotlinClass
      */
@@ -118,13 +110,14 @@ object KotlinClassMapper {
             mapKtFileToClasses(ktFile)
         }
 
-
         val classesByName: Map<String, KotlinClass> =
             allClasses.associateBy { it.ktClassObject.name ?: "__anonymous__" }
 
         // 4. Проставляем родителей (на всех уровнях)
         for (kclass in allClasses) {
+
             val visitedParents = mutableSetOf<KotlinClass>()
+
             fun collectParents(clsObj: KtClassOrObject) {
                 clsObj.superTypeListEntries.forEach { entry ->
                     val typeName = when (entry) {
@@ -140,8 +133,10 @@ object KotlinClassMapper {
                     }
                 }
             }
+
             collectParents(kclass.ktClassObject)
         }
+
 
         return allClasses
     }

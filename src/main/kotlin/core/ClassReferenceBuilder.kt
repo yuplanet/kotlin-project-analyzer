@@ -1,11 +1,13 @@
 package org.example.core
 
 import org.example.core.interfaces.IClassReferenceBuilder
+import org.example.core.utils.Searcher
 import org.example.data.reference.MethodCallReference
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
+import org.example.mapping.KotlinClassMapper
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
@@ -19,32 +21,32 @@ import java.io.File
 
 class ClassReferenceBuilder : IClassReferenceBuilder {
 
-    private var projectClasses = listOf<KotlinClass>()
+    private var searcher = Searcher()
 
-    override fun initialize(allClasses: List<KotlinClass>) {
-        projectClasses = allClasses
-    }
+    override fun bindAll(allClasses: List<KotlinClass>) {
 
-    override fun bindAll() {
+        searcher = Searcher()
+        searcher.initialize(allClasses)
         //Methods
-        analyzeFunctionCalls()
-        buildReverseCallRecords()
-        dumpClassesAndMethods(projectClasses,"class_methods_dump2.txt")
+        analyzeFunctionCalls(allClasses)
+        buildReverseCallRecords(allClasses)
+
+        dumpFullTrace(allClasses, "full_dump.txt")
+        dumpClassesAndMethods(allClasses,"class_methods.txt")
 
         //properties
-        bindPropertyCalls()
+        bindPropertyCalls(allClasses)
 
         //parameter
-        bindParameterCalls()
-        dumpClassesAndMethods(projectClasses, "class_methods_dump2.txt")
+        bindParameterCalls(allClasses)
+        dumpClassesAndMethods(allClasses, "class_parameters.txt")
     }
 
-    override fun bindMethodCalls() {
-
-
+    override fun bindMethodCalls(allClasses: List<KotlinClass>) {
+        TODO("Not yet implemented")
     }
 
-    override fun bindPropertyCalls() {
+    override fun bindPropertyCalls(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
             val fieldsByName = cls.properties.associateBy { it.name ?: "__no_name__" }
 
@@ -74,7 +76,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
         }
     }
 
-    override fun bindParameterCalls() {
+    override fun bindParameterCalls(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
             // Индекс параметров по имени
             val paramsByName = cls.parameters.associateBy { it.name ?: "__no_name__" }
@@ -107,7 +109,6 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
     private fun dumpClassesAndMethods(projectClasses: List<KotlinClass>, filename: String) {
         val builder = StringBuilder()
-
         projectClasses.forEach { cls ->
             val className = cls.ktClassObject.fqName?.asString()
                 ?: cls.ktClassObject.name
@@ -142,21 +143,104 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
         File(filename).writeText(builder.toString())
     }
+    private fun dumpFullTrace(projectClasses: List<KotlinClass>, filename: String) {
+        val builder = StringBuilder()
+
+        projectClasses.forEach { cls ->
+            val className = cls.ktClassObject.fqName?.asString()
+                ?: cls.ktClassObject.name
+                ?: "<anonymous>"
+
+            builder.appendLine("Class: $className")
+            builder.appendLine("Path: ${cls.path}")
+            builder.appendLine("FullName: ${cls.fullName}")
+
+            // Суперклассы
+            if (cls.superClasses.isNotEmpty()) {
+                builder.appendLine("SuperClasses:")
+                cls.superClasses.forEach { superCls ->
+                    val superName = superCls.ktClassObject.fqName?.asString()
+                        ?: superCls.ktClassObject.name
+                        ?: "<anonymous>"
+                    builder.appendLine("  -> $superName")
+                }
+            }
+
+            // Свойства класса
+            if (cls.properties.isNotEmpty()) {
+                builder.appendLine("Properties:")
+                cls.properties.forEach { prop ->
+                    builder.appendLine("  - ${prop.name}: ${prop.typeReference?.text ?: "unknown"}")
+                }
+            }
+
+            // Параметры конструктора
+            if (cls.parameters.isNotEmpty()) {
+                builder.appendLine("Constructor Parameters:")
+                cls.parameters.forEach { param ->
+                    builder.appendLine("  - ${param.name}: ${param.typeReference?.text ?: "unknown"}")
+                }
+            }
+
+            // Методы и их вызовы
+            if (cls.functionCalls.isNotEmpty()) {
+                builder.appendLine("Methods:")
+                cls.functionCalls
+                    .sortedBy { it.fullName }
+                    .forEach { method ->
+                        builder.appendLine("  Method: ${method.fullName}")
+
+                        // ---- calls (кого вызывает метод)
+                        if (method.callRecords.isNotEmpty()) {
+                            builder.appendLine("    Calls:")
+                            method.callRecords.forEach { call ->
+                                builder.appendLine("      -> ${call.fullName}")
+                            }
+                        }
+
+                        // ---- callers (кто вызывает метод)
+                        if (method.reverseCallRecords.isNotEmpty()) {
+                            builder.appendLine("    Callers:")
+                            method.reverseCallRecords.forEach { reverse ->
+                                builder.appendLine("      <- ${reverse.fullName}")
+                            }
+                        }
+
+                        // ---- параметры метода
+                        if (method.parameters.isNotEmpty()) {
+                            builder.appendLine("    Parameters:")
+                            method.parameters.forEach { param ->
+                                builder.appendLine("      - ${param.name}: ${param.typeReference?.text ?: "unknown"}")
+                            }
+                        }
+                    }
+            }
+
+            builder.appendLine("--------------------------------------------------")
+            builder.appendLine()
+        }
+
+        File(filename).writeText(builder.toString())
+    }
 
 
-    fun buildReverseCallRecords() {
-        // 1. Глобальный индекс всех методов: fullName -> KotlinMethod
-        val allMethodsByFullName: Map<String, ClassMethod> =
-            projectClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
 
+    fun buildReverseCallRecords(projectClasses: List<KotlinClass>) {
         // 2. Очищаем обратные ссылки у всех методов
         projectClasses.flatMap { it.functionCalls }.forEach { it.reverseCallRecords.clear() }
+        dumpClassesAndMethods(projectClasses, "check before reverse.txt")
+
 
         // 3. Проходим по каждому методу и его прямым вызовам
         for (cls in projectClasses) {
             for (method in cls.functionCalls) {
                 for (call in method.callRecords) {
-                    val calledMethod = allMethodsByFullName[call.fullName] ?: continue
+
+                    if(call.fullName.contains("checkPhoneNumber"))
+                        print(1)
+
+                    val calledMethod = searcher.finFullMethodName(call.fullName) ?: continue
+
                     // Добавляем текущий метод в reverseCallRecords вызываемого метода
                     calledMethod.reverseCallRecords.add(
                         MethodCallReference(
@@ -169,28 +253,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
         }
     }
 
-    fun findClassByReceiver(projectClasses: List<KotlinClass>, receiverName: String): KotlinClass? {
-        return projectClasses.firstOrNull { cls ->
-            cls.properties.any { it.name == receiverName } ||
-                    cls.parameters.any { it.name == receiverName } ||
-                    cls.superClasses.any { superCls ->
-                        superCls.properties.any { it.name == receiverName } ||
-                                superCls.parameters.any { it.name == receiverName }
-                    }
-        }
-    }
-
-
-    fun analyzeFunctionCalls() {
-
-        // Глобальный индекс всех методов: fullName -> KotlinMethod
-        val allMethodsByFullName: Map<String, ClassMethod> =
-            projectClasses.flatMap { it.functionCalls }.associateBy { it.fullName }
-
-        // Глобальный индекс классов по имени
-        val classesByName: Map<String, KotlinClass> =
-            projectClasses.associateBy { it.ktClassObject.name ?: "__anonymous__" }
-
+    fun analyzeFunctionCalls(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
             val allFields: Map<String, KtCallableDeclaration> =
                 (cls.properties.asSequence().map { it as KtCallableDeclaration } +
@@ -223,20 +286,15 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     val fieldType = fieldDecl.typeReference?.text ?: continue@callLoop
 
                     // находим класс по имени типа
-                    val targetClass = classesByName[fieldType] ?: continue@callLoop
+
+                    val targetClass = searcher.findByClassName(fieldType) ?: continue@callLoop // --
 
                     // ----------- Строим полный ключ вызываемого метода -----------
                     // Параметры вызова (типов тут не узнать → Any)
-                    val argParams: String = resolveArgumentTypes(selector, allFields, fn)
-                        .joinToString(",")
-
-                    val calledFullName =
-                        "${targetClass.ktClassObject.name}::$calledMethodName($argParams)"
+                   val argParams= resolveArgumentTypes(selector, allFields, fn)
 
                     // Находим метод среди всех методов проекта
-                    val targetMethod = allMethodsByFullName.values.find { method ->
-                        method.fullName.contains(calledFullName)
-                    } ?: continue@callLoop
+                    val targetMethod = searcher.finMethodByClassByMethodNameByParams(targetClass.name, calledMethodName, argParams) ?: continue@callLoop
 
                     // Добавляем в callRecords текущего метода
                     method.callRecords.add(
@@ -245,6 +303,10 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                             parentClass = targetClass
                         )
                     )
+
+                    val count =  method.callRecords.count()
+
+                    print(count)
                 }
 
                 // ----------- 2. Вызовы методов текущего класса без this -----------
@@ -260,17 +322,11 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     if (callee !is KtNameReferenceExpression) continue
 
                     val calledMethodName = callee.text
-                    val allFields: Map<String, KtCallableDeclaration> =
-                        (cls.properties.asSequence().map { it as KtCallableDeclaration } +
-                                cls.parameters.asSequence().map { it as KtCallableDeclaration })
-                            .associateBy { it.name ?: "__no_name__" }
 
                     var methodArgs = resolveArgumentTypes(callExpr, allFields,fn)
 
-                    val targetMethod = cls.functionCalls.firstOrNull { m ->
-                        m.name == calledMethodName &&
-                                m.parameters.values.map { it.typeReference?.text ?: "Any" } == methodArgs
-                    } ?: continue
+                    val targetMethod = searcher.finMethodByClassByMethodNameByParams(cls.name, calledMethodName, methodArgs)
+                        ?: continue
 
                     method.callRecords.add(
                         MethodCallReference(
@@ -281,6 +337,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                 }
             }
         }
+
     }
 
     fun resolveArgumentTypes(

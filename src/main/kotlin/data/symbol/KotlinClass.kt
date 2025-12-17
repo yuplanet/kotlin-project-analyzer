@@ -11,9 +11,9 @@ class KotlinClass {
 
     var superClasses: List<KotlinClass> = listOf()
 
-
     var name: String
     var path: String
+    var fullName: String
 
     var properties: MutableList<KtProperty> = mutableListOf()
     var parameters: MutableList<KtParameter> = mutableListOf()
@@ -26,7 +26,8 @@ class KotlinClass {
 
     constructor(ktClass: KtClassOrObject, path: String, name: String) {
         this.ktClassObject = ktClass
-        this.path = path
+        this.fullName = path
         this.name = name
+        this.path = path
     }
 }

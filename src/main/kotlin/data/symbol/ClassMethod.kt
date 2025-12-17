@@ -1,7 +1,6 @@
 package org.example.data.symbol
 
 import org.example.data.reference.MethodCallReference
-import org.jetbrains.kotlin.psi.KtCallableDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
 
@@ -14,7 +13,7 @@ data class ClassMethod(
      *ApiKeyManagementController::getApiKeyClients():Boolean
      */
     val fullName: String,
-    val parameters: Map<String, KtParameter>,
+    val parameters: List<KtParameter>,
 
     val function: KtNamedFunction,
 
