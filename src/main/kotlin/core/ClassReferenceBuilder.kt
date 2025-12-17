@@ -103,9 +103,6 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
             for (method in cls.functionCalls) {
                 for (call in method.callRecords) {
 
-                    if(call.fullName.contains("checkPhoneNumber"))
-                        print(1)
-
                     val calledMethod = searcher.finFullMethodName(call.fullName) ?: continue
 
                     // Добавляем текущий метод в reverseCallRecords вызываемого метода
@@ -128,6 +125,9 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                 (cls.properties.asSequence().map { it as KtCallableDeclaration } +
                         cls.parameters.asSequence().map { it as KtCallableDeclaration })
                     .associateBy { it.name ?: "__no_name__" }
+
+            if(cls.name.contains( "NotificationService"))
+                print(1)
 
 
             for (method in cls.functionCalls) {
@@ -164,9 +164,14 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     val argParams = resolveArgumentTypes(selector, classFields, fn)
 
                     // Находим метод среди всех методов проекта
-                    val targetMethod =
-                        searcher.finMethodByClassByMethodNameByParams(targetClass.name, calledMethodName, argParams)
-                            ?: continue@callLoop
+                    var targetMethod = searcher.findMethodByClassByMethodNameByParams(targetClass.name, calledMethodName, argParams)
+
+                   if( targetMethod == null)
+                       targetMethod = searcher.findFirstMethodByClassByMethodNameByParams(targetClass.name, calledMethodName)
+
+                    targetMethod  ?: continue@callLoop
+
+
 
                     // Добавляем в callRecords текущего метода
                     method.callRecords.add(
@@ -175,10 +180,6 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                             parentClass = targetClass
                         )
                     )
-
-                    val count = method.callRecords.count()
-
-                    print(count)
                 }
             }
 
@@ -201,9 +202,6 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                     if (callee !is KtNameReferenceExpression) continue
 
                     val calledMethodName = callee.text
-
-                    if(calledMethodName.contains("checkPhoneNumber"))
-                        print(1)
 
                     var methodArgs = resolveArgumentTypes(callExpr, classFields, fn)
 

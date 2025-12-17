@@ -6,6 +6,7 @@ import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.ClassMethod
 
 class DependencyChainBuilder: IDependencyChainBuilder {
+
     override fun generateChangedChains(
         methods: List<ClassMethod>,
         allClasses: List<KotlinClass>,
@@ -23,17 +24,17 @@ class DependencyChainBuilder: IDependencyChainBuilder {
         rootMethod: ClassMethod,
         allClasses: List<KotlinClass>
     ): MethodCallNode {
-        val visited = mutableSetOf<String>()
-        return buildChain(rootMethod, allClasses, visited)
+
+        return buildChain(rootMethod, allClasses)
     }
 
     private fun buildChain(
         method: ClassMethod,
         allClasses: List<KotlinClass>,
-        visited: MutableSet<String>
+        visited: MutableSet<String> = mutableSetOf()
     ): MethodCallNode {
+        // Если уже встречали метод в текущей цепи — прекращаем рекурсию
         if (!visited.add(method.fullName)) {
-            // Уже обработан, возвращаем пустое звено (или null, если nullable)
             return MethodCallNode(method.fullName, method.function, "", mutableListOf())
         }
 
@@ -44,34 +45,28 @@ class DependencyChainBuilder: IDependencyChainBuilder {
             nextCalls = mutableListOf()
         )
 
-        // Получаем класс метода
         val cls = allClasses.firstOrNull { it.functionCalls.contains(method) } ?: return node
-
-        // Собираем список методов с одинаковым именем: текущий + все родители
         val methodShortName = method.fullName.substringAfter("::")
         val allRelevantMethods = mutableListOf<ClassMethod>()
 
-        // Текущий класс
         allRelevantMethods += cls.functionCalls.filter { it.fullName.endsWith("::$methodShortName") }
-
-        // Родители
         for (parent in cls.superClasses) {
             allRelevantMethods += parent.functionCalls.filter { it.fullName.endsWith("::$methodShortName") }
         }
 
-        // Пробегаем по всем найденным методам и их reverseCallRecords
         for (m in allRelevantMethods) {
             for (reverseCall in m.reverseCallRecords) {
-                val callerMethod = reverseCall.parentClass
-                    .functionCalls
+                val callerMethod = reverseCall.parentClass.functionCalls
                     .firstOrNull { it.fullName == reverseCall.fullName }
-                    ?: continue
 
-                val childNode = buildChain(callerMethod, allClasses, visited)
+                callerMethod?: continue
+
+                val childNode = buildChain(callerMethod, allClasses, visited.toMutableSet())
                 node.nextCalls.add(childNode)
             }
         }
 
         return node
     }
+
 }

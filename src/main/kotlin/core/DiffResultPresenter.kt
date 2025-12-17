@@ -13,7 +13,7 @@ class DiffResultPresenter : IDiffResultPresenter {
             buildLinearChains(root, builder)
             builder.appendLine() // пустая строка между цепями
         }
-        var a = builder.toString()
+
         File("changed_methods.txt").writeText(builder.toString())
     }
 
@@ -24,10 +24,10 @@ class DiffResultPresenter : IDiffResultPresenter {
     private fun buildLinearChains(
         node: MethodCallNode,
         builder: StringBuilder,
-        visited: MutableSet<String> = mutableSetOf(),
         path: List<String> = emptyList()
     ) {
-        if (!visited.add(node.fullName)) return
+        // Проверка на цикл в текущей ветке
+        if (node.fullName in path) return
 
         // Формируем текущий путь
         val currentPath = path + node.fullName
@@ -39,9 +39,9 @@ class DiffResultPresenter : IDiffResultPresenter {
             return
         }
 
-        // Рекурсивно для всех веток
+        // Рекурсивно обходим всех дочерних вызовов
         validNext.forEach { child ->
-            buildLinearChains(child, builder, visited.toMutableSet(), currentPath)
+            buildLinearChains(child, builder, currentPath)
         }
     }
 }

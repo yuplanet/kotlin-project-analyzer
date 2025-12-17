@@ -77,7 +77,28 @@ class Searcher(_allClasses: List<KotlinClass>) {
         return res
     }
 
-    fun finMethodByClassByMethodNameByParams(
+    fun findFirstMethodByClassByMethodNameByParams(
+        className: String,
+        methodName: String,
+    ): ClassMethod? {
+
+        val pclass = findByClassName(className) ?: return null
+
+        val key = methodName.hashCode()
+        val candidates = methodSimpleNameDictionary[key] ?: emptyList()
+
+        val res = candidates.firstOrNull { method ->
+            // проверяем класс
+            method.fullName.contains("${pclass.ktClassObject.name}::$methodName") &&
+                    // проверяем имя метода
+                    method.name == methodName
+                    // проверяем параметры
+        }
+
+        return res
+    }
+
+    fun findMethodByClassByMethodNameByParams(
         className: String,
         methodName: String,
         params: List<String>

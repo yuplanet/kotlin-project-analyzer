@@ -5,6 +5,7 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
@@ -25,7 +26,9 @@ object KotlinClassMapper {
             val filePath = ktFile.name
             val className = cls.name?: filePath.substringAfterLast("/").substringBeforeLast(".kt")
 
-            val ktClass = KotlinClass(cls, filePath, className)
+            val type = getEntityType(cls)
+            val annotation  = getAnnotations(cls)
+            val ktClass = KotlinClass(cls, filePath, className, type, annotation)
 
             // Берём все функции класса и companion object
             //1 functions
@@ -139,4 +142,28 @@ object KotlinClassMapper {
 
         return allClasses
     }
+
+    fun getAnnotations(declaration: KtClassOrObject): List<String> {
+        return declaration.annotationEntries.map { entry ->
+            // Получаем текст аннотации, например "@Serializable"
+            entry.shortName?.asString() ?: entry.text
+        }
+    }
+
+    fun getEntityType(declaration: KtClassOrObject): ObjectType {
+        return when (declaration) {
+            is KtClass -> when {
+                declaration.isInterface() -> ObjectType.Interface
+                declaration.isEnum() -> ObjectType.EnumClass
+                declaration.isAnnotation() -> ObjectType.Undefined // или добавить Annotation в enum
+                declaration.isData() -> ObjectType.DataClass
+                declaration.isSealed() -> ObjectType.SealedClass
+                else -> ObjectType.Class
+            }
+            is KtObjectDeclaration -> if (declaration.isCompanion()) ObjectType.Undefined // можно добавить CompanionObject в enum
+            else ObjectType.Object
+            else -> ObjectType.Undefined
+        }
+    }
+
 }

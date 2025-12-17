@@ -31,20 +31,7 @@ class GraphBuilder() {
         // 3 analyze difference
         // 4 generate impart chains
         // 5 output
-
-
-        logStatus(logFile, "The process of build is started")
-
-        //clear inside state
-        //1 load project
-        try {
-            loadProject(repoPath, mainCommit, branchCommit)
-            logStatus(logFile, "The projects loaded success")
-        } catch (ex: Exception) {
-            logStatus(logFile, "The projects loaded error ${ex.message}")
-            return
-        }
-
+        loadProject(repoPath, mainCommit, branchCommit)
 
         //2 proccess all call links
         collectMethodCalls(developClasses)
