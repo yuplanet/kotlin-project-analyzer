@@ -4,11 +4,10 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.jetbrains.kotlin.psi.KtParameter
 
-class Searcher {
+class Searcher(_allClasses: List<KotlinClass>) {
 
     private var allClasses = listOf<KotlinClass>()
     private var allMethods = listOf<ClassMethod>()
-
 
     //key - full name for class: path+name+args+return type
     private var classFullNameDictionary: MutableMap<Int, MutableList<KotlinClass>> = mutableMapOf()
@@ -18,8 +17,7 @@ class Searcher {
     private var methodFullNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
     private var methodSimpleNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
 
-    fun initialize(_allClasses: List<KotlinClass>) {
-
+    init {
         allClasses = _allClasses
         allMethods = allClasses.flatMap { it.functionCalls }
 
@@ -42,7 +40,6 @@ class Searcher {
             val nkey = method.name.hashCode() // метод, который возвращает hashCode fullName
             methodSimpleNameDictionary.computeIfAbsent(nkey) { mutableListOf() }.add(method)
         }
-        print(1)
     }
 
 
@@ -89,7 +86,6 @@ class Searcher {
 
         return res
     }
-
 
 
     /**
