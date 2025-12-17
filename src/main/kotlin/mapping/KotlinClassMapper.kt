@@ -1,19 +1,12 @@
 package org.example.mapping
 
 import org.example.core.PsiExtractor
-import org.example.data.symbol.ClassProperty
-import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
-import org.jetbrains.kotlin.psi.KtClassOrObject
-import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtProperty
-import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
-import org.jetbrains.kotlin.psi.KtSuperTypeEntry
+import org.example.data.symbol.ClassProperty
+import org.example.data.symbol.KotlinClass
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
-import kotlin.collections.plus
 
 object KotlinClassMapper {
 
@@ -47,7 +40,7 @@ object KotlinClassMapper {
             }.toMutableList()
 
             ktClass.functionCalls.addAll(functions)
-            ktClass.functions = functions.associateBy { it.fullName }.mapValues { it.value.function }
+            ktClass.functions = collectFunctions(cls)
 
 
             // мапи поля и параметры(то же самое что и поля) класса
@@ -99,6 +92,12 @@ object KotlinClassMapper {
             parent = parent.parent
         }
         return "__top_level__"
+    }
+
+    fun collectFunctions(klass: KtClassOrObject): MutableList<KtNamedFunction> {
+        return klass.declarations
+            .filterIsInstance<KtNamedFunction>()
+            .toMutableList()
     }
 
     /**

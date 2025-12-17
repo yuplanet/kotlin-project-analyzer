@@ -4,8 +4,9 @@ import org.example.data.symbol.KotlinClass
 
 interface IClassReferenceBuilder {
 
-    fun bindAll(allClasses: List<KotlinClass>)
-    fun bindMethodCalls(allClasses: List<KotlinClass>)
-    fun bindPropertyCalls(allClasses: List<KotlinClass>)
-    fun bindParameterCalls(allClasses: List<KotlinClass>)
+    fun bindAll(projectClasses: List<KotlinClass>)
+
+    fun bindMethodCalls(projectClasses: List<KotlinClass>)
+    fun bindPropertyCalls(projectClasses: List<KotlinClass>)
+    fun bindParameterCalls(projectClasses: List<KotlinClass>)
 }

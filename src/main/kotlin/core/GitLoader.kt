@@ -1,4 +1,4 @@
-package org.example.plugins
+package org.example.core
 
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder

@@ -21,7 +21,7 @@ class KotlinClass {
     var propertyReferences: MutableList<ClassProperty> = mutableListOf()
     var parameterReferences: MutableList<ClassParameter> = mutableListOf()
 
-    var functions: Map<String, KtNamedFunction> = mapOf()
+    var functions: MutableList<KtNamedFunction> = mutableListOf()
     val functionCalls: MutableList<ClassMethod> = mutableListOf()
 
     constructor(ktClass: KtClassOrObject, path: String, name: String) {
