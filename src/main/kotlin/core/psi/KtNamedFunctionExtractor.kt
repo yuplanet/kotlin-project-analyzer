@@ -7,72 +7,78 @@ import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
 
 object KtNamedFunctionExtractor {
-    data class FunctionContent(
-        val callSteps: List<Expression>,
-        val assignments: List<String>
-    )
+    private var tmpCounter = 0
 
+    fun parseFunctionContent(
+        fn: KtNamedFunction
+    ): Pair<List<Expression>, List<String>> {
 
-    var tmpCounter = 0
-
-    fun parseFunctionContent(fn: KtNamedFunction): Pair<List<Expression>, List<String>> {
         val expressions = mutableListOf<Expression>()
         val assignments = mutableListOf<String>()
 
         fun generateTmp(): String = "tmp${++tmpCounter}"
 
-        // Рекурсивная обработка выражений
-        fun processExpression(expr: KtExpression, variableName: String? = null): String {
-            return when (expr) {
-                is KtCallExpression -> {
-                    val callee = expr.calleeExpression?.text ?: "unknown"
+        /**
+         * @param expr анализируемое выражение
+         * @param assignedVar имя переменной, КУДА пишется результат (val x = ...)
+         */
+        fun processExpression(
+            expr: KtExpression,
+            assignedVar: String? = null
+        ): String =
+            when (expr) {
 
-                    // Обрабатываем аргументы
-                    val args = expr.valueArguments.map { arg ->
-                        arg.getArgumentExpression()?.let { processExpression(it) } ?: "?"
+                is KtCallExpression -> {
+                    val methodName = expr.calleeExpression?.text ?: "unknown"
+
+                    val params = expr.valueArguments.map { arg ->
+                        arg.getArgumentExpression()
+                            ?.let { processExpression(it) }
+                            ?: "?"
                     }
 
-                    // Определяем receiver
-                    val parentReceiver = (expr.parent as? KtDotQualifiedExpression)?.receiverExpression?.text ?: "null"
+                    val receiver =
+                        (expr.parent as? KtDotQualifiedExpression)
+                            ?.receiverExpression
+                            ?.text
+                            ?: ""
 
-                    // Используем явную переменную слева, если есть
-                    val varName = variableName ?: generateTmp()
+                    val variable = assignedVar ?: generateTmp()
 
-                    // Добавляем Expression
-                    expressions.add(Expression().apply {
-                        variable = varName
-                        type = "_" // можно подставлять тип через BindingContext
-                        receiver = parentReceiver
-                        method = callee
-                        params = args
-                    })
+                    expressions += Expression().apply {
+                        this.variable = variable      // ✅ ТОЛЬКО имя переменной
+                        this.type = "_"
+                        this.receiver = receiver      // ✅ объект вызова
+                        this.method = methodName
+                        this.params = params
+                    }
 
-                    varName
+                    variable
                 }
 
                 is KtDotQualifiedExpression -> {
-                    val rec = processExpression(expr.receiverExpression)
-                    expr.selectorExpression?.let { processExpression(it, rec) } ?: rec
+                    // не трогаем variable, только идём к selector
+                    expr.selectorExpression
+                        ?.let { processExpression(it, assignedVar) }
+                        ?: expr.text
                 }
 
-                else -> expr.text ?: ""
+                else -> expr.text
             }
-        }
 
-        // --- Обрабатываем локальные переменные (val/var) ---
+        // --- val / var ---
         fn.collectDescendantsOfType<KtProperty>().forEach { prop ->
             val varName = prop.name ?: generateTmp()
-            val initializer = prop.initializer
-            val value = initializer?.let { processExpression(it, varName) } ?: "_"
-            assignments.add("$varName = $value")
-        }
-
-        // --- Обрабатываем все вызовы без присваивания ---
-        fn.collectDescendantsOfType<KtCallExpression>().forEach { call ->
-            if (call.parent !is KtProperty) {
-                processExpression(call)
+            prop.initializer?.let {
+                processExpression(it, varName)
+                assignments += "$varName = ${it.text}"
             }
         }
+
+        // --- вызовы без присваивания ---
+        fn.collectDescendantsOfType<KtCallExpression>()
+            .filter { it.parent !is KtProperty }
+            .forEach { processExpression(it) }
 
         return expressions to assignments
     }
