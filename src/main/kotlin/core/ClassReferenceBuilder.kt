@@ -7,8 +7,10 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import org.jetbrains.kotlin.resolve.BindingContext
 
 class ClassReferenceBuilder : IClassReferenceBuilder {
 
@@ -117,6 +119,38 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
         }
     }
 
+    data class FunctionContent(
+        val methodCalls: List<String>,
+        val assignments: List<String>
+    )
+
+    fun parseFunctionContent(fn: KtNamedFunction): FunctionContent {
+        // --- Методы ---
+        val methodCalls = fn.collectDescendantsOfType<KtCallExpression>().map { call ->
+            val receiver = (call.parent as? KtDotQualifiedExpression)?.receiverExpression?.text
+            val methodName = call.calleeExpression?.text ?: "unknown"
+
+            // Аргументы
+            val args = call.valueArguments.joinToString(", ") { arg ->
+                arg.getArgumentExpression()?.text ?: "?"
+            }
+
+            val fullCall = if (receiver != null) "$receiver.$methodName($args)" else "$methodName($args)"
+            fullCall
+        }
+
+        // --- Присваивания ---
+        val assignments = fn.collectDescendantsOfType<KtBinaryExpression>()
+            .filter { it.operationToken == KtTokens.EQ }
+            .map { assign ->
+                val left = assign.left?.text ?: "unknown"
+                val right = assign.right?.text ?: "unknown"
+                "$left = $right"
+            }
+
+        return FunctionContent(methodCalls = methodCalls, assignments = assignments)
+    }
+
     fun analyzeFunctionCalls(projectClasses: List<KotlinClass>) {
         
         for (cls in projectClasses) {
@@ -126,15 +160,21 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
                         cls.parameters.asSequence().map { it as KtCallableDeclaration })
                     .associateBy { it.name ?: "__no_name__" }
 
-            if(cls.name.contains( "NotificationService"))
-                print(1)
+
 
 
             for (method in cls.functionCalls) {
                 val fn = method.function//funtion
-
+                if(cls.name.contains( "NotificationService"))
+                    parseFunctionContent(fn)
                 // Находим все выражения вида a.b(), obj.service.doWork(), и т.д.
                 val dotCalls = fn.collectDescendantsOfType<KtDotQualifiedExpression>()
+
+                val debugList: List<String> = dotCalls.map { expr ->
+                    val receiver = expr.receiverExpression.text
+                    val selector = expr.selectorExpression?.text ?: "null"
+                    "$receiver.$selector"
+                }
 
                 callLoop@ for (expr in dotCalls) {
 

@@ -12,7 +12,7 @@ repositories {
         defaultRepositories()
     }
     maven("https://central.sonatype.com/repository/maven-snapshots/")
-    maven { url = uri("https://packages.jetbrains.team/maven/p/kotlin/kotlin-dev/") }
+    maven("https://packages.jetbrains.team/maven/p/kotlin/kotlin-dev/")
     maven("https://www.jetbrains.com/intellij-repository/releases")
     maven("https://www.jetbrains.com/intellij-repository/snapshots")
     maven("https://packages.jetbrains.team/maven/p/kotlin/kotlin-dev/")
