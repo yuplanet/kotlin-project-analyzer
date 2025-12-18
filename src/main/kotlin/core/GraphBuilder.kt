@@ -1,51 +1,91 @@
 package org.example.core
 
-import org.example.core.interfaces.IClassReferenceBuilder
-import org.example.core.interfaces.IDiffResultPresenter
-import org.example.core.interfaces.IProjectDifferenceAnalyzer
-import org.example.core.interfaces.IProjectLoader
+import org.example.core.interfaces.*
+import org.example.core.linking.ClassReferenceBuilder
+import org.example.core.linking.DependencyChainBuilder
+import org.example.core.mapping.KtFileMapper
 import org.example.core.psi.KtFileExtractor
+import org.example.core.search.SearcherEngine
 import org.example.data.analyzer.ProjectDiffResult
 import org.example.data.chain.MethodCallNode
 import org.example.data.symbol.KotlinClass
-import org.example.core.mapping.KtFileMapper
 import java.io.File
 
 class GraphBuilder() {
 
-    private val projectDifferenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
+
+    //modules
+    private val differenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
     private val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
-    private val dependencyChainBuilder = DependencyChainBuilder()
-    private val callResolver: IClassReferenceBuilder = ClassReferenceBuilder()
+    private val dependencyChainBuilder: IDependencyChainBuilder = DependencyChainBuilder()
+    private val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
     private val projectLoader: IProjectLoader = GitLoader()
 
+
+    //state
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
 
+    //separate search engine
+    private lateinit var devSearchEngine: IProjectSearchEngine
+    private lateinit var featSearchEngine: IProjectSearchEngine
+
+    //output
     private var diffResult = ProjectDiffResult()
     private var callChain: List<MethodCallNode> = listOf()
-    private val logFile ="logs.txt"
+
+
+    //logs
+    private val logFile ="logs/logs.txt"
+
+
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
-        // 1 load
-        // 2 build references
-        // 3 analyze difference
-        // 4 generate impart chains
-        // 5 output
+        // 1 load project
+        // 2 init engine
+        // 3 build references
+        // 4 analyze difference
+        // 5 generate chains
+        // 6 output
+
+
+
+        //1 load
         loadProject(repoPath, mainCommit, branchCommit)
 
-        //2 proccess all call links
-        collectMethodCalls(developClasses)
-        collectMethodCalls(featureClasses)
 
+        //2 init search engine
+        initSearchEngine()
+
+        //3
+        buildClassReferences(developClasses, devSearchEngine)
+        buildClassReferences(featureClasses, featSearchEngine)
 
         //4 analizy
         analyzeDifference()
 
-        //3 filter
+        //5 generate chains
         generateChains()
 
+        // output data
         output()
+    }
+
+    private fun initSearchEngine() {
+        logStatus(logFile, "Initialize engines")
+
+        try {
+            devSearchEngine = SearcherEngine()
+            featSearchEngine = SearcherEngine()
+
+            devSearchEngine.init(developClasses)
+            featSearchEngine.init(featureClasses)
+
+            logStatus(logFile, "Initialize engines success")
+        } catch (ex: Exception) {
+            logStatus(logFile, "Initialize engines error ${ex.message}")
+            throw ex
+        }
     }
 
     private fun output(){
@@ -57,47 +97,68 @@ class GraphBuilder() {
     }
 
     private fun analyzeDifference() {
-        diffResult = projectDifferenceAnalyzer.analyzeProjectDifferences(developClasses, featureClasses)
-    }
-
-    private fun collectMethodCalls(projectClasses: List<KotlinClass>) {
-
-        logStatus(logFile, "The project binding started")
+        logStatus(logFile, "Analyzing difference")
 
         try {
-            callResolver.bindAll(projectClasses)
-            logStatus(logFile, "The project binding success")
+            diffResult = differenceAnalyzer.analyzeProjectDifferences(developClasses, featureClasses)
+
+            logStatus(logFile, "Analyzing difference success")
+
         } catch (ex: Exception) {
-            logStatus(logFile, "The project binding error ${ex.message}")
+            logStatus(logFile, "Analyzing difference error ${ex.message}")
+            throw ex
+        }
+    }
+
+    private fun buildClassReferences(projectClasses: List<KotlinClass>, searchEngine: IProjectSearchEngine) {
+
+        logStatus(logFile, "Project binding")
+
+        try {
+
+            referenceBuilder.bindAll(projectClasses, searchEngine)
+
+            logStatus(logFile, "Project binding success")
+
+        } catch (ex: Exception) {
+            logStatus(logFile, "Project binding error ${ex.message}")
             throw ex
         }
     }
 
     private fun loadProject(repoPath: String, mainCommit: String, branchCommit: String) {
 
-        developClasses = listOf()
-        featureClasses = listOf()
+        logStatus(logFile, "Project loading")
 
-        val developFiles = projectLoader.loadProjectFilesFromCommit(repoPath, mainCommit)
-            .filterKeys { !it.startsWith("src/test") }
+        try {
+            developClasses = listOf()
+            featureClasses = listOf()
 
-        val featureFiles = projectLoader.loadProjectFilesFromCommit(repoPath, branchCommit)
-            .filterKeys { !it.startsWith("src/test") }
+            val developFiles = projectLoader.loadProjectFilesFromCommit(repoPath, mainCommit)
+                .filterKeys { !it.startsWith("src/test") }
 
-        val project = KtFileExtractor.createProject()
+            val featureFiles = projectLoader.loadProjectFilesFromCommit(repoPath, branchCommit)
+                .filterKeys { !it.startsWith("src/test") }
 
-        val developKtFiles = developFiles.entries.map { (name, content) ->
-            KtFileExtractor.createPsiFile(project, name, content)
+            val project = KtFileExtractor.createProject()
+
+            val developKtFiles = developFiles.entries.map { (name, content) ->
+                KtFileExtractor.createPsiFile(project, name, content)
+            }
+
+            val featureKtFiles = featureFiles.entries.map { (name, content) ->
+                KtFileExtractor.createPsiFile(project, name, content)
+            }
+
+            developClasses = KtFileMapper.mapKtFilesToClasses(developKtFiles)
+            featureClasses = KtFileMapper.mapKtFilesToClasses(featureKtFiles)
+
+            logStatus(logFile, "Project loading success")
+        } catch (ex: Exception) {
+            logStatus(logFile, "Project loading error ${ex.message}")
+            throw ex
         }
-
-        val featureKtFiles = featureFiles.entries.map { (name, content) ->
-            KtFileExtractor.createPsiFile(project, name, content)
-        }
-
-        developClasses = KtFileMapper.mapKtFilesToClasses(developKtFiles)
-        featureClasses = KtFileMapper.mapKtFilesToClasses(featureKtFiles)
     }
-
 
     private fun logStatus(filename: String, content: String) {
         File(filename).appendText(content + System.lineSeparator())

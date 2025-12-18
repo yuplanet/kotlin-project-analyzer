@@ -1,10 +1,12 @@
-package org.example.core.utils
+package org.example.core.search
 
+import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.jetbrains.kotlin.psi.KtParameter
 
-class Searcher(_allClasses: List<KotlinClass>) {
+
+class SearcherEngine: IProjectSearchEngine {
 
     private var allClasses = listOf<KotlinClass>()
     private var allMethods = listOf<ClassMethod>()
@@ -17,8 +19,9 @@ class Searcher(_allClasses: List<KotlinClass>) {
     private var methodFullNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
     private var methodSimpleNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
 
-    init {
-        allClasses = _allClasses
+
+    override fun init(projectClasses: List<KotlinClass>) {
+        allClasses = projectClasses
         allMethods = allClasses.flatMap { it.functionCalls }
 
 
@@ -42,11 +45,45 @@ class Searcher(_allClasses: List<KotlinClass>) {
         }
     }
 
-    fun findByClassNameByMethodName(className: String, methodName: String): List<ClassMethod>? {
+
+    //Methods
+
+    override fun findByFullMethodName(methodName: String): ClassMethod? {
+
+        val key = methodName.hashCode()
+
+        val candidates = methodFullNameDictionary[key] ?: emptyList()
+
+        val result = candidates.firstOrNull { method ->
+            // проверяем класс
+            method.fullName == methodName
+        }
+
+        return result
+    }
+
+
+
+    //Classes
+    override fun findByClassName(className: String): KotlinClass? {
+
         val key = className.hashCode()
         val candidates = classSimpleNameDictionary[key] ?: emptyList()
 
-        val targetClass = candidates.firstOrNull { it.ktClassObject.name == className } ?: return null
+        val result = candidates.firstOrNull { it.ktClassObject.name == className }
+        return result
+    }
+
+
+    //class and method
+    override fun findByClassNameAndMethodName(
+        className: String,
+        methodName: String
+    ): List<ClassMethod> {
+        val key = className.hashCode()
+        val candidates = classSimpleNameDictionary[key] ?: emptyList()
+
+        val targetClass = candidates.firstOrNull { it.ktClassObject.name == className } ?: return emptyList()
 
         val matchedMethod = targetClass.functionCalls.filter { method ->
             method.function.name == methodName
@@ -55,78 +92,55 @@ class Searcher(_allClasses: List<KotlinClass>) {
         return matchedMethod
     }
 
-
-    fun findByClassName(className: String): KotlinClass? {
-        val key = className.hashCode()
-        val candidates = classSimpleNameDictionary[key] ?: emptyList()
-        return candidates.firstOrNull { it.ktClassObject.name == className }
-    }
-
-    fun finFullMethodName(
-        methodName: String,
-    ): ClassMethod? {
-
-        val key = methodName.hashCode()
-        val candidates = methodFullNameDictionary[key] ?: emptyList()
-
-        val res = candidates.firstOrNull { method ->
-            // проверяем класс
-            method.fullName == methodName
-        }
-
-        return res
-    }
-
-    fun findFirstMethodByClassByMethodNameByParams(
+    override fun findFirstMethodByClassNameAndMethodName(
         className: String,
-        methodName: String,
+        methodName: String
     ): ClassMethod? {
 
-        val pclass = findByClassName(className) ?: return null
+        val parentClass = findByClassName(className) ?: return null
 
         val key = methodName.hashCode()
         val candidates = methodSimpleNameDictionary[key] ?: emptyList()
 
-        val res = candidates.firstOrNull { method ->
+        val result = candidates.firstOrNull { method ->
             // проверяем класс
-            method.fullName.contains("${pclass.ktClassObject.name}::$methodName") &&
+            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName") &&
                     // проверяем имя метода
                     method.name == methodName
                     // проверяем параметры
         }
 
-        return res
+        return result
     }
 
-    fun findMethodByClassByMethodNameByParams(
+    override fun findMethodByClassNameAndMethodNameAndParams(
         className: String,
         methodName: String,
         params: List<String>
     ): ClassMethod? {
-
-        val pclass = findByClassName(className) ?: return null
+        val parentClass = findByClassName(className) ?: return null
 
         val key = methodName.hashCode()
         val candidates = methodSimpleNameDictionary[key] ?: emptyList()
 
-        val res = candidates.firstOrNull { method ->
+        val result = candidates.firstOrNull { method ->
             // проверяем класс
-            method.fullName.contains("${pclass.ktClassObject.name}::$methodName") &&
+            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName") &&
                     // проверяем имя метода
-                    method.name == methodName &&
-                    // проверяем параметры
-                    areParamsEqual(params, method.parameters)
+                    method.name == methodName
+                    && areParamsEqual(params, method.parameters)
+            // проверяем параметры
         }
 
-        return res
+        return result
     }
 
-
+    // utils
     /**
      * Проверяет, совпадают ли два списка типов аргументов.
      * Возвращает true, если списки одной длины и все элементы на соответствующих позициях равны.
      */
-    fun areParamsEqual(targetParams: List<String>, methodParams: List<KtParameter>): Boolean {
+    private fun areParamsEqual(targetParams: List<String>, methodParams: List<KtParameter>): Boolean {
         val types = methodParams.map { it.typeReference?.text ?: "Any" }
         if (types.size != targetParams.size) return false
         return types.indices.all { types[it] == targetParams[it] }

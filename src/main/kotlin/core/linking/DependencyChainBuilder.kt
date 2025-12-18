@@ -1,9 +1,9 @@
-package org.example.core
+package org.example.core.linking
 
 import org.example.core.interfaces.IDependencyChainBuilder
 import org.example.data.chain.MethodCallNode
-import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.ClassMethod
+import org.example.data.symbol.KotlinClass
 
 class DependencyChainBuilder: IDependencyChainBuilder {
 

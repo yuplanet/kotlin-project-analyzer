@@ -1,8 +1,8 @@
-package org.example.core
+package org.example.core.linking
 
 import org.example.core.interfaces.IClassReferenceBuilder
+import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtNamedFunctionExtractor
-import org.example.core.utils.Searcher
 import org.example.data.reference.MethodCallReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
@@ -11,15 +11,16 @@ import org.example.data.symbol.KotlinClass
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
-import org.jetbrains.kotlin.resolve.BindingContext
 
-class ClassReferenceBuilder : IClassReferenceBuilder {
+class ClassReferenceBuilder (): IClassReferenceBuilder {
 
-    private lateinit var searcher: Searcher
 
-    override fun bindAll(projectClasses: List<KotlinClass>) {
+    private lateinit var searchEngine: IProjectSearchEngine
 
-        searcher = Searcher(projectClasses)
+    override fun bindAll(projectClasses: List<KotlinClass>, searchEngine: IProjectSearchEngine) {
+
+        this.searchEngine = searchEngine
+
         //Methods
         analyzeFunctionCalls(projectClasses)
         buildReverseCallRecords(projectClasses)
@@ -106,7 +107,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
             for (method in cls.functionCalls) {
                 for (call in method.callRecords) {
 
-                    val calledMethod = searcher.finFullMethodName(call.fullName) ?: continue
+                    val calledMethod = searchEngine.findByFullMethodName(call.fullName) ?: continue
 
                     // Добавляем текущий метод в reverseCallRecords вызываемого метода
                     calledMethod.reverseCallRecords.add(
@@ -155,7 +156,7 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
     }
 
     fun analyzeFunctionCalls(projectClasses: List<KotlinClass>) {
-        
+
         for (cls in projectClasses) {
 
             val classFields: Map<String, KtCallableDeclaration> =
@@ -200,17 +201,17 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
                     // находим класс по имени типа
 
-                    val targetClass = searcher.findByClassName(fieldType) ?: continue@callLoop // --
+                    val targetClass = searchEngine.findByClassName(fieldType) ?: continue@callLoop // --
 
                     // ----------- Строим полный ключ вызываемого метода -----------
                     // Параметры вызова (типов тут не узнать → Any)
                     val argParams = resolveArgumentTypes(selector, classFields, fn)
 
                     // Находим метод среди всех методов проекта
-                    var targetMethod = searcher.findMethodByClassByMethodNameByParams(targetClass.name, calledMethodName, argParams)
+                    var targetMethod = searchEngine.findFirstMethodByClassNameAndMethodNameAndParams(targetClass.name, calledMethodName, argParams)
 
-                   if( targetMethod == null)
-                       targetMethod = searcher.findFirstMethodByClassByMethodNameByParams(targetClass.name, calledMethodName)
+                   if(targetMethod == null)
+                       targetMethod = searchEngine.findFirstMethodByClassNameAndMethodName(targetClass.name, calledMethodName)
 
                     targetMethod  ?: continue@callLoop
 
@@ -252,9 +253,11 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
 
                     if(targetMethod == null){
                         val methods =
-                          searcher.findByClassNameByMethodName(cls.name, calledMethodName)
+                          searchEngine.findByClassNameAndMethodName(cls.name, calledMethodName)
 
-                        targetMethod = methods?.firstOrNull { it.parameters.size == methodArgs.size }
+                        if(methods.isEmpty()) continue
+
+                        targetMethod = methods.firstOrNull { it.parameters.size == methodArgs.size }
                     }
 
                     targetMethod  ?: continue

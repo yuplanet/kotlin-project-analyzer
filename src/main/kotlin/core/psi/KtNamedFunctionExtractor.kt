@@ -1,7 +1,6 @@
 package org.example.core.psi
 
 import org.example.data.symbol.Expression
-import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
