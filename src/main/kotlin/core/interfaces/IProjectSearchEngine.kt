@@ -9,7 +9,13 @@ interface IProjectSearchEngine {
 
     // ===== Methods =====
 
-
+    /**
+     * Full method name format:
+     * <Class>::<Receiver?>method(paramTypes):returnType
+     *
+     * Example:
+     * ApiKeyManagementController::getApiKeyClients(String):Boolean
+     */
     fun findByFullMethodName(methodName: String): ClassMethod?
 
     // ===== Classes =====

@@ -1,13 +1,10 @@
 package org.example.core.psi
 
-import org.example.data.reference.MethodCallReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.FullExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
-import java.io.File
 
 
 object KtNamedFunctionExtractor {
@@ -20,6 +17,7 @@ object KtNamedFunctionExtractor {
             ?: (call.parent as? KtSafeQualifiedExpression)?.receiverExpression?.text
             ?: "this"
         val params = call.valueArguments.map { it.getArgumentExpression()?.text ?: "?" }
+
 
         return FullExpression(
             variable = variable,
@@ -78,14 +76,5 @@ object KtNamedFunctionExtractor {
 
 
         fn.bodyExpression?.let { process(it) }
-    }
-
-
-
-    fun parseFunctionContent(
-        fn: KtNamedFunction,
-        fnC:ClassMethod,
-    ) {
-        val wfun = collectFunctionExpressions(fn,fnC)
     }
 }

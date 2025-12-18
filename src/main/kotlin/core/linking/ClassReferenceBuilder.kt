@@ -120,121 +120,23 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
     fun analyzeFunctionCalls(projectClasses: List<KotlinClass>) {
 
+
+
         for (cls in projectClasses) {
 
-            val classFields: Map<String, KtCallableDeclaration> =
-                (cls.ktProperties.asSequence().map { it as KtCallableDeclaration } +
-                        cls.ktParameters.asSequence().map { it as KtCallableDeclaration })
-                    .associateBy { it.name ?: "__no_name__" }
-
-
             for (method in cls.functionCalls) {
-                val fn = method.function//funtion
 
-                if(cls.name.contains( "NotificationService"))
-                    KtNamedFunctionExtractor.parseFunctionContent(fn, method)
+                if(method.name!="sendScheduledEnvelopeNotification")
+                    continue
 
+                KtNamedFunctionExtractor.collectFunctionExpressions(method.function, method)
 
-                // Находим все выражения вида a.b(), obj.service.doWork(), и т.д.
-                val dotCalls = fn.collectDescendantsOfType<KtDotQualifiedExpression>()
+                for (expression in method.fullExpressions) {
 
-                val debugList: List<String> = dotCalls.map { expr ->
-                    val receiver = expr.receiverExpression.text
-                    val selector = expr.selectorExpression?.text ?: "null"
-                    "$receiver.$selector"
-                }
-
-                callLoop@ for (expr in dotCalls) {
-
-                    val receiver = expr.receiverExpression as? KtNameReferenceExpression
-                        ?: continue@callLoop
-
-                    val selector = expr.selectorExpression as? KtCallExpression
-                        ?: continue@callLoop
-
-                    val receiverName = receiver.getReferencedName()//field name
-
-                    // метод вызывается: a.method()
-                    val calledMethodName = selector.calleeExpression?.text ?: continue@callLoop//fiel mat name
-
-                    // что такое a ?
-                    val fieldDecl = classFields[receiverName] ?: continue@callLoop
-
-                    // какой у него тип?
-                    val fieldType = fieldDecl.typeReference?.text ?: continue@callLoop
-
-                    // находим класс по имени типа
-
-                    val targetClass = searchEngine.findByClassName(fieldType) ?: continue@callLoop // --
-
-                    // ----------- Строим полный ключ вызываемого метода -----------
-                    // Параметры вызова (типов тут не узнать → Any)
-                    val argParams = resolveArgumentTypes(selector, classFields, fn)
-
-                    // Находим метод среди всех методов проекта
-                    var targetMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(targetClass.name, calledMethodName, argParams)
-
-                   if(targetMethod == null)
-                       targetMethod = searchEngine.findFirstMethodByClassNameAndMethodName(targetClass.name, calledMethodName)
-
-                    targetMethod  ?: continue@callLoop
-
-
-
-                    // Добавляем в callRecords текущего метода
-                    method.callRecords.add(
-                        MethodCallReference(
-                            fullName = targetMethod.fullName,
-                            parentClass = targetClass
-                        )
-                    )
-                }
-            }
-
-
-
-            for (method in cls.functionCalls){
-                val fn = method.function//funtion
-
-                // Находим все выражения вида a.b(), obj.service.doWork(), и т.д.
-                // ----------- 2. Вызовы методов текущего класса без this -----------
-                // Берём только тело функции
-                val body = fn.bodyExpression ?: continue
-                val simpleCalls = body.collectDescendantsOfType<KtCallExpression>()
-                    // исключаем аннотации
-                    .filter { it.parent !is KtAnnotationEntry }
-
-                for (callExpr in simpleCalls) {
-                    // 1️⃣ только внутренние вызовы
-                    val callee = callExpr.calleeExpression
-                    if (callee !is KtNameReferenceExpression) continue
-
-                    val calledMethodName = callee.text
-
-                    var methodArgs = resolveArgumentTypes(callExpr, classFields, fn)
-
-                    var targetMethod: ClassMethod? = null// searcher.finMethodByClassByMethodNameByParams(cls.name, calledMethodName, methodArgs)
-
-                    if(targetMethod == null){
-                        val methods =
-                          searchEngine.findByClassNameAndMethodName(cls.name, calledMethodName)
-
-                        if(methods.isEmpty()) continue
-
-                    }
-
-                    targetMethod  ?: continue
-
-                    method.callRecords.add(
-                        MethodCallReference(
-                            fullName = targetMethod.fullName,
-                            parentClass = cls
-                        )
-                    )
+                    ExpressionTypeResolver.resolveExpressionType(expression, method, cls,searchEngine)
                 }
             }
         }
-
     }
 
     fun resolveArgumentTypes(
