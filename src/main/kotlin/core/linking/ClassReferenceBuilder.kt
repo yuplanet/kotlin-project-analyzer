@@ -133,7 +133,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                 for (expression in method.fullExpressions) {
 
-                    ExpressionTypeResolver.resolveExpressionType(expression, method, cls,searchEngine)
+                    ExpressionTypeResolver.resolveExpressionType(expression, method, cls, searchEngine)
                 }
             }
         }

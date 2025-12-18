@@ -1,34 +1,47 @@
 package org.example.core.linking
 
 import org.example.core.interfaces.IProjectSearchEngine
+import org.example.core.search.KiFileIndexed
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FullExpression
 import org.example.data.symbol.KotlinClass
+import org.jetbrains.kotlin.psi.KtFile
 
 object ExpressionTypeResolver {
+    // Функция для резолва полного имени класса через импорты
+    private fun resolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
+        // Сначала ищем точное совпадение
+        ktFile.importDirectives.firstOrNull { it.importedFqName?.shortName()?.asString() == typeName }
+            ?.importedFqName?.asString()?.let { return it }
 
+        // Затем ищем wildcard import, например java.time.*
+        ktFile.importDirectives.firstOrNull { it.importedFqName?.asString()?.endsWith(".*") == true }
+            ?.importedFqName?.asString()?.removeSuffix(".*")?.let { pkg ->
+                return "$pkg.$typeName"
+            }
+
+        return null
+    }
 
     fun resolveExpressionType(
         expr: FullExpression,
         parentMethod: ClassMethod,
         parentClass: KotlinClass,
-        engine: IProjectSearchEngine
+        engine: IProjectSearchEngine,
     ) {
+
+
+        val ktFile = KiFileIndexed.getFileByClassName(parentClass.name)?:return
         // --- RESOLVE RECEIVER ---
         expr.type = when {
             expr.receiver == "this" -> parentClass.name // класс текущего метода
             else -> {
-                // 1️⃣ Локальные свойства метода
                 parentMethod.properties.firstOrNull { it.name == expr.receiver }?.type
-                // 2️⃣ Параметры метода
                     ?: parentMethod.ktParameters.firstOrNull { it.name == expr.receiver }?.typeReference?.text
-                    // 3️⃣ Поля класса
                     ?: parentClass.propertyReferences.firstOrNull { it.name == expr.receiver }?.type
-                    // 4️⃣ Параметры класса
                     ?: parentClass.parameterReferences.firstOrNull { it.name == expr.receiver }?.type
-                    // 5️⃣ Через движок
                     ?: engine.findByClassName(expr.receiver)?.name
-                    // если не нашли
+                    ?: resolveTypeFromImports(expr.receiver, ktFile)
                     ?: "_"
             }
         }
@@ -39,21 +52,15 @@ object ExpressionTypeResolver {
                 param.contains(".") -> param.substringBefore(".") // EnumName.VALUE -> EnumName
                 param.endsWith("()") -> param.substringBefore("(") // Constructor() -> Constructor
                 else -> {
-                    // 1️⃣ Локальные свойства метода
                     parentMethod.properties.firstOrNull { it.name == param }?.type
-                    // 2️⃣ Параметры метода
                         ?: parentMethod.ktParameters.firstOrNull { it.name == param }?.typeReference?.text
-                        // 3️⃣ Поля класса
                         ?: parentClass.propertyReferences.firstOrNull { it.name == param }?.type
-                        // 4️⃣ Параметры класса
                         ?: parentClass.parameterReferences.firstOrNull { it.name == param }?.type
-                        // 5️⃣ Через движок
                         ?: engine.findByClassName(param)?.name
-                        // если не нашли
+                        ?: resolveTypeFromImports(param, ktFile)
                         ?: "_"
                 }
             }
         }.toMutableList()
     }
-
 }
