@@ -1,6 +1,6 @@
-package org.example.mapping
+package org.example.core.mapping
 
-import org.example.core.PsiExtractor
+import org.example.core.psi.KtFileExtractor
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
@@ -9,7 +9,7 @@ import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
-object KotlinClassMapper {
+object KtFileMapper {
 
     /**
      * Преобразует KtFile в список KotlinClass
@@ -32,7 +32,7 @@ object KotlinClassMapper {
 
             // Берём все функции класса и companion object
             //1 functions
-            val namedFunctions = PsiExtractor.getClassMethods(cls)
+            val namedFunctions = KtFileExtractor.getClassMethods(cls)
             val functions = namedFunctions.map {
                 ClassMethod(
                     name = it.name ?: "__no_name__",
@@ -165,5 +165,4 @@ object KotlinClassMapper {
             else -> ObjectType.Undefined
         }
     }
-
 }

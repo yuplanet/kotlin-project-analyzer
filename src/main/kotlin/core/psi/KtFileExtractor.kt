@@ -1,4 +1,4 @@
-package org.example.core
+package org.example.core.psi
 
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
@@ -15,12 +15,11 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtPsiFactory
 
-
 /**
 * Класс по распаковен файлов txt на KtFile, KtClass, KtFunc
 *
 */
-object PsiExtractor {
+object KtFileExtractor {
     fun createProject(): Project {
         val disposable: Disposable = Disposer.newDisposable()
 

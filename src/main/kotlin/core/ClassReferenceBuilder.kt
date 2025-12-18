@@ -1,6 +1,7 @@
 package org.example.core
 
 import org.example.core.interfaces.IClassReferenceBuilder
+import org.example.core.psi.KtNamedFunctionExtractor
 import org.example.core.utils.Searcher
 import org.example.data.reference.MethodCallReference
 import org.example.data.symbol.ClassMethod
@@ -125,6 +126,8 @@ class ClassReferenceBuilder : IClassReferenceBuilder {
     )
 
     fun parseFunctionContent(fn: KtNamedFunction): FunctionContent {
+
+       val data = KtNamedFunctionExtractor.parseFunctionContent(fn)
         // --- Методы ---
         val methodCalls = fn.collectDescendantsOfType<KtCallExpression>().map { call ->
             val receiver = (call.parent as? KtDotQualifiedExpression)?.receiverExpression?.text

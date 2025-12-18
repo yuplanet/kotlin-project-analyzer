@@ -4,10 +4,11 @@ import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IDiffResultPresenter
 import org.example.core.interfaces.IProjectDifferenceAnalyzer
 import org.example.core.interfaces.IProjectLoader
+import org.example.core.psi.KtFileExtractor
 import org.example.data.analyzer.ProjectDiffResult
 import org.example.data.chain.MethodCallNode
 import org.example.data.symbol.KotlinClass
-import org.example.mapping.KotlinClassMapper
+import org.example.core.mapping.KtFileMapper
 import java.io.File
 
 class GraphBuilder() {
@@ -83,18 +84,18 @@ class GraphBuilder() {
         val featureFiles = projectLoader.loadProjectFilesFromCommit(repoPath, branchCommit)
             .filterKeys { !it.startsWith("src/test") }
 
-        val project = PsiExtractor.createProject()
+        val project = KtFileExtractor.createProject()
 
         val developKtFiles = developFiles.entries.map { (name, content) ->
-            PsiExtractor.createPsiFile(project, name, content)
+            KtFileExtractor.createPsiFile(project, name, content)
         }
 
         val featureKtFiles = featureFiles.entries.map { (name, content) ->
-            PsiExtractor.createPsiFile(project, name, content)
+            KtFileExtractor.createPsiFile(project, name, content)
         }
 
-        developClasses = KotlinClassMapper.mapKtFilesToClasses(developKtFiles)
-        featureClasses = KotlinClassMapper.mapKtFilesToClasses(featureKtFiles)
+        developClasses = KtFileMapper.mapKtFilesToClasses(developKtFiles)
+        featureClasses = KtFileMapper.mapKtFilesToClasses(featureKtFiles)
     }
 
 
