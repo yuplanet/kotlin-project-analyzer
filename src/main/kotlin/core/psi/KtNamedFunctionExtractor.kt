@@ -1,6 +1,7 @@
 package org.example.core.psi
 
 import org.example.data.symbol.FullExpression
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import java.io.File
@@ -8,98 +9,93 @@ import java.io.File
 
 object KtNamedFunctionExtractor {
     private var tmpCounter = 0
-    fun collectAllMethodCalls(fn: KtNamedFunction): List<String> {
-        val calls = mutableListOf<String>()
 
-        // Рекурсивно находим receiver
-        fun findReceiver(call: KtCallExpression): String {
-            var expr: KtExpression = call
-            val receivers = mutableListOf<String>()
-            while (true) {
-                val parent = expr.parent
-                when (parent) {
-                    is KtDotQualifiedExpression -> {
-                        receivers.add(parent.receiverExpression.text)
-                        expr = parent
-                    }
-                    is KtSafeQualifiedExpression -> {
-                        receivers.add(parent.receiverExpression.text + "?")
-                        expr = parent
-                    }
-                    else -> break
-                }
-            }
-            return if (receivers.isEmpty()) "this" else receivers.reversed().joinToString(".")
-        }
 
-        fun buildFullCall(expr: KtExpression): String? {
-            return when (expr) {
-                is KtCallExpression -> {
-                    val receiver = findReceiver(expr)
-                    val methodName = expr.calleeExpression?.text ?: "unknown"
-                    val args = expr.valueArguments.map { it.getArgumentExpression()?.text ?: "?" }
-                    "$receiver.$methodName(${args.joinToString(", ")})"
-                }
-                is KtDotQualifiedExpression -> {
-                    expr.selectorExpression?.let { buildFullCall(it) }
-                }
-                is KtSafeQualifiedExpression -> {
-                    expr.selectorExpression?.let { buildFullCall(it)?.let { s -> "${expr.receiverExpression.text}?." + s.substringAfter('.') } }
-                }
-                else -> null
-            }
-        }
 
-        fun process(expr: KtExpression) {
-            when (expr) {
+    fun collectFullExpressions(fn: KtNamedFunction): List<FullExpression> {
+        val result = mutableListOf<FullExpression>()
 
-                // Переменные
+        fun process(element: PsiElement, currentVar: String = "") {
+            when (element) {
+
+                // --- переменные ---
                 is KtProperty -> {
-                    val varName = expr.name ?: "__no_name__"
-                    expr.initializer?.let { init ->
-                        val callText = buildFullCall(init)
-                        if (callText != null) calls += "$varName = $callText"
-                        process(init) // рекурсивно обрабатываем выражение
+                    val varName = element.name ?: ""
+                    val type = element.typeReference?.text ?: "_"
+                    element.initializer?.let { init ->
+                        // если RHS вызов метода
+                        if (init is KtCallExpression) {
+                            val expr = buildFullExpression(init, varName)
+                            result += expr
+                        }
+                        process(init, varName)
                     }
                 }
 
-                // Вызовы
+                // --- вызовы методов ---
                 is KtCallExpression -> {
-                    buildFullCall(expr)?.let { calls += it }
-                    expr.valueArguments.forEach { arg -> arg.getArgumentExpression()?.let { process(it) } }
+                    val expr = buildFullExpression(element, currentVar)
+                    result += expr
+                    // рекурсивно по аргументам
+                    element.valueArguments.forEach { it.getArgumentExpression()?.let { process(it) } }
                 }
 
-                // DotQualified и SafeQualified рекурсивно
-                is KtDotQualifiedExpression -> expr.selectorExpression?.let { process(it) }
-                is KtSafeQualifiedExpression -> expr.selectorExpression?.let { process(it) }
+                // --- dot цепочки ---
+                is KtDotQualifiedExpression -> element.selectorExpression?.let { process(it) }
 
-                // Блоки и управляющие конструкции
-                is KtBlockExpression -> expr.statements.forEach { process(it) }
-                is KtForExpression -> expr.body?.let { process(it) }
-                is KtWhileExpression -> expr.body?.let { process(it) }
-                is KtIfExpression -> { expr.then?.let { process(it) }; expr.`else`?.let { process(it) } }
+                // --- safe call цепочки ---
+                is KtSafeQualifiedExpression -> element.selectorExpression?.let { process(it) }
+
+                // --- блоки ---
+                is KtBlockExpression -> element.statements.forEach { process(it) }
+
+                // --- циклы ---
+                is KtForExpression -> element.body?.let { process(it) }
+                is KtWhileExpression -> element.body?.let { process(it) }
+
+                // --- if ---
+                is KtIfExpression -> {
+                    element.then?.let { process(it) }
+                    element.`else`?.let { process(it) }
+                }
+
+                // --- try/catch/finally ---
                 is KtTryExpression -> {
-                    process(expr.tryBlock)
-                    expr.catchClauses.forEach { it.catchBody?.let { b -> process(b) } }
-                    expr.finallyBlock?.finalExpression?.let { process(it) }
+                    process(element.tryBlock)
+                    element.catchClauses.forEach { clause -> clause.catchBody?.let { process(it) } }
+                    element.finallyBlock?.finalExpression?.let { process(it) }
                 }
+
+                else -> element.children.forEach { process(it) }
             }
         }
 
-        // Рекурсивно строим полный вызов с receiver
-
-
-
-
-        fn.bodyBlockExpression?.statements?.forEach { process(it) }
-        return calls
+        fn.bodyExpression?.let { process(it) }
+        return result
     }
+
+    // --- helper для построения FullExpression ---
+    fun buildFullExpression(call: KtCallExpression, variable: String = ""): FullExpression {
+        val method = call.calleeExpression?.text ?: ""
+        val receiver = (call.parent as? KtDotQualifiedExpression)?.receiverExpression?.text
+            ?: (call.parent as? KtSafeQualifiedExpression)?.receiverExpression?.text
+            ?: "this"
+        val params = call.valueArguments.map { it.getArgumentExpression()?.text ?: "?" }
+
+        return FullExpression(
+            variable = variable,
+            receiver = receiver,
+            method = method,
+            params = params
+        )
+    }
+
 
 
     fun parseFunctionContent(
         fn: KtNamedFunction
     ): Pair<List<FullExpression>, List<String>> {
-        collectAllMethodCalls(fn)
+        val wfun = collectFullExpressions(fn)
 
         val dotCalls3 =
             fn.bodyBlockExpression
