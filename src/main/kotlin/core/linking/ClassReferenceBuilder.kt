@@ -1,19 +1,13 @@
 package org.example.core.linking
 
-import com.google.gson.GsonBuilder
-import com.intellij.psi.PsiElement
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtNamedFunctionExtractor
 import org.example.data.reference.MethodCallReference
 import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.ClassParameter
-import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
-import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
-import java.io.File
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
 
@@ -42,7 +36,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
     override fun bindPropertyCalls(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
-            val fieldsByName = cls.properties.associateBy { it.name ?: "__no_name__" }
+            val fieldsByName = cls.ktProperties.associateBy { it.name ?: "__no_name__" }
 
             for (method in cls.functionCalls) {
                 val fn = method.function
@@ -56,7 +50,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                     // Находим или создаём ClassProperty для этого свойства
                     val classProperty = cls.propertyReferences.firstOrNull { it.property == property }
-                        ?: ClassProperty(property = property).also { cls.propertyReferences.add(it) }
+                        ?: continue//ClassProperty(property = property).also { cls.propertyReferences.add(it) }
 
                     // Добавляем ссылку на метод, который использует это свойство
                     classProperty.callRecord.add(
@@ -73,7 +67,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
     override fun bindParameterCalls(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
             // Индекс параметров по имени
-            val paramsByName = cls.parameters.associateBy { it.name ?: "__no_name__" }
+            val paramsByName = cls.ktParameters.associateBy { it.name ?: "__no_name__" }
 
             for (method in cls.functionCalls) {
                 val fn = method.function
@@ -87,7 +81,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                     // Находим или создаём ClassParameter
                     val classParam = cls.parameterReferences.firstOrNull { it.property == parameter }
-                        ?: ClassParameter(property = parameter).also { cls.parameterReferences.add(it) }
+                        ?: continue//ClassParameter(property = parameter).also { cls.parameterReferences.add(it) }
 
                     // Добавляем ссылку на метод, который использует этот параметр
                     classParam.callRecord.add(
@@ -124,58 +118,23 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         }
     }
 
-    data class FunctionContent(
-        val methodCalls: List<String>,
-        val assignments: List<String>
-    )
-
-
-    fun parseFunctionContent(fn: KtNamedFunction, clsName: String): FunctionContent {
-
-
-       val data = KtNamedFunctionExtractor.parseFunctionContent(fn)
-        // --- Методы ---
-        val methodCalls = fn.collectDescendantsOfType<KtCallExpression>().map { call ->
-            val receiver = (call.parent as? KtDotQualifiedExpression)?.receiverExpression?.text
-            val methodName = call.calleeExpression?.text ?: "unknown"
-
-            // Аргументы
-            val args = call.valueArguments.joinToString(", ") { arg ->
-                arg.getArgumentExpression()?.text ?: "?"
-            }
-
-            val fullCall = if (receiver != null) "$receiver.$methodName($args)" else "$methodName($args)"
-            fullCall
-        }
-
-        // --- Присваивания ---
-        val assignments = fn.collectDescendantsOfType<KtBinaryExpression>()
-            .filter { it.operationToken == KtTokens.EQ }
-            .map { assign ->
-                val left = assign.left?.text ?: "unknown"
-                val right = assign.right?.text ?: "unknown"
-                "$left = $right"
-            }
-
-        return FunctionContent(methodCalls = methodCalls, assignments = assignments)
-    }
-
     fun analyzeFunctionCalls(projectClasses: List<KotlinClass>) {
 
         for (cls in projectClasses) {
 
             val classFields: Map<String, KtCallableDeclaration> =
-                (cls.properties.asSequence().map { it as KtCallableDeclaration } +
-                        cls.parameters.asSequence().map { it as KtCallableDeclaration })
+                (cls.ktProperties.asSequence().map { it as KtCallableDeclaration } +
+                        cls.ktParameters.asSequence().map { it as KtCallableDeclaration })
                     .associateBy { it.name ?: "__no_name__" }
-
-
 
 
             for (method in cls.functionCalls) {
                 val fn = method.function//funtion
+
                 if(cls.name.contains( "NotificationService"))
-                    parseFunctionContent(fn, cls.name)
+                    KtNamedFunctionExtractor.parseFunctionContent(fn, method)
+
+
                 // Находим все выражения вида a.b(), obj.service.doWork(), и т.д.
                 val dotCalls = fn.collectDescendantsOfType<KtDotQualifiedExpression>()
 
@@ -262,7 +221,6 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                         if(methods.isEmpty()) continue
 
-                        targetMethod = methods.firstOrNull { it.parameters.size == methodArgs.size }
                     }
 
                     targetMethod  ?: continue

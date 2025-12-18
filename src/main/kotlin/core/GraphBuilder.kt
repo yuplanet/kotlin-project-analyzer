@@ -3,7 +3,7 @@ package org.example.core
 import org.example.core.interfaces.*
 import org.example.core.linking.ClassReferenceBuilder
 import org.example.core.linking.DependencyChainBuilder
-import org.example.core.mapping.KtFileMapper
+import org.example.core.utils.KtFileMapper
 import org.example.core.psi.KtFileExtractor
 import org.example.core.search.SearcherEngine
 import org.example.data.analyzer.ProjectDiffResult

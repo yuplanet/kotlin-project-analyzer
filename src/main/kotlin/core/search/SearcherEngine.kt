@@ -128,7 +128,7 @@ class SearcherEngine: IProjectSearchEngine {
             method.fullName.contains("${parentClass.ktClassObject.name}::$methodName") &&
                     // проверяем имя метода
                     method.name == methodName
-                    && areParamsEqual(params, method.parameters)
+                // && areParamsEqual(params, method.parameterTypeNames)
             // проверяем параметры
         }
 
