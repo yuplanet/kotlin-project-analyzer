@@ -14,7 +14,9 @@ class KotlinClass {
     var annotations = listOf<String>()
 
 
-    var superClasses: List<KotlinClass> = listOf()
+    var superClasses: MutableList<KotlinClass> = mutableListOf()
+    var subClasses: MutableList<KotlinClass> = mutableListOf()
+
 
     var name: String
     var path: String

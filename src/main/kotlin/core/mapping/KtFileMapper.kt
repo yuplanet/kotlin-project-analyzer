@@ -6,7 +6,6 @@ import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.enum.ObjectType
-import org.jetbrains.kotlin.com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
@@ -25,10 +24,10 @@ object KtFileMapper {
         for (cls in classes) {
 
             val filePath = ktFile.name
-            val className = cls.name?: filePath.substringAfterLast("/").substringBeforeLast(".kt")
+            val className = cls.name ?: filePath.substringAfterLast("/").substringBeforeLast(".kt")
 
             val type = getEntityType(cls)
-            val annotation  = getAnnotations(cls)
+            val annotation = getAnnotations(cls)
             val ktClass = KotlinClass(cls, filePath, className, type, annotation)
 
             // Берём все функции класса и companion object
@@ -39,20 +38,35 @@ object KtFileMapper {
                     name = it.name ?: "__no_name__",
                     fullName = methodKey(it),
                     function = it,
-                    parameters = it.valueParameters
+                    parameters = it.valueParameters,
+                    parameterTypes = getFunctionParameterNames(it),
                 )
             }.toMutableList()
 
             ktClass.functionCalls.addAll(functions)
             ktClass.functions = collectFunctions(cls)
 
-
             // мапи поля и параметры(то же самое что и поля) класса
             val properties = cls.declarations.filterIsInstance<KtProperty>()
             val parameters = cls.primaryConstructorParameters
 
-            val fieldRefs = properties.map { ClassProperty(it) }
-            val paramRefs = parameters.map { ClassParameter(it) }
+            val fieldRefs = properties.map {
+                ClassProperty(
+                    name = it.name ?: "__no_name__",
+                    type = it.typeReference?.text ?: "_",
+                    property = it,
+                    callRecord = mutableListOf()
+                )
+            }
+
+            val paramRefs = parameters.map {
+                ClassParameter(
+                    name = it.name ?: "__no_name__",
+                    type = it.typeReference?.text ?: "_",
+                    property = it,
+                    callRecord = mutableListOf()
+                )
+            }
 
             ktClass.propertyReferences.addAll(fieldRefs)
             ktClass.parameterReferences.addAll(paramRefs)
@@ -78,7 +92,7 @@ object KtFileMapper {
         val params = fn.valueParameters.joinToString(",") { it.typeReference?.text ?: "Any" }
 
         // 4. Имя класса, если есть
-        val className = fn.getContainingClassName()
+        val className = getFunctionParentClassName(fn)
 
         // 5. Тип возвращаемого значения
         val returnType = fn.typeReference?.text ?: "Unit"
@@ -87,8 +101,8 @@ object KtFileMapper {
     }
 
     // Вспомогательная функция для получения имени класса или top-level
-    fun KtNamedFunction.getContainingClassName(): String {
-        var parent = this.parent
+    fun getFunctionParentClassName(fn: KtNamedFunction): String {
+        var parent = fn.parent
         while (parent != null) {
             if (parent is KtClassOrObject) {
                 return parent.name ?: "__anonymous__"
@@ -131,7 +145,8 @@ object KtFileMapper {
 
                     val parentClass = classesByName[typeName] ?: return@forEach
                     if (visitedParents.add(parentClass)) {
-                        kclass.superClasses = kclass.superClasses + parentClass
+                        kclass.superClasses = (kclass.superClasses + parentClass).toMutableList()
+
                         collectParents(parentClass.ktClassObject) // рекурсивно добавляем родителей
                     }
                 }
@@ -165,5 +180,11 @@ object KtFileMapper {
             else ObjectType.Object
             else -> ObjectType.Undefined
         }
+    }
+
+    fun getFunctionParameterNames(fn: KtNamedFunction): List<String> {
+        val paramsPsi: List<KtParameter> = fn.valueParameters
+        val parameterTypes: List<String> = paramsPsi.map { it.typeReference?.text ?: "_" }
+        return parameterTypes
     }
 }
