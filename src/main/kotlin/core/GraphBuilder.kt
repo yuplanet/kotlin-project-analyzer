@@ -36,7 +36,7 @@ class GraphBuilder() {
 
 
     //logs
-    private val logFile ="logs/logs.txt"
+    private val logFile ="logs.txt"
 
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
@@ -58,7 +58,7 @@ class GraphBuilder() {
         initSearchEngine()
 
         //3
-        buildClassReferences(developClasses, devSearchEngine)
+            //buildClassReferences(developClasses, devSearchEngine)
         buildClassReferences(featureClasses, featSearchEngine)
 
         //4 analizy

@@ -22,6 +22,7 @@ dependencies {
     intellijPlatform {
         intellijIdea("2025.1")
         bundledPlugin("com.intellij.java")
+        bundledPlugin("org.jetbrains.kotlin")
     }
     testImplementation(kotlin("test"))
     implementation(kotlin("stdlib"))

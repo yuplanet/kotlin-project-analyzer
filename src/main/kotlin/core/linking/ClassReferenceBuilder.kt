@@ -1,5 +1,7 @@
 package org.example.core.linking
 
+import com.google.gson.GsonBuilder
+import com.intellij.psi.PsiElement
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtNamedFunctionExtractor
@@ -11,6 +13,7 @@ import org.example.data.symbol.KotlinClass
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import java.io.File
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
 
@@ -126,7 +129,9 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         val assignments: List<String>
     )
 
-    fun parseFunctionContent(fn: KtNamedFunction): FunctionContent {
+
+    fun parseFunctionContent(fn: KtNamedFunction, clsName: String): FunctionContent {
+
 
        val data = KtNamedFunctionExtractor.parseFunctionContent(fn)
         // --- Методы ---
@@ -170,7 +175,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
             for (method in cls.functionCalls) {
                 val fn = method.function//funtion
                 if(cls.name.contains( "NotificationService"))
-                    parseFunctionContent(fn)
+                    parseFunctionContent(fn, cls.name)
                 // Находим все выражения вида a.b(), obj.service.doWork(), и т.д.
                 val dotCalls = fn.collectDescendantsOfType<KtDotQualifiedExpression>()
 
@@ -208,7 +213,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                     val argParams = resolveArgumentTypes(selector, classFields, fn)
 
                     // Находим метод среди всех методов проекта
-                    var targetMethod = searchEngine.findFirstMethodByClassNameAndMethodNameAndParams(targetClass.name, calledMethodName, argParams)
+                    var targetMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(targetClass.name, calledMethodName, argParams)
 
                    if(targetMethod == null)
                        targetMethod = searchEngine.findFirstMethodByClassNameAndMethodName(targetClass.name, calledMethodName)
