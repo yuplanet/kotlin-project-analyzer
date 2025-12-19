@@ -100,7 +100,7 @@ object ExpressionTypeResolver {
     ) {
         val ktFile = KiFileIndexed.getFileByClassName(parentClass.name) ?: return
 
-        expr.type = if (expr.receiver == "this") parentClass.name
+        expr.collingContextType = if (expr.receiver == "this") parentClass.name
         else resolveVariableType(expr.receiver, parentMethod, parentClass, engine, ktFile)
 
         // --- RESOLVE PARAMS СНАЧАЛА ---
@@ -121,7 +121,7 @@ object ExpressionTypeResolver {
         }.toMutableList()
 
         // --- RESOLVE VARIABLE TYPE ПОСЛЕ ПАРАМЕТРОВ ---
-        expr.type = when {
+        expr.collingContextType = when {
             expr.receiver == "this" -> parentClass.name
             else -> {
                 // если receiver совпадает с именем переменной, то ищем через движок, так как параметры уже резолвились
@@ -143,13 +143,13 @@ object ExpressionTypeResolver {
         // --- ОБНОВЛЯЕМ ВСЕ FullExpression В parentMethod.fullExpressions ---
         parentMethod.fullExpressions.forEach { otherExpr ->
             // Обновляем тип переменной
-            if (otherExpr.variable == expr.variable && otherExpr.variable.isNotEmpty()) {
-                otherExpr.type = expr.type
+            if (otherExpr.collingContext == expr.collingContext && otherExpr.collingContext.isNotEmpty()) {
+                otherExpr.collingContextType = expr.collingContextType
             }
 
             // Обновляем параметры, если встречается имя текущей переменной
             otherExpr.params = otherExpr.params.map { p ->
-                if (p == expr.variable) expr.type else p
+                if (p == expr.collingContext) expr.collingContextType else p
             }.toMutableList()
         }
 

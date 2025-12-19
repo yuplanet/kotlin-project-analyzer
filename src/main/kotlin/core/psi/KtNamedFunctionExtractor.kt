@@ -9,74 +9,96 @@ import org.jetbrains.kotlin.psi.*
 
 object KtNamedFunctionExtractor {
 
-    fun buildFullExpression(call: KtCallExpression, variable: String = "", type: String = "_"): FullExpression {
-
-        val method = call.calleeExpression?.text ?: ""
+    fun buildFullExpression(
+        call: KtCallExpression,
+        collingContext: String = "",
+        collingContextType: String = "_",
+        method: String = ""
+    ): FullExpression {
 
         val receiver = (call.parent as? KtDotQualifiedExpression)?.receiverExpression?.text
             ?: (call.parent as? KtSafeQualifiedExpression)?.receiverExpression?.text
             ?: "this"
         val params = call.valueArguments.map { it.getArgumentExpression()?.text ?: "?" }
 
-
         return FullExpression(
-            variable = variable,
-            type = type,
+            collingContext = collingContext,
+            collingContextType = collingContextType,
             receiver = receiver,
-            method = method,
+            method = method.ifEmpty { call.calleeExpression?.text ?: "" },
             methodReturnType = "_",
             params = params
         )
     }
 
+
     fun collectFunctionExpressions(fn: KtNamedFunction, parentMethod: ClassMethod) {
 
-        fun process(element: PsiElement, currentVar: String = "", currentType: String = "_") {
+        fun process(
+            element: PsiElement,
+            currentVar: String = "",
+            currentType: String = "_",
+            parentCall: PsiElement? = null
+        ) {
             when (element) {
                 is KtProperty -> {
                     val varName = element.name ?: "__no_name__"
                     val varType = element.typeReference?.text ?: "_"
 
-                    val classProp = ClassProperty(varName, varType, element)
-                    parentMethod.properties += classProp
+                    parentMethod.properties += ClassProperty(varName, varType, element)
 
                     element.initializer?.let { init ->
-                        if (init is KtCallExpression) {
-                            val expr = buildFullExpression(init, varName, varType)
-                            parentMethod.fullExpressions += expr
-                        }
-                        process(init, varName, varType) // передаем varName дальше
+                        process(init, varName, varType, parentCall)
                     }
                 }
+
                 is KtCallExpression -> {
-                    // Сначала рекурсивно обработаем аргументы, чтобы поймать вложенные вызовы
+                    // Сначала обрабатываем аргументы
                     element.valueArguments.forEach { arg ->
-                        arg.getArgumentExpression()?.let { process(it, currentVar, currentType) }
+                        arg.getArgumentExpression()?.let { process(it, currentVar, currentType, element) }
                     }
 
-                    // Потом добавляем сам вызов в список
-                    val expr = buildFullExpression(element, currentVar, currentType)
-                    parentMethod.fullExpressions += expr
+                    // Определяем collingContext и method
+                    val collingContextName = parentCall?.text ?: currentVar
+                    val methodName = element.text
+
+                    parentMethod.fullExpressions += buildFullExpression(
+                        element,
+                        collingContextName,
+                        currentType,
+                        methodName
+                    )
                 }
 
-                is KtDotQualifiedExpression -> element.selectorExpression?.let { process(it, currentVar, currentType) }
-                is KtSafeQualifiedExpression -> element.selectorExpression?.let { process(it, currentVar, currentType) }
-                is KtBlockExpression -> element.statements.forEach { process(it, currentVar, currentType) }
-                is KtForExpression -> element.body?.let { process(it, currentVar, currentType) }
-                is KtWhileExpression -> element.body?.let { process(it, currentVar, currentType) }
+
+                is KtDotQualifiedExpression -> {
+                    // Receiver становится parent для selector
+                    element.receiverExpression?.let { process(it, currentVar, currentType, element) }
+                    element.selectorExpression?.let { process(it, currentVar, currentType, element) }
+                }
+
+                is KtSafeQualifiedExpression -> {
+                    element.receiverExpression?.let { process(it, currentVar, currentType, element) }
+                    element.selectorExpression?.let { process(it, currentVar, currentType, element) }
+                }
+
+                is KtBlockExpression -> element.statements.forEach { process(it, currentVar, currentType, parentCall) }
+                is KtForExpression -> element.body?.let { process(it, currentVar, currentType, parentCall) }
+                is KtWhileExpression -> element.body?.let { process(it, currentVar, currentType, parentCall) }
                 is KtIfExpression -> {
-                    element.then?.let { process(it, currentVar, currentType) }
-                    element.`else`?.let { process(it, currentVar, currentType) }
+                    element.then?.let { process(it, currentVar, currentType, parentCall) }
+                    element.`else`?.let { process(it, currentVar, currentType, parentCall) }
                 }
                 is KtTryExpression -> {
-                    process(element.tryBlock, currentVar, currentType)
-                    element.catchClauses.forEach { it.catchBody?.let { process(it, currentVar, currentType) } }
-                    element.finallyBlock?.finalExpression?.let { process(it, currentVar, currentType) }
+                    process(element.tryBlock, currentVar, currentType, parentCall)
+                    element.catchClauses.forEach { it.catchBody?.let { process(it, currentVar, currentType, parentCall) } }
+                    element.finallyBlock?.finalExpression?.let { process(it, currentVar, currentType, parentCall) }
                 }
 
-                else -> element.children.forEach { process(it, currentVar, currentType) }
+                else -> element.children.forEach { process(it, currentVar, currentType, parentCall) }
             }
         }
+
 
 
         fn.bodyExpression?.let { process(it) }
