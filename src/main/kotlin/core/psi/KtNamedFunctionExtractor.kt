@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.psi.*
 
 object KtNamedFunctionExtractor {
 
-
+    val tmpMap = mutableMapOf<String, String>()
     var tmpCounter = 1
 
     fun buildFullExpression(
@@ -26,28 +26,27 @@ object KtNamedFunctionExtractor {
         val receiverExpression = (call.parent as? KtDotQualifiedExpression)?.receiverExpression
             ?: (call.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
-        val receiverName = when (receiverExpression) {
-            is KtNameReferenceExpression -> receiverExpression.getReferencedName() // просто имя переменной/объекта
-            is KtThisExpression -> "this"
-            else -> "tmp${tmpCounter++}" // если это сложное выражение → временный контекст
-        }
-
+        val receiverName = receiverExpression?.text?.let { tmpMap[it] }
+            ?: when (receiverExpression) {
+                is KtNameReferenceExpression -> receiverExpression.getReferencedName()
+                is KtThisExpression -> "this"
+                else -> receiverExpression?.text ?: "this" // сюда не должно попасть сложное выражение, если tmpMap работает
+            }
 
         val params = call.valueArguments.map {
-
-            val paramName = it.getArgumentExpression()?.text ?: "?"
+            val paramContent = it.getArgumentExpression()?.text ?: "?"
+            val paramName = tmpMap[paramContent] ?: paramContent
 
             val typeFromFullExpr = fullExpressions
-                .firstOrNull { it.collingContext.name == paramName }
-                ?.collingContext?.type
-            // 2️⃣ Если не нашли, ищем в params этих FullExpression
+                .firstOrNull { it.collingContext.name == paramName }?.collingContext?.type
                 ?: fullExpressions.firstOrNull { expr ->
                     expr.params.any { it.name == paramName }
                 }?.params?.firstOrNull { it.name == paramName }?.type
-                ?: "" // оставляем пустым, если нигде не нашли
+                ?: ""
 
             VariableInfo(paramName, typeFromFullExpr)
         }
+
 
         return FullExpression(
             collingContext = VariableInfo(collingContext, collingContextType),
@@ -110,10 +109,21 @@ object KtNamedFunctionExtractor {
                         arg.getArgumentExpression()?.let { process(it, "", currentType, element) }
                     }
 
-                    // Определяем calling context
                     val collingContextName = currentVar.ifEmpty {
-                        "tmp${tmpCounter++}"
+                        val receiverExpression = (element.parent as? KtDotQualifiedExpression)?.receiverExpression
+                            ?: (element.parent as? KtSafeQualifiedExpression)?.receiverExpression
+
+                        val receiverText = receiverExpression?.text ?: "this"
+
+// Для сложных выражений, включающих вызовы, лучше проверять:
+                        val isComplex = receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
+
+                        if (isComplex) {
+                            tmpMap.getOrPut(receiverText) { "tmp${tmpCounter++}" }
+                        } else ""
                     }
+
+
                     // Имя метода — сам вызов
                     val methodName = element.calleeExpression?.text ?: ""
 
