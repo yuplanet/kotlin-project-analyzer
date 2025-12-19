@@ -48,11 +48,15 @@ object KtNamedFunctionExtractor {
                         process(init, varName, varType) // передаем varName дальше
                     }
                 }
-
                 is KtCallExpression -> {
+                    // Сначала рекурсивно обработаем аргументы, чтобы поймать вложенные вызовы
+                    element.valueArguments.forEach { arg ->
+                        arg.getArgumentExpression()?.let { process(it, currentVar, currentType) }
+                    }
+
+                    // Потом добавляем сам вызов в список
                     val expr = buildFullExpression(element, currentVar, currentType)
                     parentMethod.fullExpressions += expr
-                    element.valueArguments.forEach { it.getArgumentExpression()?.let { process(it, currentVar, currentType) } }
                 }
 
                 is KtDotQualifiedExpression -> element.selectorExpression?.let { process(it, currentVar, currentType) }
