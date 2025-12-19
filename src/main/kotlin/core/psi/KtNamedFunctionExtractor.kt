@@ -3,6 +3,7 @@ package org.example.core.psi
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.FullExpression
+import org.example.data.symbol.VariableInfo
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.psi.*
 
@@ -19,11 +20,10 @@ object KtNamedFunctionExtractor {
         val receiver = (call.parent as? KtDotQualifiedExpression)?.receiverExpression?.text
             ?: (call.parent as? KtSafeQualifiedExpression)?.receiverExpression?.text
             ?: "this"
-        val params = call.valueArguments.map { it.getArgumentExpression()?.text ?: "?" }
+        val params = call.valueArguments.map {VariableInfo( it.getArgumentExpression()?.text ?: "?","") }
 
         return FullExpression(
-            collingContext = collingContext,
-            collingContextType = collingContextType,
+            collingContext = VariableInfo(collingContext, collingContextType),
             receiver = receiver,
             method = method.ifEmpty { call.calleeExpression?.text ?: "" },
             methodReturnType = "_",
@@ -53,13 +53,19 @@ object KtNamedFunctionExtractor {
                 }
 
                 is KtCallExpression -> {
-                    // Сначала обрабатываем аргументы
+                    // Сначала обрабатываем аргументы рекурсивно
                     element.valueArguments.forEach { arg ->
                         arg.getArgumentExpression()?.let { process(it, currentVar, currentType, element) }
                     }
 
-                    // Определяем collingContext и method
-                    val collingContextName = parentCall?.text ?: currentVar
+                    // Определяем calling context
+                    val receiverName = (element.parent as? KtDotQualifiedExpression)?.receiverExpression?.text
+                        ?: (element.parent as? KtSafeQualifiedExpression)?.receiverExpression?.text
+
+                    val collingContextName =
+                        currentVar.ifEmpty { receiverName?:"" }   // если receiver есть → переменная, иначе currentVar (имя метода/переменной)
+
+                    // Имя метода — сам вызов
                     val methodName = element.text
 
                     parentMethod.fullExpressions += buildFullExpression(
@@ -69,6 +75,7 @@ object KtNamedFunctionExtractor {
                         methodName
                     )
                 }
+
 
 
                 is KtDotQualifiedExpression -> {

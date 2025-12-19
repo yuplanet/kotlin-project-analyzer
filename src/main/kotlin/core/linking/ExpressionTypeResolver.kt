@@ -24,74 +24,6 @@ object ExpressionTypeResolver {
         return null
     }
 
-    fun resolveVariableType(
-        name: String,
-        parentMethod: ClassMethod,
-        parentClass: KotlinClass,
-        engine: IProjectSearchEngine,
-        ktFile: KtFile
-    ): String {
-        // 1️⃣ Проверяем в методе (property и параметр)
-        val methodType = parentMethod.properties.firstOrNull { it.name == name }?.type
-            ?: parentMethod.ktParameters.firstOrNull { it.name == name }?.typeReference?.text
-
-        if (methodType != null) return methodType
-
-        // 2️⃣ Проверяем в классе (property и параметр)
-        val classType = parentClass.propertyReferences.firstOrNull { it.name == name }?.type
-            ?: parentClass.parameterReferences.firstOrNull { it.name == name }?.type
-        if (classType != null) return classType
-
-        // 3️⃣ Проверяем в движке
-        val engineClass = engine.findByClassName(name)
-        if (engineClass != null) {
-            // Если enum или поле своего класса — берём до точки
-            if (engineClass.ktClassObjectType == ObjectType.EnumClass || engineClass.ktClassObjectType == ObjectType.Class) {
-                return name.substringBefore(".")
-            }
-            return engineClass.name
-        }
-
-        // 4️⃣ Проверяем системные импорты
-        val importedType = resolveTypeFromImports(name, ktFile)
-        if (importedType != null) return importedType
-
-        // 5️⃣ Не нашли — возвращаем _
-        return "_"
-    }
-
-    fun resolveParam(
-        param: String,
-        parentMethod: ClassMethod,
-        parentClass: KotlinClass,
-        engine: IProjectSearchEngine,
-        ktFile: KtFile
-    ): String {
-
-        // 2️⃣ Enum или Object
-        if (param.contains(".")) {
-            val receiverName = param.substringBefore(".")
-            val engineClass = engine.findByClassName(receiverName)
-            if (engineClass != null) {
-                return when (engineClass.ktClassObjectType) {
-                    ObjectType.EnumClass -> receiverName // EnumName.VALUE -> EnumName
-                    ObjectType.Class -> {
-                        // ищем property с таким именем в классе
-                        engineClass.propertyReferences.firstOrNull { it.name == param.substringAfter(".") }?.type
-                            ?: "_" // если не нашли, оставляем "_"
-                    }
-                    else -> engineClass.name
-                }
-            }
-            return receiverName
-        }
-
-        // 3️⃣ Обычная переменная
-        return ExpressionTypeResolver.resolveVariableType(param, parentMethod, parentClass, engine, ktFile)
-    }
-
-
-
     fun resolveExpressionType(
         expr: FullExpression,
         parentMethod: ClassMethod,
@@ -100,61 +32,71 @@ object ExpressionTypeResolver {
     ) {
         val ktFile = KiFileIndexed.getFileByClassName(parentClass.name) ?: return
 
-        expr.collingContextType = if (expr.receiver == "this") parentClass.name
-        else resolveVariableType(expr.receiver, parentMethod, parentClass, engine, ktFile)
+        // --- 1️⃣ RESOLVE CALLING CONTEXT TYPE ---
+        expr.collingContext.type =
 
-        // --- RESOLVE PARAMS СНАЧАЛА ---
+                    parentMethod.properties.firstOrNull { it.name == expr.collingContext.name }?.type?.takeIf { it != "_" }
+
+                    ?: parentMethod.ktParameters.firstOrNull { it.name == expr.collingContext.name }?.typeReference?.text?.takeIf { it != "_" }
+
+                    ?: parentClass.propertyReferences.firstOrNull { it.name == expr.collingContext.name }?.type?.takeIf { it != "_" }
+
+                    ?: parentClass.parameterReferences.firstOrNull { it.name == expr.collingContext.name }?.type?.takeIf { it != "_" }
+
+                    ?: engine.findByClassName(expr.receiver)?.name?.takeIf { it != "_" }
+
+                    ?: resolveTypeFromImports(expr.receiver, ktFile)
+
+                    ?: "_"
+
+        // --- 2️⃣ RESOLVE PARAMS ---
         expr.params = expr.params.map { param ->
-            when {
-                param.contains(")") -> param.substringBefore("(")
-                param.contains(".") -> param.substringBefore(".")
+            val resolvedType = when {
+
+                param.name.contains("(") -> {
+                    // метод → ищем через engine
+                    val methodName = param.name.substringBefore("(")
+                    engine.findMethodByClassNameAndMethodNameAndParams(
+                        className = expr.collingContext.name,
+                        methodName = methodName,
+                        params = listOf() // TODO: можно расширить для точных параметров
+                    )?.parameterTypeNames?.lastOrNull() ?: "_"
+                }
+
+                param.name.contains(".") -> {
+                    // enum или object
+                    val receiver = param.name.substringBefore(".")
+                    val member = param.name.substringAfter(".")
+                    val engineClass = engine.findByClassName(receiver)
+                    when (engineClass?.ktClassObjectType) {
+                        ObjectType.EnumClass -> receiver
+                        ObjectType.Class -> engineClass.propertyReferences.firstOrNull { it.name == member }?.type ?: "_"
+                        else -> engineClass?.name ?: "_"
+                    }
+                }
                 else -> {
-                    parentMethod.properties.firstOrNull { it.name == param }?.type
-                        ?: parentMethod.ktParameters.firstOrNull { it.name == param }?.typeReference?.text
-                        ?: parentClass.propertyReferences.firstOrNull { it.name == param }?.type
-                        ?: parentClass.parameterReferences.firstOrNull { it.name == param }?.type
-                        ?: engine.findByClassName(param)?.name
-                        ?: resolveTypeFromImports(param, ktFile)
+                    // обычная переменная
+                    parentMethod.properties.firstOrNull { it.name == param.name }?.type
+                        ?: parentMethod.ktParameters.firstOrNull { it.name == param.name }?.typeReference?.text
+                        ?: parentClass.propertyReferences.firstOrNull { it.name == param.name }?.type
+                        ?: parentClass.parameterReferences.firstOrNull { it.name == param.name }?.type
+                        ?: engine.findByClassName(param.name)?.name
+                        ?: resolveTypeFromImports(param.name, ktFile)
                         ?: "_"
                 }
             }
+            param.copy(type = resolvedType) // создаем новый VariableInfo с типом
         }.toMutableList()
 
-        // --- RESOLVE VARIABLE TYPE ПОСЛЕ ПАРАМЕТРОВ ---
-        expr.collingContextType = when {
-            expr.receiver == "this" -> parentClass.name
-            else -> {
-                // если receiver совпадает с именем переменной, то ищем через движок, так как параметры уже резолвились
-                parentMethod.properties.firstOrNull { it.name == expr.receiver }?.type
-                    ?: parentMethod.ktParameters.firstOrNull { it.name == expr.receiver }?.typeReference?.text
-                    ?: parentClass.propertyReferences.firstOrNull { it.name == expr.receiver }?.type
-                    ?: parentClass.parameterReferences.firstOrNull { it.name == expr.receiver }?.type
-                    ?: engine.findMethodByClassNameAndMethodNameAndParams(
-                        className = expr.receiver,
-                        methodName = expr.method,
-                        params = expr.params
-                    )?.parameterTypeNames?.lastOrNull() // берем возвращаемый тип метода
-                    ?: engine.findByClassName(expr.receiver)?.name
-                    ?: resolveTypeFromImports(expr.receiver, ktFile)
-                    ?: "_"
-            }
-        }
-
-        // --- ОБНОВЛЯЕМ ВСЕ FullExpression В parentMethod.fullExpressions ---
+        // --- 3️⃣ ОБНОВЛЕНИЕ ВСЕХ FullExpression В МЕТОДЕ ---
         parentMethod.fullExpressions.forEach { otherExpr ->
-            // Обновляем тип переменной
-            if (otherExpr.collingContext == expr.collingContext && otherExpr.collingContext.isNotEmpty()) {
-                otherExpr.collingContextType = expr.collingContextType
+            if (otherExpr.collingContext.name == expr.collingContext.name && otherExpr.collingContext.name.isNotEmpty()) {
+                otherExpr.collingContext.type = expr.collingContext.type
             }
 
-            // Обновляем параметры, если встречается имя текущей переменной
             otherExpr.params = otherExpr.params.map { p ->
-                if (p == expr.collingContext) expr.collingContextType else p
+                if (p.name == expr.collingContext.name) p.copy(type = expr.collingContext.type) else p
             }.toMutableList()
         }
-
-
     }
-
-
 }
