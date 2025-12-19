@@ -120,8 +120,6 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
     fun analyzeFunctionCalls(projectClasses: List<KotlinClass>) {
 
-
-
         for (cls in projectClasses) {
 
             for (method in cls.functionCalls) {
@@ -129,7 +127,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                 if(method.name!="sendScheduledEnvelopeNotification")
                     continue
 
-                KtNamedFunctionExtractor.collectFunctionExpressions(method.function, method)
+                KtNamedFunctionExtractor.collectFunctionExpressions(method.function, method,cls, searchEngine)
 
                 for (expression in method.fullExpressions) {
 

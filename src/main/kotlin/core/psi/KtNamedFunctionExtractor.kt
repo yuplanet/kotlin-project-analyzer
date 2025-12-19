@@ -1,30 +1,57 @@
 package org.example.core.psi
 
+import org.example.core.interfaces.IProjectSearchEngine
+import org.example.core.linking.ExpressionTypeResolver
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.FullExpression
+import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.VariableInfo
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.psi.*
 
-
 object KtNamedFunctionExtractor {
+
+
+    var tmpCounter = 1
 
     fun buildFullExpression(
         call: KtCallExpression,
         collingContext: String = "",
         collingContextType: String = "_",
-        method: String = ""
+        method: String = "",
+        fullExpressions: List<FullExpression>
     ): FullExpression {
 
-        val receiver = (call.parent as? KtDotQualifiedExpression)?.receiverExpression?.text
-            ?: (call.parent as? KtSafeQualifiedExpression)?.receiverExpression?.text
-            ?: "this"
-        val params = call.valueArguments.map {VariableInfo( it.getArgumentExpression()?.text ?: "?","") }
+        val receiverExpression = (call.parent as? KtDotQualifiedExpression)?.receiverExpression
+            ?: (call.parent as? KtSafeQualifiedExpression)?.receiverExpression
+
+        val receiverName = when (receiverExpression) {
+            is KtNameReferenceExpression -> receiverExpression.getReferencedName() // просто имя переменной/объекта
+            is KtThisExpression -> "this"
+            else -> "tmp${tmpCounter++}" // если это сложное выражение → временный контекст
+        }
+
+
+        val params = call.valueArguments.map {
+
+            val paramName = it.getArgumentExpression()?.text ?: "?"
+
+            val typeFromFullExpr = fullExpressions
+                .firstOrNull { it.collingContext.name == paramName }
+                ?.collingContext?.type
+            // 2️⃣ Если не нашли, ищем в params этих FullExpression
+                ?: fullExpressions.firstOrNull { expr ->
+                    expr.params.any { it.name == paramName }
+                }?.params?.firstOrNull { it.name == paramName }?.type
+                ?: "" // оставляем пустым, если нигде не нашли
+
+            VariableInfo(paramName, typeFromFullExpr)
+        }
 
         return FullExpression(
             collingContext = VariableInfo(collingContext, collingContextType),
-            receiver = receiver,
+            receiver = receiverName,
             method = method.ifEmpty { call.calleeExpression?.text ?: "" },
             methodReturnType = "_",
             params = params
@@ -32,7 +59,32 @@ object KtNamedFunctionExtractor {
     }
 
 
-    fun collectFunctionExpressions(fn: KtNamedFunction, parentMethod: ClassMethod) {
+    fun collectFunctionExpressions(fn: KtNamedFunction,
+                                   parentMethod: ClassMethod,
+                                   parentClass: KotlinClass,
+                                   engine: IProjectSearchEngine,
+    ) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         fun process(
             element: PsiElement,
@@ -55,28 +107,29 @@ object KtNamedFunctionExtractor {
                 is KtCallExpression -> {
                     // Сначала обрабатываем аргументы рекурсивно
                     element.valueArguments.forEach { arg ->
-                        arg.getArgumentExpression()?.let { process(it, currentVar, currentType, element) }
+                        arg.getArgumentExpression()?.let { process(it, "", currentType, element) }
                     }
 
                     // Определяем calling context
-                    val receiverName = (element.parent as? KtDotQualifiedExpression)?.receiverExpression?.text
-                        ?: (element.parent as? KtSafeQualifiedExpression)?.receiverExpression?.text
-
-                    val collingContextName =
-                        currentVar.ifEmpty { receiverName?:"" }   // если receiver есть → переменная, иначе currentVar (имя метода/переменной)
-
+                    val collingContextName = currentVar.ifEmpty {
+                        "tmp${tmpCounter++}"
+                    }
                     // Имя метода — сам вызов
-                    val methodName = element.text
+                    val methodName = element.calleeExpression?.text ?: ""
 
-                    parentMethod.fullExpressions += buildFullExpression(
+                    val expression = buildFullExpression(
                         element,
                         collingContextName,
                         currentType,
-                        methodName
+                        methodName,
+                        parentMethod.fullExpressions
                     )
+
+                    parentMethod.fullExpressions += expression
+                    ExpressionTypeResolver.resolveExpressionType(expression, parentMethod, parentClass, engine)
+
+                    print(1)
                 }
-
-
 
                 is KtDotQualifiedExpression -> {
                     // Receiver становится parent для selector
