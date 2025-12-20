@@ -5,7 +5,6 @@ import org.example.core.linking.ExpressionTypeResolver
 import org.example.data.symbol.*
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.psi.*
-import kotlin.text.ifEmpty
 
 object KtFunctionExpressionCollector {
 
@@ -31,7 +30,7 @@ object KtFunctionExpressionCollector {
             ?: when (receiverExpression) {
                 is KtNameReferenceExpression -> receiverExpression.getReferencedName()
                 is KtThisExpression -> "this"
-                else -> receiverExpression?.text
+                else ->  tmpMap.entries.firstOrNull { it.value == receiverExpression?.text }?.key ?: receiverExpression?.text
                     ?: "this" // сюда не должно попасть сложное выражение, если tmpMap работает
             }
         val methodName = currentExpression.calleeExpression?.text ?: "" // мя метода
@@ -137,13 +136,18 @@ object KtFunctionExpressionCollector {
             if (callWithoutContext) {
                 val isComplex =
                     receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
-                if (isComplex)
-                    tmpMap.getOrPut("tmp${tmpCounter++}") { receiverText }
+
+                if (isComplex){
+
+                    val value = "tmp${tmpCounter++}"
+                    tmpMap.getOrPut(value) { receiverText }
+                }
             }
 
             var currentContext = if (callingContext == null) {
                 VariableInfo(
-                    receiverText,
+
+                    tmpMap.entries.firstOrNull { it.value == receiverText }?.key ?: receiverText,
                     ""
                 )
             } else
