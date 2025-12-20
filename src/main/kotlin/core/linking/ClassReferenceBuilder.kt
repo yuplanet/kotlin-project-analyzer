@@ -2,9 +2,8 @@ package org.example.core.linking
 
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
-import org.example.core.psi.KtNamedFunctionExtractor
+import org.example.core.psi.KtFunctionExpressionCollector
 import org.example.data.reference.MethodCallReference
-import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
@@ -127,12 +126,8 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                 if(method.name!="sendScheduledEnvelopeNotification")
                     continue
 
-                KtNamedFunctionExtractor.collectFunctionExpressions(method.function, method,cls, searchEngine)
-
-                for (expression in method.fullExpressions) {
-
-                    ExpressionTypeResolver.resolveExpressionType(expression, method, cls, searchEngine)
-                }
+                KtFunctionExpressionCollector.collectExpressions(method, cls, searchEngine)
+               // KtOperationParser.collectAllExpressions(method.function)
             }
         }
     }

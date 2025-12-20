@@ -3,6 +3,7 @@ package org.example.data.symbol
 import org.example.data.reference.MethodCallReference
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
+import org.jetbrains.kotlin.psi.KtProperty
 
 data class ClassMethod(
 
@@ -17,10 +18,12 @@ data class ClassMethod(
 
     //content
     var properties: MutableList<ClassProperty> = mutableListOf(),
-    var fullExpressions: List<FullExpression> = mutableListOf(),
+    var parameters: MutableList<ClassParameter> = mutableListOf(),
 
+    var fullExpressions: MutableList<FullExpression> = mutableListOf(),
 
     //params
+    var ktProperties: List<KtProperty> = listOf(),
     var ktParameters: List<KtParameter> = listOf(),
 
     //refs

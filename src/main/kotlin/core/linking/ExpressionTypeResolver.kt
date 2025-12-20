@@ -10,6 +10,7 @@ import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtFile
 
 object ExpressionTypeResolver {
+
     // Функция для резолва полного имени класса через импорты
     private fun resolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
         // Сначала ищем точное совпадение
