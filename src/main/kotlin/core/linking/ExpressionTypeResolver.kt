@@ -8,7 +8,70 @@ import org.example.data.symbol.VariableInfo
 import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtFile
 
-class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
+class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine,
+    private val currentClass: KotlinClass,
+    private val currentMethod: ClassMethod) {
+
+    private val ktFile: KtFile
+    private var expressions: List<FullExpression>
+    private val classVariables: MutableList<VariableInfo> = mutableListOf()
+    private val methodVariables: MutableList<VariableInfo> = mutableListOf()
+
+    init {
+
+        expressions = currentMethod.fullExpressions
+        ktFile = currentClass.ktFile
+
+        // 1️⃣ Свойства класса
+        currentClass.propertyReferences.forEach { prop ->
+            classVariables.add(VariableInfo(name = prop.name, type = prop.type))
+        }
+
+        // 2️⃣ Параметры конструктора
+        currentClass.parameterReferences.forEach { param ->
+            classVariables.add(VariableInfo(name = param.name, type = param.type))
+        }
+    }
+
+
+    fun getTypeByVariableName(variableName: String): String {
+
+        var type = classVariables.firstOrNull { it.name == variableName }?.let {
+            it.type
+        }
+
+        if (type == null)
+            type = methodVariables.firstOrNull { it.name == variableName }?.let {
+                it.type
+            }
+        if (type == null) {
+            for (expression in expressions) {
+
+                if (expression.target.name == variableName){
+                    type = expression.target.type
+                    return type                   
+                }
+
+                for (param in expression.method.parameters) {
+                    if (param.name == variableName){
+                        type = param.type
+                        return type
+                    }
+                }
+            }
+        }
+
+        if (type == null)
+            type = getEnumOrObjectType(variableName)
+
+        if (type == null)
+            type = resolveTypeFromImports(variableName, ktFile)
+
+
+        // 3️⃣ Если не нашли — неизвестно
+        return type ?: "_"
+    }
+
 
     // Функция для резолва полного имени класса через импорты
     private fun resolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
@@ -24,156 +87,79 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
 
         return null
     }
-
-    fun resolveExpressionType(
-        expr: FullExpression,
-        parentMethod: ClassMethod,
-        parentClass: KotlinClass,
-    ) {
-        val ktFile = parentClass.ktFile
-
-        val variables = collectClassVariables(parentClass)
-
-        //сначала разбираем методы. типа Class.Field, enum/item
-        expr.params.forEach { param ->
-            resolveExpressionParameterType(variables, param, expr, ktFile, parentMethod)
-        }
-
-        // --- 1️⃣ RESOLVE CALLING CONTEXT TYPE ---
-        expr.target.type =  resolveExpressionCallingContextType(variables, expr, ktFile, parentClass, parentMethod)
-
-        // --- 3️⃣ ОБНОВЛЕНИЕ ВСЕХ FullExpression В МЕТОДЕ ---
-        parentMethod.fullExpressions.forEach { otherExpr ->
-            if (otherExpr.target.name == expr.target.name && otherExpr.target.name.isNotEmpty()) {
-                otherExpr.target.type = expr.target.type
-            }
-
-            otherExpr.params = otherExpr.params.map { p ->
-                if (p.name == expr.target.name) p.copy(type = expr.target.type) else p
-            }.toMutableList()
-        }
-
-        val receiverType = variables.firstOrNull { it.name == expr.receiver }?.type ?: expr.receiver
-        expr.receiverType = receiverType
-    }
+    
+    
+    fun resolveExpressionParameterType(expr: FullExpression) : String {
 
 
+        val method = expr.method
 
-    private fun resolveExpressionParameterType(variables: List<VariableInfo>, parameter: VariableInfo, expr: FullExpression, ktFile: KtFile, parentMethod: ClassMethod) {
+        var type = if (method.rawContent.contains("(")) {
+            val methodName = method.name.substringBefore("(")
+            val type = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                className = expr.target.name,
+                methodName = methodName,
+                params = method.parameters.map { it.type },
 
-
-        var resolvedType: String? = variables.firstOrNull { it.name == parameter.name }?.type
-
-        if (resolvedType == null) {
-            resolvedType =
-                parentMethod.fullExpressions.firstOrNull { it.target.name == parameter.name }?.target?.type
-        }
-        when {
-
-            parameter.name.contains("(") -> {
-
-                val methodName = parameter.name.substringBefore("(")
-                val argumentTypes = expr.params.map { it.type } // уже известные типы других параметров
-
-                resolvedType = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                    className = expr.target.name,
-                    methodName = methodName,
-                    params = argumentTypes
                 )?.parameterTypeNames?.lastOrNull() ?: "_"
 
-            }
+            type
+        } else if (method.rawContent.contains(".")) {
+            val member = method.name.substringAfter(".")
 
-            parameter.name.contains(".") -> {
-                // enum или object
-                val receiver = parameter.name.substringBefore(".")
-                val member = parameter.name.substringAfter(".")
+            val engineClass = searchEngine.findByClassName(expr.receiver.type)
 
-                val engineClass = searchEngine.findByClassName(receiver)
+            when (engineClass?.ktClassObjectType) {
+                ObjectType.EnumClass -> expr.receiver.type
 
-                when (engineClass?.ktClassObjectType) {
-                    ObjectType.EnumClass -> receiver
-                    ObjectType.Class -> engineClass.propertyReferences.firstOrNull { it.name == member }?.type ?: "_"
-                    else -> engineClass?.name ?: "_"
+                ObjectType.Class -> {
+                    engineClass.propertyReferences.firstOrNull { it.name == member }?.type
+                        ?: engineClass.parameterReferences.firstOrNull { it.name == member }?.type
+                        ?: "_"
                 }
-            }
 
-            else -> {
-                // системный тип через импорты
-                resolveTypeFromImports(parameter.name, ktFile) ?: "_"
+                else -> engineClass?.name ?: "_"
             }
+        } else "_"
+
+        if (type == "_") {
+            // системный тип через импорты
+            type = resolveTypeFromImports(expr.receiver.name, ktFile) ?: "_"
         }
-        parameter.type = resolvedType?:"_"
+
+        return type
     }
 
+    private fun getEnumOrObjectType(param: String): String? {
 
-    // ищем тип вызвавший метод - a =fun() ищем тип а
-    private fun resolveExpressionCallingContextType(variables: List<VariableInfo>, expr: FullExpression, ktFile: KtFile, parentClass: KotlinClass, parentMethod: ClassMethod):String {
 
-        var resolvedType: String? = null
+         val type = if (param.contains(".")) {
+            val className = param.substringBefore(".")
+             val fieldName = param.substringAfter(".")
 
-        // 1. Проверяем локальные переменные
-        val variable = variables.firstOrNull { it.name == expr.target.name }
-        if (variable != null && variable.type.isNotEmpty() && variable.type!="_")
-            resolvedType = variable.type
+            val engineClass = searchEngine.findByClassName(className)
 
-        // 2. Если не нашли, проверяем импорты
-        if (resolvedType == null)
-            resolvedType = resolveTypeFromImports(expr.receiver, ktFile)
+            when (engineClass?.ktClassObjectType) {
+                ObjectType.EnumClass -> engineClass.name
 
-        // 3. fallback "_"
-        if (resolvedType == null || resolvedType == "_") {
-            // 4. Проверяем параметры метода
-            val paramType = parentMethod.ktParameters
-                .firstOrNull { it.name == expr.target.name }
-                ?.typeReference?.text
-                ?.takeIf { it != "_" }
+                ObjectType.Class -> {
+                    engineClass.propertyReferences.firstOrNull { it.name == fieldName }?.type
+                        ?: engineClass.parameterReferences.firstOrNull { it.name == fieldName }?.type
+                        ?: null
+                }
 
-            if (paramType != null) resolvedType = paramType
-        }
+                else -> engineClass?.name ?: null
+            }
+        } else null
 
-        // 5. Проверяем свойства класса
-        if (resolvedType == null) {
-            val propType = parentClass.propertyReferences
-                .firstOrNull { it.name == expr.target.name }
-                ?.type?.takeIf { it != "_" }
-            if (propType != null) resolvedType = propType
-        }
-
-        // 6. Проверяем параметры класса
-        if (resolvedType == null) {
-            val classParamType = parentClass.parameterReferences
-                .firstOrNull { it.name == expr.target.name }
-                ?.type?.takeIf { it != "_" }
-            if (classParamType != null) resolvedType = classParamType
-        }
-
-        // 7. Проверяем через движок по имени класса
-        if (resolvedType == null)
-            resolvedType = searchEngine.findByClassName(expr.receiver)?.name
-
-        // 8. Ещё раз проверяем импорты (на всякий случай)
-        if (resolvedType == null)
-            resolvedType = resolveTypeFromImports(expr.receiver, ktFile)
-
-        // Присваиваем
-        return resolvedType?: "_"
+        return type
     }
 
+    fun getClassVariables(): List<VariableInfo> {
+        return classVariables.toList()
+    }
 
-
-    fun collectClassVariables(klass: KotlinClass): List<VariableInfo> {
-        val variables = mutableListOf<VariableInfo>()
-
-        // 1️⃣ Свойства класса
-        klass.propertyReferences.forEach { prop ->
-            variables.add(VariableInfo(name = prop.name, type = prop.type))
-        }
-
-        // 2️⃣ Параметры конструктора
-        klass.parameterReferences.forEach { param ->
-            variables.add(VariableInfo(name = param.name, type = param.type))
-        }
-
-        return variables
+    fun getMethodVariables(): List<VariableInfo> {
+        return methodVariables.toList()
     }
 }

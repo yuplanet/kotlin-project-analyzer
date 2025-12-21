@@ -16,11 +16,27 @@ class KtFunctionExpressionCollector {
     private lateinit var mainClass: KotlinClass
     private lateinit var typeResolver: ExpressionTypeResolver
 
-    private fun buildFullExpression(
-        currentExpression: KtCallExpression,
-        callingContext: VariableInfo
-    ): FullExpression {
 
+
+    fun getRawCallText(call: KtCallExpression): String {
+        var element: PsiElement = call
+
+        while (
+            element.parent is KtDotQualifiedExpression ||
+            element.parent is KtSafeQualifiedExpression
+        ) {
+            element = element.parent
+        }
+
+        return element.text
+    }
+
+
+
+    private fun buildFullExpression(currentExpression: KtCallExpression, callingContext: VariableInfo): FullExpression {
+        currentExpression.calleeExpression?.text
+
+        //receiver
         val receiverExpression = (currentExpression.parent as? KtDotQualifiedExpression)?.receiverExpression
             ?: (currentExpression.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
@@ -32,6 +48,11 @@ class KtFunctionExpressionCollector {
                     ?: "this" // сюда не должно попасть сложное выражение, если tmpMap работает
             }
 
+        val receiverType = typeResolver.getTypeByVariableName(receiverName)
+        val receiver = VariableInfo(receiverName, receiverType)
+
+
+//Method
         val methodName = currentExpression.calleeExpression?.text ?: "" // мя метода
 
         val params = currentExpression.valueArguments.map { arg ->
@@ -51,25 +72,28 @@ class KtFunctionExpressionCollector {
             val expressionsChain = currentClassMethod.fullExpressions
 
             // Пытаемся найти тип в уже известных FullExpression
-            val paramType = expressionsChain
-                .firstOrNull { it.target.name == paramName }?.target?.type
-                ?: expressionsChain.firstOrNull { expr -> expr.method.parameters.any { it.name == paramName } }
-                    ?.method.parameters?.firstOrNull { it.name == paramName }?.type
-                ?: ""
+            val paramType = typeResolver.getTypeByVariableName(paramName?:"")
 
             VariableInfo(paramName ?: "", paramType)
         }
 
-        val returnType = ""
+        val method = MethodInfo(
+            name = methodName,
+            innerInvoke = false,
+            returnType = "",
+            parameters = params.toMutableList(),
+            rawContent = getRawCallText(currentExpression)
+        )
 
         val expression = FullExpression(
             target = callingContext,
-            receiver = receiverName,
-            method = methodName,
-            methodReturnType = "_",
-            params = params
+            receiver = receiver,
+            method = method,
         )
 
+        expression.method.returnType = typeResolver.resolveExpressionParameterType(expression)
+
+        expression.target.type = expression.method.returnType
         return expression
     }
 
@@ -77,141 +101,130 @@ class KtFunctionExpressionCollector {
     //psi element - это все что угодно!!!
     private fun handlePsiElement(currentElement: PsiElement, callingContext: VariableInfo?=null) {
 
-        if (currentElement is KtProperty) {
+        when (currentElement) {
+            is KtProperty -> {
+                val varName = currentElement.name ?: "__no_name__"
+                val varType = currentElement.typeReference?.text ?: "_"
 
-            val varName = currentElement.name ?: "__no_name__"
-            val varType = currentElement.typeReference?.text ?: "_"
+                val property = ClassProperty(varName, varType, currentElement)
 
-            val property = ClassProperty(varName, varType, currentElement)
+                currentClassMethod.properties.add(property)
 
-            currentClassMethod.properties.add(property)
+                //initializer = это = выражение.
+                // т.у property = initializer.
+                val callingContextVariable = VariableInfo(varName, varType)
 
-            //initializer = это = выражение.
-            // т.у property = initializer.
-            val callingContextVariable = VariableInfo(varName, varType)
-
-            currentElement.initializer?.let { expression ->
-                handlePsiElement(expression, callingContextVariable)
-            }
-        }
-
-
-        else if (currentElement is KtParameter) {
-            val varName = currentElement.name ?: "__no_name__"
-            val varType = currentElement.typeReference?.text ?: "_"
-
-            // Создаём объект для хранения информации о параметре
-            val parameter = ClassParameter(varName, varType, currentElement)
-
-            // Добавляем параметр в parentMethod.properties (или отдельный список параметров, если нужно)
-            currentClassMethod.parameters.add(parameter)
-
-            val callingContextVariable = VariableInfo(varName, varType)
-
-            // Если есть значение по умолчанию, рекурсивно обрабатываем его как выражение
-            currentElement.defaultValue?.let { defaultExpr ->
-                handlePsiElement(defaultExpr,callingContextVariable)
-            }
-        }
-
-
-        //main
-        else  if (currentElement is KtCallExpression) {
-            // Сначала обрабатываем аргументы рекурсивно
-            currentElement.valueArguments.forEach { arg ->
-                arg.getArgumentExpression()?.let { handlePsiElement(it) }
-            }
-
-            val receiverExpression = (currentElement.parent as? KtDotQualifiedExpression)?.receiverExpression
-                ?: (currentElement.parent as? KtSafeQualifiedExpression)?.receiverExpression
-
-            val receiverText = receiverExpression?.text ?: "this" // имя serivce
-            val callWithoutContext = callingContext?.name.isNullOrEmpty()
-
-// Для сложных выражений, включающих вызовы, лучше проверять:
-
-            if (callWithoutContext) {
-                val isComplex =
-                    receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
-
-                if (isComplex){
-
-                    val value = "tmp${tmpCounter++}"
-                    tmpMap.getOrPut(value) { receiverText }
+                currentElement.initializer?.let { expression ->
+                    handlePsiElement(expression, callingContextVariable)
                 }
             }
 
-            var currentContext = if (callingContext == null) {
-                VariableInfo(
+            is KtParameter -> {
+                val varName = currentElement.name ?: "__no_name__"
+                val varType = currentElement.typeReference?.text ?: "_"
 
-                    tmpMap.entries.firstOrNull { it.value == receiverText }?.key ?: receiverText,
-                    ""
-                )
-            } else
-                callingContext
+                // Создаём объект для хранения информации о параметре
+                val parameter = ClassParameter(varName, varType, currentElement)
 
+                // Добавляем параметр в parentMethod.properties (или отдельный список параметров, если нужно)
+                currentClassMethod.parameters.add(parameter)
 
-            // Имя метода — сам вызов
-            val expression = buildFullExpression(currentElement, currentContext)
+                val callingContextVariable = VariableInfo(varName, varType)
 
-            currentClassMethod.fullExpressions.add(expression)
-
-            val originalExpressionText = tmpMap[expression.target.name]
-
-            if (originalExpressionText != null) {
-                val params = if (expression.method.parameters.isNotEmpty()) {
-                    expression.method.parameters
-                        .map { it.name.replace(" ", "") } // удаляем все пробелы
-                        .joinToString(",")
-                } else ""
-
-                val previousMethod = originalExpressionText + "." + expression.method + "(" + params + ")"
-                tmpMap.getOrPut("tmp${tmpCounter++}") { previousMethod }
+                // Если есть значение по умолчанию, рекурсивно обрабатываем его как выражение
+                currentElement.defaultValue?.let { defaultExpr ->
+                    handlePsiElement(defaultExpr,callingContextVariable)
+                }
             }
-            typeResolver.resolveExpressionType(expression, currentClassMethod, mainClass)
 
 
+            //main
+            is KtCallExpression -> {
+                // Сначала обрабатываем аргументы рекурсивно
+                currentElement.valueArguments.forEach { arg ->
+                    arg.getArgumentExpression()?.let { handlePsiElement(it, callingContext) }
+                }
 
-            val methReturnType = searchEngine.findMethodByClassNameAndMethodNameAndParams(expression.receiver.type, expression.method.name,
-                expression.method.parameters.map { it.type })
-            expression.method.returnType = methReturnType?.returnType?:"_"
+                val receiverExpression = (currentElement.parent as? KtDotQualifiedExpression)?.receiverExpression
+                    ?: (currentElement.parent as? KtSafeQualifiedExpression)?.receiverExpression
+
+                val receiverText = receiverExpression?.text ?: "this" // имя serivce
+                val callWithoutContext = callingContext?.name.isNullOrEmpty()
+
+    // Для сложных выражений, включающих вызовы, лучше проверять:
+
+                if (callWithoutContext) {
+                    val isComplex =
+                        receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
+
+                    if (isComplex){
+
+                        val value = "tmp${tmpCounter++}"
+                        tmpMap.getOrPut(value) { receiverText }
+                    }
+                }
+
+                var currentContext = callingContext
+                    ?: VariableInfo(
+                        tmpMap.entries.firstOrNull { it.value == receiverText }?.key ?: receiverText,
+                        "" // to do find type
+                    )
+
+
+                // Имя метода — сам вызов
+                val expression = buildFullExpression(currentElement, currentContext)
+
+                currentClassMethod.fullExpressions.add(expression)
+
+                val originalExpressionText = tmpMap[expression.target.name]
+
+                if (originalExpressionText != null) {
+                    val params = if (expression.method.parameters.isNotEmpty()) {
+                        expression.method.parameters
+                            .map { it.name.replace(" ", "") } // удаляем все пробелы
+                            .joinToString(",")
+                    } else ""
+
+                    val previousMethod = originalExpressionText + "." + expression.method + "(" + params + ")"
+                    tmpMap.getOrPut("tmp${tmpCounter++}") { previousMethod }
+                }
+                //typeResolver.resolveExpressionType(expression, currentClassMethod, mainClass)
+
+
+                val methReturnType = searchEngine.findMethodByClassNameAndMethodNameAndParams(expression.receiver.type, expression.method.name,
+                    expression.method.parameters.map { it.type })
+                expression.method.returnType = methReturnType?.returnType?:"_"
+            }
+
+            ///dot
+            is KtDotQualifiedExpression -> {
+                // Receiver становится parent для selector
+                currentElement.receiverExpression?.let { handlePsiElement(it, callingContext) }
+                currentElement.selectorExpression?.let { handlePsiElement(it, callingContext) }
+            }
+
+            is KtSafeQualifiedExpression -> {
+                currentElement.receiverExpression?.let { handlePsiElement(it, callingContext) }
+                currentElement.selectorExpression?.let { handlePsiElement(it, callingContext) }
+            }
+
+
+            ///others
+            is KtBlockExpression -> currentElement.statements.forEach { handlePsiElement(it, callingContext) }
+            is KtForExpression -> currentElement.body?.let { handlePsiElement(it, callingContext) }
+            is KtWhileExpression -> currentElement.body?.let { handlePsiElement(it, callingContext) }
+            is KtIfExpression -> {
+                currentElement.then?.let { handlePsiElement(it, callingContext) }
+                currentElement.`else`?.let { handlePsiElement(it, callingContext) }
+            }
+            is KtTryExpression -> {
+                handlePsiElement(currentElement.tryBlock, callingContext)
+                currentElement.catchClauses.forEach { it.catchBody?.let { handlePsiElement(it, callingContext) } }
+                currentElement.finallyBlock?.finalExpression?.let { handlePsiElement(it, callingContext) }
+            }
+            else
+                -> currentElement.children.forEach { handlePsiElement(it, callingContext) }
         }
-
-        ///dot
-    else  if (currentElement is KtDotQualifiedExpression) {
-            // Receiver становится parent для selector
-            currentElement.receiverExpression?.let { handlePsiElement(it, callingContext) }
-            currentElement.selectorExpression?.let { handlePsiElement(it, callingContext) }
-        }
-    else  if (currentElement is KtSafeQualifiedExpression) {
-            currentElement.receiverExpression?.let { handlePsiElement(it, callingContext) }
-            currentElement.selectorExpression?.let { handlePsiElement(it, callingContext) }
-        }
-
-
-        ///others
-
-    else  if (currentElement is KtBlockExpression)
-            currentElement.statements.forEach { handlePsiElement(it, callingContext) }
-
-    else if (currentElement is KtForExpression)
-            currentElement.body?.let { handlePsiElement(it, callingContext) }
-
-    else if (currentElement is KtWhileExpression)
-            currentElement.body?.let { handlePsiElement(it, callingContext) }
-
-
-    else  if (currentElement is KtIfExpression) {
-            currentElement.then?.let { handlePsiElement(it, callingContext) }
-            currentElement.`else`?.let { handlePsiElement(it, callingContext) }
-        }
-
-    else  if (currentElement is KtTryExpression) {
-            handlePsiElement(currentElement.tryBlock, callingContext)
-            currentElement.catchClauses.forEach { it.catchBody?.let { handlePsiElement(it, callingContext) } }
-            currentElement.finallyBlock?.finalExpression?.let { handlePsiElement(it, callingContext) }
-        } else
-            currentElement.children.forEach { handlePsiElement(it, callingContext) }
     }
 
 
@@ -221,7 +234,7 @@ class KtFunctionExpressionCollector {
         this.searchEngine = searchEngine
         this.mainClass = kotlinClass
 
-        typeResolver = ExpressionTypeResolver(searchEngine)
+        typeResolver = ExpressionTypeResolver(searchEngine, kotlinClass, method)
         val currentMethodFnNamedFunction = method.function
 
         currentMethodFnNamedFunction.bodyExpression?.let { handlePsiElement(it) } // it: KtExpression
