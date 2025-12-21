@@ -2,6 +2,7 @@ package org.example.data.symbol
 
 import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtClassOrObject
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
@@ -12,7 +13,7 @@ class KotlinClass {
     var ktClassObjectType: ObjectType
     var annotations: List<String>
 
-    var ktClass: KtClassOrObject? = null//to do add to int
+    var ktFile: KtFile//to do add to int
 
     var superClasses: MutableList<KotlinClass> = mutableListOf()
     var subClasses: MutableList<KotlinClass> = mutableListOf()
@@ -39,12 +40,13 @@ class KotlinClass {
         ktClassObjectType: ObjectType,
         annotations: List<String>,
         ktFunctions: List<KtNamedFunction>,
+        ktFile: KtFile,
         ) {
         this.ktClassObject = ktClass
         this.fullName = path
         this.name = name
         this.path = path
-
+        this.ktFile = ktFile
         this.ktProperties = ktProperties.toMutableList()
         this.ktParameters = ktParameters.toMutableList()
         this.ktClassObjectType = ktClassObjectType

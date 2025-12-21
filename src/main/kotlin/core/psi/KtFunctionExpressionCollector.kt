@@ -6,10 +6,9 @@ import org.example.data.symbol.*
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.psi.*
 
-object KtFunctionExpressionCollector {
+class KtFunctionExpressionCollector {
 
     val tmpMap = mutableMapOf<String, String>()
-
     var tmpCounter = 1
 
     private lateinit var currentClassMethod: ClassMethod
@@ -22,7 +21,6 @@ object KtFunctionExpressionCollector {
         callingContext: VariableInfo
     ): FullExpression {
 
-
         val receiverExpression = (currentExpression.parent as? KtDotQualifiedExpression)?.receiverExpression
             ?: (currentExpression.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
@@ -33,8 +31,8 @@ object KtFunctionExpressionCollector {
                 else ->  tmpMap.entries.firstOrNull { it.value == receiverExpression?.text }?.key ?: receiverExpression?.text
                     ?: "this" // сюда не должно попасть сложное выражение, если tmpMap работает
             }
-        val methodName = currentExpression.calleeExpression?.text ?: "" // мя метода
 
+        val methodName = currentExpression.calleeExpression?.text ?: "" // мя метода
 
         val params = currentExpression.valueArguments.map { arg ->
             val argExpr = arg.getArgumentExpression()
@@ -54,9 +52,9 @@ object KtFunctionExpressionCollector {
 
             // Пытаемся найти тип в уже известных FullExpression
             val paramType = expressionsChain
-                .firstOrNull { it.collingContext.name == paramName }?.collingContext?.type
-                ?: expressionsChain.firstOrNull { expr -> expr.params.any { it.name == paramName } }
-                    ?.params?.firstOrNull { it.name == paramName }?.type
+                .firstOrNull { it.target.name == paramName }?.target?.type
+                ?: expressionsChain.firstOrNull { expr -> expr.method.parameters.any { it.name == paramName } }
+                    ?.method.parameters?.firstOrNull { it.name == paramName }?.type
                 ?: ""
 
             VariableInfo(paramName ?: "", paramType)
@@ -64,9 +62,8 @@ object KtFunctionExpressionCollector {
 
         val returnType = ""
 
-
         val expression = FullExpression(
-            collingContext = callingContext,
+            target = callingContext,
             receiver = receiverName,
             method = methodName,
             methodReturnType = "_",
@@ -128,10 +125,8 @@ object KtFunctionExpressionCollector {
             val receiverExpression = (currentElement.parent as? KtDotQualifiedExpression)?.receiverExpression
                 ?: (currentElement.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
-
             val receiverText = receiverExpression?.text ?: "this" // имя serivce
             val callWithoutContext = callingContext?.name.isNullOrEmpty()
-
 
 // Для сложных выражений, включающих вызовы, лучше проверять:
 
@@ -161,11 +156,11 @@ object KtFunctionExpressionCollector {
 
             currentClassMethod.fullExpressions.add(expression)
 
-            val originalExpressionText = tmpMap[expression.collingContext.name]
+            val originalExpressionText = tmpMap[expression.target.name]
 
             if (originalExpressionText != null) {
-                val params = if (expression.params.isNotEmpty()) {
-                    expression.params
+                val params = if (expression.method.parameters.isNotEmpty()) {
+                    expression.method.parameters
                         .map { it.name.replace(" ", "") } // удаляем все пробелы
                         .joinToString(",")
                 } else ""
@@ -175,9 +170,11 @@ object KtFunctionExpressionCollector {
             }
             typeResolver.resolveExpressionType(expression, currentClassMethod, mainClass)
 
-            val methReturnType = searchEngine.findMethodByClassNameAndMethodNameAndParams(expression.receiverType, expression.method,
-                expression.params.map { it.type })
-            expression.methodReturnType = methReturnType?.returnType?:"_"
+
+
+            val methReturnType = searchEngine.findMethodByClassNameAndMethodNameAndParams(expression.receiver.type, expression.method.name,
+                expression.method.parameters.map { it.type })
+            expression.method.returnType = methReturnType?.returnType?:"_"
         }
 
         ///dot

@@ -32,7 +32,8 @@ object KtFileMapper {
                 ktProperties = cls.declarations.filterIsInstance<KtProperty>(),
                 ktFunctions = KtFileExtractor.getClassMethods(cls),
                 ktClassObjectType = type,
-                annotations = annotation
+                annotations = annotation,
+                ktFile = ktFile
             )
 
             // Создаем property и parameter references

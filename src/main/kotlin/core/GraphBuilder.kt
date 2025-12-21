@@ -3,17 +3,15 @@ package org.example.core
 import org.example.core.interfaces.*
 import org.example.core.linking.ClassReferenceBuilder
 import org.example.core.linking.DependencyChainBuilder
-import org.example.core.utils.KtFileMapper
 import org.example.core.psi.KtFileExtractor
 import org.example.core.search.SearcherEngine
+import org.example.core.utils.KtFileMapper
 import org.example.data.analyzer.ProjectDiffResult
 import org.example.data.chain.MethodCallNode
 import org.example.data.symbol.KotlinClass
-import org.jetbrains.kotlin.psi.KtFile
 import java.io.File
 
 class GraphBuilder() {
-
 
     //modules
     private val differenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
@@ -24,8 +22,6 @@ class GraphBuilder() {
 
 
     //state
-    private var developerProject: Map<KtFile, List<KotlinClass>> = mutableMapOf()
-    private var featureProject: Map<KtFile, List<KotlinClass>> = mutableMapOf()
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
 
@@ -82,10 +78,7 @@ class GraphBuilder() {
             featSearchEngine = SearcherEngine()
 
             devSearchEngine.init(developClasses)
-            devSearchEngine.initKtFilesLibrary(developerProject)
-
             featSearchEngine.init(featureClasses)
-            featSearchEngine.initKtFilesLibrary(featureProject)
 
 
             logStatus(logFile, "Initialize engines success")
@@ -157,12 +150,8 @@ class GraphBuilder() {
                 KtFileExtractor.createPsiFile(project, name, content)
             }
 
-
-            developerProject = KtFileMapper.collectClassesByFile(developKtFiles)
-            featureProject = KtFileMapper.collectClassesByFile(featureKtFiles)
-
-            developClasses = developerProject.values.flatten()
-            featureClasses = featureProject.values.flatten()
+            developClasses = KtFileMapper.mapKtFilesToClassList(developKtFiles)
+            featureClasses = KtFileMapper.mapKtFilesToClassList(featureKtFiles)
 
             KtFileMapper.linkSuperClasses(developClasses)
             KtFileMapper.linkSuperClasses(featureClasses)

@@ -2,13 +2,9 @@ package org.example.data.symbol
 
 data class FullExpression (
 
-    var collingContext: VariableInfo = VariableInfo(),
+    var target: VariableInfo = VariableInfo(),
 
-    var receiver: String = "",                  // объект/receiver
-    var receiverType: String = "",
+    val receiver: VariableInfo = VariableInfo(),
 
-    var method: String = "",                  // имя метода
-    var methodReturnType: String = "",        // имя метода
-
-    var params: List<VariableInfo> = listOf(),
+    val method: MethodInfo = MethodInfo(),
 )

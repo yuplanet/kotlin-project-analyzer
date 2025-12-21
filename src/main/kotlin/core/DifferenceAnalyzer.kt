@@ -62,9 +62,7 @@ class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
         result.addedMethods = addedMethods
         result.changedMethods = changedMethods
         result.removedMethods = removedMethods
-
     }
-
 
     fun analyzeParameters(){
 

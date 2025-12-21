@@ -30,9 +30,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         parentMethod: ClassMethod,
         parentClass: KotlinClass,
     ) {
-        val ktFile = searchEngine.getKtFileByClassName(parentClass.name)
-
-        ktFile ?: return
+        val ktFile = parentClass.ktFile
 
         val variables = collectClassVariables(parentClass)
 
@@ -42,16 +40,16 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         }
 
         // --- 1️⃣ RESOLVE CALLING CONTEXT TYPE ---
-        expr.collingContext.type =  resolveExpressionCallingContextType(variables, expr, ktFile, parentClass, parentMethod)
+        expr.target.type =  resolveExpressionCallingContextType(variables, expr, ktFile, parentClass, parentMethod)
 
         // --- 3️⃣ ОБНОВЛЕНИЕ ВСЕХ FullExpression В МЕТОДЕ ---
         parentMethod.fullExpressions.forEach { otherExpr ->
-            if (otherExpr.collingContext.name == expr.collingContext.name && otherExpr.collingContext.name.isNotEmpty()) {
-                otherExpr.collingContext.type = expr.collingContext.type
+            if (otherExpr.target.name == expr.target.name && otherExpr.target.name.isNotEmpty()) {
+                otherExpr.target.type = expr.target.type
             }
 
             otherExpr.params = otherExpr.params.map { p ->
-                if (p.name == expr.collingContext.name) p.copy(type = expr.collingContext.type) else p
+                if (p.name == expr.target.name) p.copy(type = expr.target.type) else p
             }.toMutableList()
         }
 
@@ -68,7 +66,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
 
         if (resolvedType == null) {
             resolvedType =
-                parentMethod.fullExpressions.firstOrNull { it.collingContext.name == parameter.name }?.collingContext?.type
+                parentMethod.fullExpressions.firstOrNull { it.target.name == parameter.name }?.target?.type
         }
         when {
 
@@ -78,7 +76,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
                 val argumentTypes = expr.params.map { it.type } // уже известные типы других параметров
 
                 resolvedType = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                    className = expr.collingContext.name,
+                    className = expr.target.name,
                     methodName = methodName,
                     params = argumentTypes
                 )?.parameterTypeNames?.lastOrNull() ?: "_"
@@ -114,7 +112,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         var resolvedType: String? = null
 
         // 1. Проверяем локальные переменные
-        val variable = variables.firstOrNull { it.name == expr.collingContext.name }
+        val variable = variables.firstOrNull { it.name == expr.target.name }
         if (variable != null && variable.type.isNotEmpty() && variable.type!="_")
             resolvedType = variable.type
 
@@ -126,7 +124,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         if (resolvedType == null || resolvedType == "_") {
             // 4. Проверяем параметры метода
             val paramType = parentMethod.ktParameters
-                .firstOrNull { it.name == expr.collingContext.name }
+                .firstOrNull { it.name == expr.target.name }
                 ?.typeReference?.text
                 ?.takeIf { it != "_" }
 
@@ -136,7 +134,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         // 5. Проверяем свойства класса
         if (resolvedType == null) {
             val propType = parentClass.propertyReferences
-                .firstOrNull { it.name == expr.collingContext.name }
+                .firstOrNull { it.name == expr.target.name }
                 ?.type?.takeIf { it != "_" }
             if (propType != null) resolvedType = propType
         }
@@ -144,7 +142,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         // 6. Проверяем параметры класса
         if (resolvedType == null) {
             val classParamType = parentClass.parameterReferences
-                .firstOrNull { it.name == expr.collingContext.name }
+                .firstOrNull { it.name == expr.target.name }
                 ?.type?.takeIf { it != "_" }
             if (classParamType != null) resolvedType = classParamType
         }

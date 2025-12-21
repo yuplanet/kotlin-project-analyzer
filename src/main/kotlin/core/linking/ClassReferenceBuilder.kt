@@ -17,9 +17,13 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
         this.searchEngine = searchEngine
 
+
+        // 11 collect function expressions
+        collectExpressions(projectClasses)
+
         //Methods
-        analyzeFunctionCalls(projectClasses)
-        buildReverseCallRecords(projectClasses)
+        buildFunctionCallRecords(projectClasses)
+        buildFunctionReverseCallRecords(projectClasses)
 
         //properties
         bindPropertyCalls(projectClasses)
@@ -28,12 +32,29 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         bindParameterCalls(projectClasses)
     }
 
-    override fun bindMethodCalls(projectClasses: List<KotlinClass>) {
+    fun collectExpressions(projectClasses: List<KotlinClass>) {
+
+        for (cls in projectClasses) {
+
+            for (method in cls.functionCalls) {
+                if (method.name != "sendScheduledEnvelopeNotification")
+                    continue
+
+                val expressionCollector = KtFunctionExpressionCollector();
+                expressionCollector.collectExpressions(method, cls, searchEngine)
+            }
+        }
     }
 
+    fun buildFunctionCallRecords(projectClasses: List<KotlinClass>) {
 
+    }
 
-    override fun bindPropertyCalls(projectClasses: List<KotlinClass>) {
+    fun buildFunctionReverseCallRecords(projectClasses: List<KotlinClass>) {
+
+    }
+
+    fun bindPropertyCalls(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
             val fieldsByName = cls.ktProperties.associateBy { it.name ?: "__no_name__" }
 
@@ -63,7 +84,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         }
     }
 
-    override fun bindParameterCalls(projectClasses: List<KotlinClass>) {
+    fun bindParameterCalls(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
             // Индекс параметров по имени
             val paramsByName = cls.ktParameters.associateBy { it.name ?: "__no_name__" }
@@ -117,20 +138,6 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         }
     }
 
-    fun analyzeFunctionCalls(projectClasses: List<KotlinClass>) {
-
-        for (cls in projectClasses) {
-
-            for (method in cls.functionCalls) {
-
-                if(method.name!="sendScheduledEnvelopeNotification")
-                    continue
-
-                KtFunctionExpressionCollector.collectExpressions(method, cls, searchEngine)
-               // KtOperationParser.collectAllExpressions(method.function)
-            }
-        }
-    }
 
     fun resolveArgumentTypes(
         selector: KtCallExpression,
@@ -140,7 +147,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         return selector.valueArguments.map { arg ->
             val expr = arg.getArgumentExpression()
             when (expr) {
-                 is KtDotQualifiedExpression -> {
+                is KtDotQualifiedExpression -> {
                     // Пример: EnvelopeStatus.SCHEDULED
                     val typeName = expr.receiverExpression.text
                     if (typeName.isNotBlank()) typeName else "Any"
@@ -167,10 +174,12 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                     // 4️⃣ По умолчанию Any
                     name // или "Any" если хочешь совсем безопасно
                 }
+
                 is KtCallExpression -> {
                     // Если передан вызов метода, пока можно использовать имя метода
                     expr.calleeExpression?.text ?: "Any"
                 }
+
                 is KtConstantExpression, is KtStringTemplateExpression -> {
                     // Литералы
                     when (expr) {
@@ -178,6 +187,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                         else -> "String"
                     }
                 }
+
                 else -> "Any"
             }
         }
