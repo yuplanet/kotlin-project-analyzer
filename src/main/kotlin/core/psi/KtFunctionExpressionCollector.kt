@@ -62,6 +62,8 @@ object KtFunctionExpressionCollector {
             VariableInfo(paramName ?: "", paramType)
         }
 
+        val returnType = ""
+
 
         val expression = FullExpression(
             collingContext = callingContext,
@@ -172,6 +174,8 @@ object KtFunctionExpressionCollector {
                 tmpMap.getOrPut("tmp${tmpCounter++}") { previousMethod }
             }
             typeResolver.resolveExpressionType(expression, currentClassMethod, mainClass, searchEngine)
+
+            expression.methodReturnType = expression.collingContext.type
         }
 
         ///dot

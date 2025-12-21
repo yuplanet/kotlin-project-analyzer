@@ -12,6 +12,8 @@ class KotlinClass {
     var ktClassObjectType: ObjectType
     var annotations: List<String>
 
+    var ktClass: KtClassOrObject? = null//to do add to int
+
     var superClasses: MutableList<KotlinClass> = mutableListOf()
     var subClasses: MutableList<KotlinClass> = mutableListOf()
 

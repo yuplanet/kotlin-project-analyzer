@@ -59,7 +59,7 @@ class SearcherEngine: IProjectSearchEngine {
     }
 
     override fun getKtFileByClassName(className: String): KtFile? {
-        val myClassFile: KtFile? = invertedKtFilesLibrary["MyClassName"]
+        val myClassFile: KtFile? = invertedKtFilesLibrary[className]
         return myClassFile
     }
 

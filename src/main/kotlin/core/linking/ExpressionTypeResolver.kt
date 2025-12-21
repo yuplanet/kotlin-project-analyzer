@@ -6,6 +6,7 @@ import org.example.data.symbol.FullExpression
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.VariableInfo
 import org.example.data.symbol.enum.ObjectType
+import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtFile
 
 class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
@@ -31,14 +32,21 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         parentClass: KotlinClass,
         engine: IProjectSearchEngine,
     ) {
-        val ktFile = searchEngine.getKtFileByClassName(parentClass.name) ?: return
+        val ktFile = searchEngine.getKtFileByClassName(parentClass.name)
+
+        ktFile ?: return
 
         val variables = collectClassVariables(parentClass)
 
+        //сначала разбираем методы. типа Class.Field, enum/item
         expr.params = expr.params.map { param ->
+
+
             val resolvedType = variables.firstOrNull { it.name == param.name }?.type
                 ?: parentMethod.fullExpressions.firstOrNull { it.collingContext.name == param.name }?.collingContext?.type
-                ?: when {
+                ?:
+
+                when {
                     param.name.contains("(") -> {
                         // метод → ищем через engine с известными типами аргументов
                          val methodName = param.name.substringBefore("(")
@@ -49,6 +57,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
                             params = argumentTypes
                         )?.parameterTypeNames?.lastOrNull() ?: "_"
                     }
+
                     param.name.contains(".") -> {
                         // enum или object
                         val receiver = param.name.substringBefore(".")
@@ -69,23 +78,7 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         }.toMutableList()
 
         // --- 1️⃣ RESOLVE CALLING CONTEXT TYPE ---
-        expr.collingContext.type =
-
-            variables.firstOrNull { it.name == expr.collingContext.name }?.type
-                ?: resolveTypeFromImports(expr.receiver, ktFile)
-                        ?: "_"
-
-                    ?: parentMethod.ktParameters.firstOrNull { it.name == expr.collingContext.name }?.typeReference?.text?.takeIf { it != "_" }
-
-                    ?: parentClass.propertyReferences.firstOrNull { it.name == expr.collingContext.name }?.type?.takeIf { it != "_" }
-
-                    ?: parentClass.parameterReferences.firstOrNull { it.name == expr.collingContext.name }?.type?.takeIf { it != "_" }
-
-                    ?: engine.findByClassName(expr.receiver)?.name?.takeIf { it != "_" }
-
-                    ?: resolveTypeFromImports(expr.receiver, ktFile)
-
-                    ?: "_"
+        expr.collingContext.type =  resolveExpressionCallingContext(variables, expr, ktFile, parentClass, parentMethod)
 
         // --- 3️⃣ ОБНОВЛЕНИЕ ВСЕХ FullExpression В МЕТОДЕ ---
         parentMethod.fullExpressions.forEach { otherExpr ->
@@ -98,6 +91,62 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
             }.toMutableList()
         }
     }
+
+
+
+    // ищем тип вызвавший метод - a =fun() ищем тип а
+    private fun resolveExpressionCallingContext(variables: List<VariableInfo>, expr: FullExpression, ktFile: KtFile, parentClass: KotlinClass, parentMethod: ClassMethod):String {
+
+        var resolvedType: String? = null
+
+        // 1. Проверяем локальные переменные
+        val variable = variables.firstOrNull { it.name == expr.collingContext.name }
+        if (variable != null && variable.type.isNotEmpty() && variable.type!="_")
+            resolvedType = variable.type
+
+        // 2. Если не нашли, проверяем импорты
+        if (resolvedType == null)
+            resolvedType = resolveTypeFromImports(expr.receiver, ktFile)
+
+        // 3. fallback "_"
+        if (resolvedType == null || resolvedType == "_") {
+            // 4. Проверяем параметры метода
+            val paramType = parentMethod.ktParameters
+                .firstOrNull { it.name == expr.collingContext.name }
+                ?.typeReference?.text
+                ?.takeIf { it != "_" }
+
+            if (paramType != null) resolvedType = paramType
+        }
+
+        // 5. Проверяем свойства класса
+        if (resolvedType == null) {
+            val propType = parentClass.propertyReferences
+                .firstOrNull { it.name == expr.collingContext.name }
+                ?.type?.takeIf { it != "_" }
+            if (propType != null) resolvedType = propType
+        }
+
+        // 6. Проверяем параметры класса
+        if (resolvedType == null) {
+            val classParamType = parentClass.parameterReferences
+                .firstOrNull { it.name == expr.collingContext.name }
+                ?.type?.takeIf { it != "_" }
+            if (classParamType != null) resolvedType = classParamType
+        }
+
+        // 7. Проверяем через движок по имени класса
+        if (resolvedType == null)
+            resolvedType = searchEngine.findByClassName(expr.receiver)?.name
+
+        // 8. Ещё раз проверяем импорты (на всякий случай)
+        if (resolvedType == null)
+            resolvedType = resolveTypeFromImports(expr.receiver, ktFile)
+
+        // Присваиваем
+        return resolvedType?: "_"
+    }
+
 
 
     fun collectClassVariables(klass: KotlinClass): List<VariableInfo> {
