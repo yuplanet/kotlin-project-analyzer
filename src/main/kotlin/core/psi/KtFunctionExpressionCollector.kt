@@ -173,9 +173,11 @@ object KtFunctionExpressionCollector {
                 val previousMethod = originalExpressionText + "." + expression.method + "(" + params + ")"
                 tmpMap.getOrPut("tmp${tmpCounter++}") { previousMethod }
             }
-            typeResolver.resolveExpressionType(expression, currentClassMethod, mainClass, searchEngine)
+            typeResolver.resolveExpressionType(expression, currentClassMethod, mainClass)
 
-            expression.methodReturnType = expression.collingContext.type
+            val methReturnType = searchEngine.findMethodByClassNameAndMethodNameAndParams(expression.receiverType, expression.method,
+                expression.params.map { it.type })
+            expression.methodReturnType = methReturnType?.returnType?:"_"
         }
 
         ///dot

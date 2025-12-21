@@ -6,7 +6,6 @@ import org.example.data.symbol.FullExpression
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.VariableInfo
 import org.example.data.symbol.enum.ObjectType
-import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtFile
 
 class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
@@ -30,7 +29,6 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         expr: FullExpression,
         parentMethod: ClassMethod,
         parentClass: KotlinClass,
-        engine: IProjectSearchEngine,
     ) {
         val ktFile = searchEngine.getKtFileByClassName(parentClass.name)
 
@@ -56,6 +54,9 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
                 if (p.name == expr.collingContext.name) p.copy(type = expr.collingContext.type) else p
             }.toMutableList()
         }
+
+        val receiverType = variables.firstOrNull { it.name == expr.receiver }?.type ?: expr.receiver
+        expr.receiverType = receiverType
     }
 
 

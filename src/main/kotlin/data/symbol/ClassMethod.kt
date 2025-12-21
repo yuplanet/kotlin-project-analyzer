@@ -12,6 +12,7 @@ data class ClassMethod(
      *ApiKeyManagementController::getApiKeyClients():Boolean
      */
     val name: String,
+    val returnType: String,
     val fullName: String,
     val function: KtNamedFunction,
     val parameterTypeNames: List<String>,

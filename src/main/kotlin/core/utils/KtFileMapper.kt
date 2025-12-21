@@ -49,6 +49,7 @@ object KtFileMapper {
                     ClassMethod(
                         name = it.name ?: "__no_name__",
                         fullName = KtFunctionHelper.getFullFunctionName(it),
+                        returnType = it.typeReference?.text ?: "Unit",
                         function = it,
                         parameterTypeNames = it.valueParameters.map { p -> p.typeReference?.text ?: "_" }
                     )
