@@ -39,46 +39,12 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
         val variables = collectClassVariables(parentClass)
 
         //сначала разбираем методы. типа Class.Field, enum/item
-        expr.params = expr.params.map { param ->
-
-
-            val resolvedType = variables.firstOrNull { it.name == param.name }?.type
-                ?: parentMethod.fullExpressions.firstOrNull { it.collingContext.name == param.name }?.collingContext?.type
-                ?:
-
-                when {
-                    param.name.contains("(") -> {
-                        // метод → ищем через engine с известными типами аргументов
-                         val methodName = param.name.substringBefore("(")
-                        val argumentTypes = expr.params.map { it.type } // уже известные типы других параметров
-                        engine.findMethodByClassNameAndMethodNameAndParams(
-                            className = expr.collingContext.name,
-                            methodName = methodName,
-                            params = argumentTypes
-                        )?.parameterTypeNames?.lastOrNull() ?: "_"
-                    }
-
-                    param.name.contains(".") -> {
-                        // enum или object
-                        val receiver = param.name.substringBefore(".")
-                        val member = param.name.substringAfter(".")
-                        val engineClass = engine.findByClassName(receiver)
-                        when (engineClass?.ktClassObjectType) {
-                            ObjectType.EnumClass -> receiver
-                            ObjectType.Class -> engineClass.propertyReferences.firstOrNull { it.name == member }?.type ?: "_"
-                            else -> engineClass?.name ?: "_"
-                        }
-                    }
-                    else -> {
-                        // системный тип через импорты
-                        resolveTypeFromImports(param.name, ktFile) ?: "_"
-                    }
-                }
-            param.copy(type = resolvedType)
-        }.toMutableList()
+        expr.params.forEach { param ->
+            resolveExpressionParameterType(variables, param, expr, ktFile, parentMethod)
+        }
 
         // --- 1️⃣ RESOLVE CALLING CONTEXT TYPE ---
-        expr.collingContext.type =  resolveExpressionCallingContext(variables, expr, ktFile, parentClass, parentMethod)
+        expr.collingContext.type =  resolveExpressionCallingContextType(variables, expr, ktFile, parentClass, parentMethod)
 
         // --- 3️⃣ ОБНОВЛЕНИЕ ВСЕХ FullExpression В МЕТОДЕ ---
         parentMethod.fullExpressions.forEach { otherExpr ->
@@ -94,8 +60,55 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
 
 
 
+    private fun resolveExpressionParameterType(variables: List<VariableInfo>, parameter: VariableInfo, expr: FullExpression, ktFile: KtFile, parentMethod: ClassMethod) {
+
+
+        var resolvedType: String? = variables.firstOrNull { it.name == parameter.name }?.type
+
+        if (resolvedType == null) {
+            resolvedType =
+                parentMethod.fullExpressions.firstOrNull { it.collingContext.name == parameter.name }?.collingContext?.type
+        }
+        when {
+
+            parameter.name.contains("(") -> {
+
+                val methodName = parameter.name.substringBefore("(")
+                val argumentTypes = expr.params.map { it.type } // уже известные типы других параметров
+
+                resolvedType = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                    className = expr.collingContext.name,
+                    methodName = methodName,
+                    params = argumentTypes
+                )?.parameterTypeNames?.lastOrNull() ?: "_"
+
+            }
+
+            parameter.name.contains(".") -> {
+                // enum или object
+                val receiver = parameter.name.substringBefore(".")
+                val member = parameter.name.substringAfter(".")
+
+                val engineClass = searchEngine.findByClassName(receiver)
+
+                when (engineClass?.ktClassObjectType) {
+                    ObjectType.EnumClass -> receiver
+                    ObjectType.Class -> engineClass.propertyReferences.firstOrNull { it.name == member }?.type ?: "_"
+                    else -> engineClass?.name ?: "_"
+                }
+            }
+
+            else -> {
+                // системный тип через импорты
+                resolveTypeFromImports(parameter.name, ktFile) ?: "_"
+            }
+        }
+        parameter.type = resolvedType?:"_"
+    }
+
+
     // ищем тип вызвавший метод - a =fun() ищем тип а
-    private fun resolveExpressionCallingContext(variables: List<VariableInfo>, expr: FullExpression, ktFile: KtFile, parentClass: KotlinClass, parentMethod: ClassMethod):String {
+    private fun resolveExpressionCallingContextType(variables: List<VariableInfo>, expr: FullExpression, ktFile: KtFile, parentClass: KotlinClass, parentMethod: ClassMethod):String {
 
         var resolvedType: String? = null
 
