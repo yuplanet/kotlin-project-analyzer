@@ -82,7 +82,11 @@ class GraphBuilder() {
             featSearchEngine = SearcherEngine()
 
             devSearchEngine.init(developClasses)
+            devSearchEngine.initKtFilesLibrary(developerProject)
+
             featSearchEngine.init(featureClasses)
+            featSearchEngine.initKtFilesLibrary(featureProject)
+
 
             logStatus(logFile, "Initialize engines success")
         } catch (ex: Exception) {

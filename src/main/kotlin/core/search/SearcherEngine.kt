@@ -3,6 +3,7 @@ package org.example.core.search
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtParameter
 
 
@@ -19,6 +20,8 @@ class SearcherEngine: IProjectSearchEngine {
     private var methodFullNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
     private var methodSimpleNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
 
+    private var ktFilesLibrary: Map<KtFile, List<KotlinClass>> = mapOf()
+    private var invertedKtFilesLibrary: Map<String, KtFile> = mapOf()
 
     override fun init(projectClasses: List<KotlinClass>) {
         allClasses = projectClasses
@@ -43,6 +46,21 @@ class SearcherEngine: IProjectSearchEngine {
             val nkey = method.name.hashCode() // метод, который возвращает hashCode fullName
             methodSimpleNameDictionary.computeIfAbsent(nkey) { mutableListOf() }.add(method)
         }
+    }
+
+    override fun initKtFilesLibrary(ktFiles: Map<KtFile, List<KotlinClass>>) {
+        ktFilesLibrary = ktFiles
+
+        invertedKtFilesLibrary = ktFilesLibrary
+            .flatMap { (ktFile, classes) ->
+                classes.map { it.name to ktFile }
+            }
+            .toMap()
+    }
+
+    override fun getKtFileByClassName(className: String): KtFile? {
+        val myClassFile: KtFile? = invertedKtFilesLibrary["MyClassName"]
+        return myClassFile
     }
 
 

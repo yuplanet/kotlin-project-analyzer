@@ -2,10 +2,19 @@ package org.example.core.interfaces
 
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
+import org.jetbrains.kotlin.psi.KtFile
 
 interface IProjectSearchEngine {
 
     fun init(projectClasses: List<KotlinClass>)
+
+
+
+    // ===== KtFiles =====
+
+    fun initKtFilesLibrary(ktFiles: Map<KtFile, List<KotlinClass>>)
+
+    fun getKtFileByClassName(className: String): KtFile?
 
     // ===== Methods =====
 
