@@ -15,7 +15,7 @@ object KtFunctionExpressionCollector {
     private lateinit var currentClassMethod: ClassMethod
     private lateinit var searchEngine: IProjectSearchEngine
     private lateinit var mainClass: KotlinClass
-
+    private lateinit var typeResolver: ExpressionTypeResolver
 
     private fun buildFullExpression(
         currentExpression: KtCallExpression,
@@ -171,7 +171,7 @@ object KtFunctionExpressionCollector {
                 val previousMethod = originalExpressionText + "." + expression.method + "(" + params + ")"
                 tmpMap.getOrPut("tmp${tmpCounter++}") { previousMethod }
             }
-            ExpressionTypeResolver.resolveExpressionType(expression, currentClassMethod, mainClass, searchEngine)
+            typeResolver.resolveExpressionType(expression, currentClassMethod, mainClass, searchEngine)
         }
 
         ///dot
@@ -218,6 +218,7 @@ object KtFunctionExpressionCollector {
         this.searchEngine = searchEngine
         this.mainClass = kotlinClass
 
+        typeResolver = ExpressionTypeResolver(searchEngine)
         val currentMethodFnNamedFunction = method.function
 
         currentMethodFnNamedFunction.bodyExpression?.let { handlePsiElement(it) } // it: KtExpression

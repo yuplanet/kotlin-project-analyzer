@@ -1,7 +1,6 @@
 package org.example.core.linking
 
 import org.example.core.interfaces.IProjectSearchEngine
-import org.example.core.search.KiFileIndexed
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FullExpression
 import org.example.data.symbol.KotlinClass
@@ -9,7 +8,7 @@ import org.example.data.symbol.VariableInfo
 import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtFile
 
-object ExpressionTypeResolver {
+class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine) {
 
     // Функция для резолва полного имени класса через импорты
     private fun resolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
@@ -32,7 +31,7 @@ object ExpressionTypeResolver {
         parentClass: KotlinClass,
         engine: IProjectSearchEngine,
     ) {
-        val ktFile = KiFileIndexed.getFileByClassName(parentClass.name) ?: return
+        val ktFile = searchEngine.getKtFileByClassName(parentClass.name) ?: return
 
         val variables = collectClassVariables(parentClass)
 

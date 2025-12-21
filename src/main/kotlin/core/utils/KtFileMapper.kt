@@ -1,7 +1,6 @@
 package org.example.core.utils
 
 import org.example.core.psi.KtFileExtractor
-import org.example.core.search.KiFileIndexed
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
@@ -105,9 +104,6 @@ object KtFileMapper {
         }
 
         linkSuperClasses(allClasses)
-
-
-        KiFileIndexed.indexFiles(ktFiles)
 
         return allClasses
     }
