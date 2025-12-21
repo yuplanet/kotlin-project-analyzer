@@ -9,6 +9,7 @@ import org.example.core.search.SearcherEngine
 import org.example.data.analyzer.ProjectDiffResult
 import org.example.data.chain.MethodCallNode
 import org.example.data.symbol.KotlinClass
+import org.jetbrains.kotlin.psi.KtFile
 import java.io.File
 
 class GraphBuilder() {
@@ -23,6 +24,8 @@ class GraphBuilder() {
 
 
     //state
+    private var developerProject: Map<KtFile, List<KotlinClass>> = mutableMapOf()
+    private var featureProject: Map<KtFile, List<KotlinClass>> = mutableMapOf()
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
 
@@ -150,8 +153,15 @@ class GraphBuilder() {
                 KtFileExtractor.createPsiFile(project, name, content)
             }
 
-            developClasses = KtFileMapper.mapKtFilesToClasses(developKtFiles)
-            featureClasses = KtFileMapper.mapKtFilesToClasses(featureKtFiles)
+
+            developerProject = KtFileMapper.collectClassesByFile(developKtFiles)
+            featureProject = KtFileMapper.collectClassesByFile(featureKtFiles)
+
+            developClasses = developerProject.values.flatten()
+            featureClasses = featureProject.values.flatten()
+
+            KtFileMapper.linkSuperClasses(developClasses)
+            KtFileMapper.linkSuperClasses(featureClasses)
 
             logStatus(logFile, "Project loading success")
         } catch (ex: Exception) {

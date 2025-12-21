@@ -14,7 +14,7 @@ object KtFileMapper {
     /**
      * Преобразует KtFile в список KotlinClass
      */
-    fun mapKtFileToClasses(ktFile: KtFile): List<KotlinClass> {
+    fun mapKtFileToClassList(ktFile: KtFile): List<KotlinClass> {
 
         val classes = ktFile.collectDescendantsOfType<KtClassOrObject>()
         val kotlinClasses = mutableListOf<KotlinClass>()
@@ -98,10 +98,10 @@ object KtFileMapper {
     /**
      * Преобразует список KtFile в список KotlinClass
      */
-    fun mapKtFilesToClasses(ktFiles: List<KtFile>): List<KotlinClass> {
+    fun mapKtFilesToClassList(ktFiles: List<KtFile>): List<KotlinClass> {
 
         val allClasses = ktFiles.flatMap { ktFile ->
-            mapKtFileToClasses(ktFile)
+            mapKtFileToClassList(ktFile)
         }
 
         linkSuperClasses(allClasses)
@@ -110,5 +110,19 @@ object KtFileMapper {
         KiFileIndexed.indexFiles(ktFiles)
 
         return allClasses
+    }
+
+
+    fun collectClassesByFile(ktFiles: List<KtFile>): Map<KtFile, List<KotlinClass>> {
+
+       val mapKtFilesAndClasses = ktFiles.associateWith { ktFile ->
+            mapKtFileToClassList(ktFile)
+        }
+
+        val allClasses = mapKtFilesAndClasses.values.flatten()
+
+        linkSuperClasses(allClasses)
+
+        return mapKtFilesAndClasses
     }
 }
