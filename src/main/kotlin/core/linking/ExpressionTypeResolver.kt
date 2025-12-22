@@ -3,7 +3,7 @@ package org.example.core.linking
 import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.FullExpression
+import org.example.data.symbol.expression.VariableAssignmentExpression
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.VariableInfo
 import org.example.data.symbol.enum.ObjectType
@@ -15,7 +15,7 @@ class ExpressionTypeResolver(
     private val currentMethod: ClassMethod): IExpressionTypeResolver {
 
     private val ktFile: KtFile
-    private var expressions: List<FullExpression>
+    private var expressions: List<VariableAssignmentExpression>
     private val classVariables: MutableList<VariableInfo> = mutableListOf()
     private val methodVariables: MutableList<VariableInfo> = mutableListOf()
 
@@ -95,7 +95,7 @@ class ExpressionTypeResolver(
     /// 1 class.Method(var)
     /// 2 class.Method()
     /// 3 class.field
-    override fun getMethodOrFieldReturnType(expr: FullExpression): String? {
+    override fun getMethodOrFieldReturnType(expr: VariableAssignmentExpression): String? {
 
         val method = expr.method
 

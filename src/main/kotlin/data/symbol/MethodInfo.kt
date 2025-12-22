@@ -6,6 +6,5 @@ data class MethodInfo (
 
     var parameters: MutableList<VariableInfo> = mutableListOf(),
 
-    var innerInvoke: Boolean = false,
     var rawContent: String = "",
 )

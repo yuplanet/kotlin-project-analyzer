@@ -4,6 +4,7 @@ import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.linking.ExpressionTypeResolver
 import org.example.data.symbol.*
+import org.example.data.symbol.expression.VariableAssignmentExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
@@ -58,12 +59,14 @@ class KtFunctionExpressionCollector {
     }
 
 
-    private fun buildFullExpression(currentExpression: KtCallExpression, target: VariableInfo): FullExpression {
+    private fun buildFullExpression(currentExpression: KtCallExpression, target: VariableInfo): VariableAssignmentExpression {
         //receiver
         val receiverExpression = (currentExpression.parent as? KtDotQualifiedExpression)?.receiverExpression
             ?: (currentExpression.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
-        val receiverText = receiverExpression?.text ?: "this"
+        val receiverText = receiverExpression?.text ?: ""
+
+        val isInternalCall = receiverText == ""
 
         var receiveRecord = getLastTempRecordByValue(receiverText)?.first
 
@@ -74,7 +77,12 @@ class KtFunctionExpressionCollector {
         }
         receiverName=receiverName.replace("this.", "")
         val receiverType = typeResolver.getReceiverType(receiverName) ?: "_"
-        val receiver = VariableInfo(receiverName, receiverType)
+
+
+        val receiver = if(isInternalCall)
+            VariableInfo("this", mainClass.name)
+        else
+            VariableInfo(receiverName, receiverType)
 
 //Method
         val methodName = currentExpression.calleeExpression?.text ?: "" // мя метода
@@ -111,13 +119,12 @@ class KtFunctionExpressionCollector {
 
         val method = MethodInfo(
             name = methodName,
-            innerInvoke = false,
             returnType = "",
             parameters = params.toMutableList(),
             rawContent = getRawCallText(currentExpression)
         )
 
-        val expression = FullExpression(
+        val expression = VariableAssignmentExpression(
             target = target,
             receiver = receiver,
             method = method,
@@ -199,7 +206,7 @@ class KtFunctionExpressionCollector {
                     ?: VariableInfo(
                         tmpList.firstOrNull { it.second == receiverText }?.first ?: receiverText,
                         "" // to do find type
-                    )
+                    ) // main()
 
                 // Имя метода — сам вызов
                 val expression = buildFullExpression(currentElement, currentTarget)
