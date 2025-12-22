@@ -4,6 +4,8 @@ import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtFunctionExpressionCollector
 import org.example.data.reference.MethodReference
+import org.example.data.reference.ObjectReference
+import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.MethodInfo
 import org.jetbrains.kotlin.psi.*
@@ -49,9 +51,17 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         val isTargetEnum = searchEngine.isEnumClass(className)
         val isTargetStatic = searchEngine.isStaticClass(className)
 
-
-
+        return  isTargetEnum || isTargetStatic
     }
+
+
+    private fun addFieldRef(className:String, fieldName:String): ClassProperty? {
+        val callingClass = searchEngine.findByClassName(className)
+        if(callingClass != null) {
+            val member = searchEngine.findPropertyRefByClassNameAndFieldName(className, fieldName)
+        }
+    }
+
 
     fun buildFunctionCallRecords(projectClasses: List<KotlinClass>) {
 
