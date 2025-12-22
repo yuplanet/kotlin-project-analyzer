@@ -166,26 +166,21 @@ class KtFunctionExpressionCollector {
                     ?: (currentElement.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
                 val receiverText = receiverExpression?.text ?: "this" // имя serivce
-    // Для сложных выражений, включающих вызовы, лучше проверять:
+                // Для сложных выражений, включающих вызовы, лучше проверять:
 
-                    val isComplex =
-                        receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
+                val isComplex =
+                    receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
 
-                    if (isComplex){
+                if (isComplex) {
+                    val value = "tmp${tmpCounter++}"
+                    tmpMap.getOrPut(value) { receiverText }
+                }
 
-                        val value = "tmp${tmpCounter++}"
-                        tmpMap.getOrPut(value) { receiverText }
-
-
-
-                    }
                 var currentContext = callingContext
                     ?: VariableInfo(
                         tmpMap.entries.firstOrNull { it.value == receiverText }?.key ?: receiverText,
                         "" // to do find type
                     )
-
-                val t  = getTarget(currentElement)
 
                 // Имя метода — сам вызов
                 val expression = buildFullExpression(currentElement, currentContext)
