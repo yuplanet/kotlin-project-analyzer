@@ -64,7 +64,7 @@ class ExpressionTypeResolver(
 
     override fun getReceiverType(variableName: String): String? {
 
-        var receive = variableName.replace(".this", "")
+        var receive = variableName.replace("this.", "")
         //1 class property fields
         //2 method vars
         //3 imports, className

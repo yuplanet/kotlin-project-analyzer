@@ -5,7 +5,6 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.linking.ExpressionTypeResolver
 import org.example.data.symbol.*
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.isAncestor
@@ -60,8 +59,6 @@ class KtFunctionExpressionCollector {
 
 
     private fun buildFullExpression(currentExpression: KtCallExpression, target: VariableInfo): FullExpression {
-        currentExpression.calleeExpression?.text
-
         //receiver
         val receiverExpression = (currentExpression.parent as? KtDotQualifiedExpression)?.receiverExpression
             ?: (currentExpression.parent as? KtSafeQualifiedExpression)?.receiverExpression
@@ -73,9 +70,9 @@ class KtFunctionExpressionCollector {
         var receiverName = receiveRecord ?: when (receiverExpression) {
             is KtNameReferenceExpression -> receiverExpression.getReferencedName()
             is KtThisExpression -> "this"
-            else -> receiveRecord ?: receiverText
+            else -> receiverText
         }
-
+        receiverName=receiverName.replace("this.", "")
         val receiverType = typeResolver.getReceiverType(receiverName) ?: "_"
         val receiver = VariableInfo(receiverName, receiverType)
 
@@ -105,7 +102,7 @@ class KtFunctionExpressionCollector {
             }
 
 
-            if (paramName.isNullOrBlank()) return@mapNotNull null
+            if (paramName.isBlank()) return@mapNotNull null
 
             val paramType = typeResolver.getMethodParameterType(paramName) ?: "_"
             VariableInfo(paramName, paramType)
@@ -129,7 +126,6 @@ class KtFunctionExpressionCollector {
         var methodReturnType = typeResolver.getMethodOrFieldReturnType(expression)
 
         if (methodReturnType == null) {
-
             methodReturnType = searchEngine.findMethodByClassNameAndMethodNameAndParams(
                 expression.receiver.type ?: "_",
                 expression.method.name,
@@ -186,7 +182,6 @@ class KtFunctionExpressionCollector {
                     handlePsiElement(defaultExpr,callingContextVariable)
                 }
             }
-
 
             //main
             is KtCallExpression -> {
@@ -263,20 +258,6 @@ class KtFunctionExpressionCollector {
             arg.getArgumentExpression()?.isAncestor(call) == true
         }
     }
-
-
-
-    fun getTarget(call: KtCallExpression): VariableInfo? {
-        val parent = call.parent
-
-        if (parent is KtBinaryExpression && parent.operationToken == KtTokens.EQ && parent.right == call) {
-            return VariableInfo(name = parent.left?.text ?: "", type = "")
-        }
-
-        // Можно добавить destructuring, return и т.д.
-        return null
-    }
-
 
     fun collectExpressions(method: ClassMethod, kotlinClass: KotlinClass, searchEngine: IProjectSearchEngine) {
 
