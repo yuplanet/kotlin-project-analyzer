@@ -5,6 +5,7 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtFunctionExpressionCollector
 import org.example.data.reference.MethodCallReference
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.MethodInfo
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
@@ -48,10 +49,65 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
     fun buildFunctionCallRecords(projectClasses: List<KotlinClass>) {
 
+        for (cls in projectClasses) {
+
+            for (method in cls.functionCalls) {
+
+                for (expr in method.fullExpressions) {
+                    val targetMethodFullName = expr.method.name
+
+                    val callingClass = searchEngine.findByClassName(expr.receiver.type)
+
+                    if (callingClass != null) {
+                        val classMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                            expr.receiver.type,
+                            expr.method.name,
+                            expr.method.parameters.map { it.type })
+
+                        if (classMethod != null) {
+                            val callRef = MethodCallReference(
+                                fullName = targetMethodFullName,
+                                method = expr.method,
+                                parentClass = callingClass
+                            )
+                            // Добавляем в callRecords вызывающего метода
+                            method.callRecords.add(callRef)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun buildFunctionReverseCallRecords(projectClasses: List<KotlinClass>) {
 
+        for (cls in projectClasses) {
+            for (method in cls.functionCalls) {
+                for (call in method.callRecords) {
+
+                    val methodInfo = MethodInfo(
+                        name = call.method.name,
+                        returnType = call.method.returnType,
+                        parameters = call.method.parameters
+                    )
+
+                    // Найдём целевой метод
+                    val targetMethod
+                        = searchEngine.findMethodByClassNameAndMethodNameAndParams(call.parentClass.name, call.method.name, call.method.parameters.map { it.type })
+
+                    if (targetMethod != null) {
+                        // Добавляем ссылку на обратный вызов
+                        targetMethod.reverseCallRecords.add(
+                            MethodCallReference(
+                                fullName = method.fullName, // вызывающий метод
+                                method = methodInfo,
+                                parentClass = call.parentClass
+                            )
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun bindPropertyCalls(projectClasses: List<KotlinClass>) {

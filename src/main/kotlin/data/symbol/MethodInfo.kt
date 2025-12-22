@@ -1,7 +1,5 @@
 package org.example.data.symbol
 
-import org.eclipse.jgit.diff.RawText
-
 data class MethodInfo (
     var name: String ="",
     var returnType: String = "",
