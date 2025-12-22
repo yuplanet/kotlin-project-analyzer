@@ -19,6 +19,8 @@ interface IProjectSearchEngine {
     fun findByFullMethodName(methodName: String): ClassMethod?
 
     // ===== Classes =====
+    fun isEnumClass(className: String): Boolean
+    fun isStaticClass(className: String): Boolean
 
     fun findByClassName(className: String): KotlinClass?
 

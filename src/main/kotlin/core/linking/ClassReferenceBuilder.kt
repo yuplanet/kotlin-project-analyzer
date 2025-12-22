@@ -3,14 +3,13 @@ package org.example.core.linking
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtFunctionExpressionCollector
-import org.example.data.reference.MethodCallReference
+import org.example.data.reference.MethodReference
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.MethodInfo
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
-
 
     private lateinit var searchEngine: IProjectSearchEngine
 
@@ -23,13 +22,11 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         collectExpressions(projectClasses)
 
         //Methods
-        buildFunctionCallRecords(projectClasses)
+        buildFunctionCallRecords(projectClasses) // to do
         buildFunctionReverseCallRecords(projectClasses)
 
         //properties
         bindPropertyCalls(projectClasses)
-
-        //parameter
         bindParameterCalls(projectClasses)
     }
 
@@ -47,6 +44,15 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         }
     }
 
+
+    private fun isStaticOrEnum(className: String): Boolean {
+        val isTargetEnum = searchEngine.isEnumClass(className)
+        val isTargetStatic = searchEngine.isStaticClass(className)
+
+
+
+    }
+
     fun buildFunctionCallRecords(projectClasses: List<KotlinClass>) {
 
         for (cls in projectClasses) {
@@ -54,19 +60,28 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
             for (method in cls.functionCalls) {
 
                 for (expr in method.fullExpressions) {
-                    val targetMethodFullName = expr.method.name
 
-                    val callingClass = searchEngine.findByClassName(expr.receiver.type)
+
+
+                    //2
+                    //3/
+                    //4
+
+
+                    val targetMethod = expr.method.name
+                    val targetClass = expr.receiver.type
+                    val parameters = expr.method.parameters.map { it.type }
+                    val callingClass = searchEngine.findByClassName(targetClass)
 
                     if (callingClass != null) {
                         val classMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                            expr.receiver.type,
-                            expr.method.name,
-                            expr.method.parameters.map { it.type })
+                            targetClass,
+                            targetMethod,
+                            parameters)
 
                         if (classMethod != null) {
-                            val callRef = MethodCallReference(
-                                fullName = targetMethodFullName,
+                            val callRef = MethodReference(
+                                name = targetMethod,
                                 method = expr.method,
                                 parentClass = callingClass
                             )
@@ -129,7 +144,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                         ?: continue//ClassProperty(property = property).also { cls.propertyReferences.add(it) }
 
                     // Добавляем ссылку на метод, который использует это свойство
-                    classProperty.callRecord.add(
+                    classProperty.callRecords.add(
                         MethodCallReference(
                             fullName = method.fullName,
                             parentClass = cls

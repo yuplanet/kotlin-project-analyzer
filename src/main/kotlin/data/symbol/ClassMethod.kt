@@ -1,6 +1,6 @@
 package org.example.data.symbol
 
-import org.example.data.reference.MethodCallReference
+import org.example.data.reference.ObjectReference
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
@@ -17,6 +17,8 @@ data class ClassMethod(
     val function: KtNamedFunction,
     val parameterTypeNames: List<String>,
 
+
+
     //content
     var properties: MutableList<ClassProperty> = mutableListOf(),
     var parameters: MutableList<ClassParameter> = mutableListOf(),
@@ -28,6 +30,6 @@ data class ClassMethod(
     var ktParameters: List<KtParameter> = listOf(),
 
     //refs
-    val callRecords: MutableList<MethodCallReference> = mutableListOf(),
-    val reverseCallRecords: MutableList<MethodCallReference> = mutableListOf(),
+    val callRecords: MutableList<ObjectReference> = mutableListOf(),
+    val reverseCallRecords: MutableList<ObjectReference> = mutableListOf(),
 )
