@@ -1,9 +1,11 @@
 package org.example.core.psi
 
+import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.linking.ExpressionTypeResolver
 import org.example.data.symbol.*
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 
 class KtFunctionExpressionCollector {
@@ -14,7 +16,7 @@ class KtFunctionExpressionCollector {
     private lateinit var currentClassMethod: ClassMethod
     private lateinit var searchEngine: IProjectSearchEngine
     private lateinit var mainClass: KotlinClass
-    private lateinit var typeResolver: ExpressionTypeResolver
+    private lateinit var typeResolver: IExpressionTypeResolver
 
 
 
@@ -44,18 +46,19 @@ class KtFunctionExpressionCollector {
             ?: when (receiverExpression) {
                 is KtNameReferenceExpression -> receiverExpression.getReferencedName()
                 is KtThisExpression -> "this"
-                else ->  tmpMap.entries.firstOrNull { it.value == receiverExpression?.text }?.key ?: receiverExpression?.text
+                else -> tmpMap.entries.firstOrNull { it.value == receiverExpression?.text }?.key
+                    ?: receiverExpression?.text
                     ?: "this" // сюда не должно попасть сложное выражение, если tmpMap работает
             }
 
-        val receiverType = typeResolver.getTypeByVariableName(receiverName)
+        val receiverType = typeResolver.getReceiverType(receiverName) ?: "_"
         val receiver = VariableInfo(receiverName, receiverType)
 
 
 //Method
         val methodName = currentExpression.calleeExpression?.text ?: "" // мя метода
 
-        val params = currentExpression.valueArguments.map { arg ->
+        val params = currentExpression.valueArguments.mapNotNull { arg ->
             val argExpr = arg.getArgumentExpression()
             val rawText = argExpr?.text ?: "?"
 
@@ -66,15 +69,16 @@ class KtFunctionExpressionCollector {
                     val innerText = innerReceiver?.text
                     if (innerText != null && tmpMap.containsKey(innerText)) tmpMap[innerText] else rawText
                 }
+
                 else -> tmpMap.entries.firstOrNull { it.value == rawText }?.key ?: rawText
             }
 
-            val expressionsChain = currentClassMethod.fullExpressions
 
+            if (paramName.isNullOrBlank()) return@mapNotNull null
+
+            val paramType = typeResolver.getMethodParameterType(paramName) ?: "_"
+            VariableInfo(paramName, paramType)
             // Пытаемся найти тип в уже известных FullExpression
-            val paramType = typeResolver.getTypeByVariableName(paramName?:"")
-
-            VariableInfo(paramName ?: "", paramType)
         }
 
         val method = MethodInfo(
@@ -91,9 +95,22 @@ class KtFunctionExpressionCollector {
             method = method,
         )
 
-        expression.method.returnType = typeResolver.resolveExpressionParameterType(expression)
+        var methodReturnType = typeResolver.getMethodOrFieldReturnType(expression)
+
+        if (methodReturnType == null) {
+
+            methodReturnType = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                expression.receiver.type ?: "_",
+                expression.method.name,
+                expression.method.parameters.map { it.type }) as String?
+        }
+
+        if (expression.method.returnType.isNullOrEmpty() || expression.method.returnType == "_") {
+            expression.method.returnType = methodReturnType ?: "_"
+        }
 
         expression.target.type = expression.method.returnType
+
         return expression
     }
 
@@ -149,11 +166,8 @@ class KtFunctionExpressionCollector {
                     ?: (currentElement.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
                 val receiverText = receiverExpression?.text ?: "this" // имя serivce
-                val callWithoutContext = callingContext?.name.isNullOrEmpty()
-
     // Для сложных выражений, включающих вызовы, лучше проверять:
 
-                if (callWithoutContext) {
                     val isComplex =
                         receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
 
@@ -161,15 +175,17 @@ class KtFunctionExpressionCollector {
 
                         val value = "tmp${tmpCounter++}"
                         tmpMap.getOrPut(value) { receiverText }
-                    }
-                }
 
+
+
+                    }
                 var currentContext = callingContext
                     ?: VariableInfo(
                         tmpMap.entries.firstOrNull { it.value == receiverText }?.key ?: receiverText,
                         "" // to do find type
                     )
 
+                val t  = getTarget(currentElement)
 
                 // Имя метода — сам вызов
                 val expression = buildFullExpression(currentElement, currentContext)
@@ -188,12 +204,6 @@ class KtFunctionExpressionCollector {
                     val previousMethod = originalExpressionText + "." + expression.method + "(" + params + ")"
                     tmpMap.getOrPut("tmp${tmpCounter++}") { previousMethod }
                 }
-                //typeResolver.resolveExpressionType(expression, currentClassMethod, mainClass)
-
-
-                val methReturnType = searchEngine.findMethodByClassNameAndMethodNameAndParams(expression.receiver.type, expression.method.name,
-                    expression.method.parameters.map { it.type })
-                expression.method.returnType = methReturnType?.returnType?:"_"
             }
 
             ///dot
@@ -225,6 +235,18 @@ class KtFunctionExpressionCollector {
             else
                 -> currentElement.children.forEach { handlePsiElement(it, callingContext) }
         }
+    }
+
+
+    fun getTarget(call: KtCallExpression): VariableInfo? {
+        val parent = call.parent
+
+        if (parent is KtBinaryExpression && parent.operationToken == KtTokens.EQ && parent.right == call) {
+            return VariableInfo(name = parent.left?.text ?: "", type = "")
+        }
+
+        // Можно добавить destructuring, return и т.д.
+        return null
     }
 
 

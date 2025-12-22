@@ -1,5 +1,6 @@
 package org.example.core.linking
 
+import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FullExpression
@@ -8,9 +9,10 @@ import org.example.data.symbol.VariableInfo
 import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtFile
 
-class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine,
+class ExpressionTypeResolver(
+    private val searchEngine: IProjectSearchEngine,
     private val currentClass: KotlinClass,
-    private val currentMethod: ClassMethod) {
+    private val currentMethod: ClassMethod): IExpressionTypeResolver {
 
     private val ktFile: KtFile
     private var expressions: List<FullExpression>
@@ -33,27 +35,23 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine,
         }
     }
 
+    override fun getVariableType(variableName: String): String? {
 
-    fun getTypeByVariableName(variableName: String): String {
-
-        var type = classVariables.firstOrNull { it.name == variableName }?.let {
-            it.type
-        }
+        var type = classVariables.firstOrNull { it.name == variableName }?.type
 
         if (type == null)
-            type = methodVariables.firstOrNull { it.name == variableName }?.let {
-                it.type
-            }
+            type = methodVariables.firstOrNull { it.name == variableName }?.type
+
         if (type == null) {
             for (expression in expressions) {
 
-                if (expression.target.name == variableName){
+                if (expression.target.name == variableName) {
                     type = expression.target.type
-                    return type                   
+                    return type
                 }
 
                 for (param in expression.method.parameters) {
-                    if (param.name == variableName){
+                    if (param.name == variableName) {
                         type = param.type
                         return type
                     }
@@ -61,17 +59,80 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine,
             }
         }
 
-        if (type == null)
-            type = getEnumOrObjectType(variableName)
+        return type
+    }
+
+    override fun getReceiverType(variableName: String): String? {
+
+        //1 class property fields
+        //2 method vars
+        //3 imports, className
+        //Члены класса
+        var type = getVariableType(variableName)
 
         if (type == null)
             type = resolveTypeFromImports(variableName, ktFile)
 
+        if (type == null)
+            type = getByClassName(variableName)
 
         // 3️⃣ Если не нашли — неизвестно
-        return type ?: "_"
+        return type
     }
 
+    override fun getMethodParameterType(param: String): String? {
+        var type = getVariableType(param)
+
+        if (type == null)
+            type = getEnumOrObjectType(param)
+
+        return  type
+
+    }
+
+    //возвращает тип по методу с переменной вида
+    /// 1 class.Method(var)
+    /// 2 class.Method()
+    /// 3 class.field
+    override fun getMethodOrFieldReturnType(expr: FullExpression): String? {
+
+        val method = expr.method
+
+        var type = if (method.rawContent.contains("(")) {
+            val methodName = method.name.substringBefore("(")
+            val type = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                className = expr.receiver.type,
+                methodName = methodName,
+                params = method.parameters.map { it.type },
+
+                )?.returnType
+
+            type
+        } else if (method.rawContent.contains(".")) {
+            val member = method.name.substringAfter(".")
+
+            var classType = expr.receiver.type
+            val methodClass = searchEngine.findByClassName(classType)
+
+            when (methodClass?.ktClassObjectType) {
+                ObjectType.EnumClass -> classType
+
+                ObjectType.Class -> {
+                    methodClass.propertyReferences.firstOrNull { it.name == member }?.type
+                        ?: methodClass.parameterReferences.firstOrNull { it.name == member }?.type
+                }
+
+                else -> null
+            }
+        } else null
+
+        if (type == null) {
+            // системный тип через импорты
+            type = resolveTypeFromImports(expr.receiver.name, ktFile) ?: "_"
+        }
+
+        return type
+    }
 
     // Функция для резолва полного имени класса через импорты
     private fun resolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
@@ -87,55 +148,13 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine,
 
         return null
     }
-    
-    
-    fun resolveExpressionParameterType(expr: FullExpression) : String {
 
-
-        val method = expr.method
-
-        var type = if (method.rawContent.contains("(")) {
-            val methodName = method.name.substringBefore("(")
-            val type = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                className = expr.target.name,
-                methodName = methodName,
-                params = method.parameters.map { it.type },
-
-                )?.parameterTypeNames?.lastOrNull() ?: "_"
-
-            type
-        } else if (method.rawContent.contains(".")) {
-            val member = method.name.substringAfter(".")
-
-            val engineClass = searchEngine.findByClassName(expr.receiver.type)
-
-            when (engineClass?.ktClassObjectType) {
-                ObjectType.EnumClass -> expr.receiver.type
-
-                ObjectType.Class -> {
-                    engineClass.propertyReferences.firstOrNull { it.name == member }?.type
-                        ?: engineClass.parameterReferences.firstOrNull { it.name == member }?.type
-                        ?: "_"
-                }
-
-                else -> engineClass?.name ?: "_"
-            }
-        } else "_"
-
-        if (type == "_") {
-            // системный тип через импорты
-            type = resolveTypeFromImports(expr.receiver.name, ktFile) ?: "_"
-        }
-
-        return type
-    }
 
     private fun getEnumOrObjectType(param: String): String? {
 
-
-         val type = if (param.contains(".")) {
+        val type = if (param.contains(".")) {
             val className = param.substringBefore(".")
-             val fieldName = param.substringAfter(".")
+            val fieldName = param.substringAfter(".")
 
             val engineClass = searchEngine.findByClassName(className)
 
@@ -145,21 +164,16 @@ class ExpressionTypeResolver(private val searchEngine: IProjectSearchEngine,
                 ObjectType.Class -> {
                     engineClass.propertyReferences.firstOrNull { it.name == fieldName }?.type
                         ?: engineClass.parameterReferences.firstOrNull { it.name == fieldName }?.type
-                        ?: null
                 }
 
-                else -> engineClass?.name ?: null
+                else -> null
             }
         } else null
 
         return type
     }
 
-    fun getClassVariables(): List<VariableInfo> {
-        return classVariables.toList()
-    }
-
-    fun getMethodVariables(): List<VariableInfo> {
-        return methodVariables.toList()
+    fun getByClassName(className: String): String? {
+        return searchEngine.findByClassName(className)?.name
     }
 }
