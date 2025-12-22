@@ -64,17 +64,18 @@ class ExpressionTypeResolver(
 
     override fun getReceiverType(variableName: String): String? {
 
+        var receive = variableName.replace(".this", "")
         //1 class property fields
         //2 method vars
         //3 imports, className
         //Члены класса
-        var type = getVariableType(variableName)
+        var type = getVariableType(receive)
 
         if (type == null)
-            type = resolveTypeFromImports(variableName, ktFile)
+            type = resolveTypeFromImports(receive, ktFile)
 
         if (type == null)
-            type = getByClassName(variableName)
+            type = getByClassName(receive)
 
         // 3️⃣ Если не нашли — неизвестно
         return type

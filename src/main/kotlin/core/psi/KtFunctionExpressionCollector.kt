@@ -7,53 +7,77 @@ import org.example.data.symbol.*
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
+import org.jetbrains.kotlin.psi.psiUtil.isAncestor
 
 class KtFunctionExpressionCollector {
 
-    val tmpMap = mutableMapOf<String, String>()
+    val tmpList = mutableListOf<Pair<String, String>>()
+// Добавление
     var tmpCounter = 1
 
     private lateinit var currentClassMethod: ClassMethod
     private lateinit var searchEngine: IProjectSearchEngine
     private lateinit var mainClass: KotlinClass
     private lateinit var typeResolver: IExpressionTypeResolver
+//
+    fun getLastTempRecordByKey(key: String): Pair<String, String>? {
+        return tmpList.asReversed().firstOrNull { it.first == key }
+    }
 
-
+    fun getLastTempRecordByValue(value: String): Pair<String, String>? {
+        return tmpList.asReversed().firstOrNull { it.second == value }
+    }
 
     fun getRawCallText(call: KtCallExpression): String {
         var element: PsiElement = call
 
-        while (
-            element.parent is KtDotQualifiedExpression ||
-            element.parent is KtSafeQualifiedExpression
-        ) {
-            element = element.parent
+        while (true) {
+            val parent = element.parent
+
+            when (parent) {
+                is KtDotQualifiedExpression -> {
+                    // Поднимаемся ТОЛЬКО если текущий элемент — receiver
+                    if (parent.receiverExpression == element)
+                        element = parent
+                    else
+                        break
+                }
+
+                is KtSafeQualifiedExpression -> {
+                    if (parent.receiverExpression == element)
+                        element = parent
+                    else
+                        break
+                }
+
+                else -> break
+            }
         }
 
         return element.text
     }
 
 
-
-    private fun buildFullExpression(currentExpression: KtCallExpression, callingContext: VariableInfo): FullExpression {
+    private fun buildFullExpression(currentExpression: KtCallExpression, target: VariableInfo): FullExpression {
         currentExpression.calleeExpression?.text
 
         //receiver
         val receiverExpression = (currentExpression.parent as? KtDotQualifiedExpression)?.receiverExpression
             ?: (currentExpression.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
-        val receiverName = receiverExpression?.text?.let { tmpMap[it] }
-            ?: when (receiverExpression) {
-                is KtNameReferenceExpression -> receiverExpression.getReferencedName()
-                is KtThisExpression -> "this"
-                else -> tmpMap.entries.firstOrNull { it.value == receiverExpression?.text }?.key
-                    ?: receiverExpression?.text
-                    ?: "this" // сюда не должно попасть сложное выражение, если tmpMap работает
-            }
+        val receiverText = receiverExpression?.text ?: "this"
+
+        var receiveRecord = getLastTempRecordByValue(receiverText)?.first
+
+        var receiverName = receiveRecord ?: when (receiverExpression) {
+            is KtNameReferenceExpression -> receiverExpression.getReferencedName()
+            is KtThisExpression -> "this"
+            else -> receiveRecord ?: receiverText
+        }
 
         val receiverType = typeResolver.getReceiverType(receiverName) ?: "_"
         val receiver = VariableInfo(receiverName, receiverType)
-
 
 //Method
         val methodName = currentExpression.calleeExpression?.text ?: "" // мя метода
@@ -67,10 +91,17 @@ class KtFunctionExpressionCollector {
                 is KtCallExpression -> {
                     val innerReceiver = (argExpr.parent as? KtDotQualifiedExpression)?.receiverExpression
                     val innerText = innerReceiver?.text
-                    if (innerText != null && tmpMap.containsKey(innerText)) tmpMap[innerText] else rawText
+
+                    if (innerText != null) {
+                        tmpList.asReversed().firstOrNull { it.second == innerText }.toString() ?: rawText
+                    } else rawText
                 }
 
-                else -> tmpMap.entries.firstOrNull { it.value == rawText }?.key ?: rawText
+                else -> {
+                    var customParam = getLastTempRecordByValue(rawText) ?: getLastTempRecordByValue(rawText)
+
+                    customParam?.first ?: rawText
+                }
             }
 
 
@@ -90,7 +121,7 @@ class KtFunctionExpressionCollector {
         )
 
         val expression = FullExpression(
-            target = callingContext,
+            target = target,
             receiver = receiver,
             method = method,
         )
@@ -108,8 +139,10 @@ class KtFunctionExpressionCollector {
         if (expression.method.returnType.isNullOrEmpty() || expression.method.returnType == "_") {
             expression.method.returnType = methodReturnType ?: "_"
         }
-
-        expression.target.type = expression.method.returnType
+        if (methodReturnType.isNullOrEmpty() || methodReturnType == "_")
+            expression.method.returnType = expression.target.type
+        else
+            expression.target.type = expression.method.returnType
 
         return expression
     }
@@ -167,37 +200,28 @@ class KtFunctionExpressionCollector {
 
                 val receiverText = receiverExpression?.text ?: "this" // имя serivce
                 // Для сложных выражений, включающих вызовы, лучше проверять:
-
-                val isComplex =
-                    receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
-
-                if (isComplex) {
-                    val value = "tmp${tmpCounter++}"
-                    tmpMap.getOrPut(value) { receiverText }
-                }
-
-                var currentContext = callingContext
+                var currentTarget = callingContext
                     ?: VariableInfo(
-                        tmpMap.entries.firstOrNull { it.value == receiverText }?.key ?: receiverText,
+                        tmpList.firstOrNull { it.second == receiverText }?.first ?: receiverText,
                         "" // to do find type
                     )
 
                 // Имя метода — сам вызов
-                val expression = buildFullExpression(currentElement, currentContext)
+                val expression = buildFullExpression(currentElement, currentTarget)
 
                 currentClassMethod.fullExpressions.add(expression)
 
-                val originalExpressionText = tmpMap[expression.target.name]
 
-                if (originalExpressionText != null) {
-                    val params = if (expression.method.parameters.isNotEmpty()) {
-                        expression.method.parameters
-                            .map { it.name.replace(" ", "") } // удаляем все пробелы
-                            .joinToString(",")
-                    } else ""
+                //process inners
+                val isComplex =
+                    receiverExpression is KtCallExpression || receiverExpression is KtDotQualifiedExpression || receiverExpression is KtSafeQualifiedExpression
 
-                    val previousMethod = originalExpressionText + "." + expression.method + "(" + params + ")"
-                    tmpMap.getOrPut("tmp${tmpCounter++}") { previousMethod }
+                val isInnerCall = isInnerCall(currentElement)
+
+                if (isComplex || isInnerCall) {
+                    val value = "tmp${tmpCounter++}"
+                    tmpList.add(value to "${expression.receiver.name}.${expression.method.rawContent}" )
+                    expression.target.name = value
                 }
             }
 
@@ -231,6 +255,15 @@ class KtFunctionExpressionCollector {
                 -> currentElement.children.forEach { handlePsiElement(it, callingContext) }
         }
     }
+
+    fun isInnerCall(call: KtCallExpression): Boolean {
+        val parentCall = call.parent?.getStrictParentOfType<KtCallExpression>() ?: return false
+
+        return parentCall.valueArguments.any { arg ->
+            arg.getArgumentExpression()?.isAncestor(call) == true
+        }
+    }
+
 
 
     fun getTarget(call: KtCallExpression): VariableInfo? {
