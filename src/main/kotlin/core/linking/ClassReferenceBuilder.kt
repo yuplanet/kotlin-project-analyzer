@@ -5,11 +5,8 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtFunctionExpressionCollector
 import org.example.data.reference.MethodReference
 import org.example.data.reference.ObjectReference
-import org.example.data.symbol.ClassProperty
+import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.MethodInfo
-import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
 
@@ -25,11 +22,6 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
         //Methods
         buildFunctionCallRecords(projectClasses) // to do
-        buildFunctionReverseCallRecords(projectClasses)
-
-        //properties
-        bindPropertyCalls(projectClasses)
-        bindParameterCalls(projectClasses)
     }
 
     fun collectExpressions(projectClasses: List<KotlinClass>) {
@@ -51,15 +43,25 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         val isTargetEnum = searchEngine.isEnumClass(className)
         val isTargetStatic = searchEngine.isStaticClass(className)
 
-        return  isTargetEnum || isTargetStatic
+        return isTargetEnum || isTargetStatic
     }
 
 
-    private fun addFieldRef(className:String, fieldName:String): ClassProperty? {
+    private fun addFieldRef(className: String, fieldName: String): ObjectReference? {
+
         val callingClass = searchEngine.findByClassName(className)
-        if(callingClass != null) {
-            val member = searchEngine.findPropertyRefByClassNameAndFieldName(className, fieldName)
-        }
+        val member = if (callingClass != null) {
+            searchEngine.findObjectRefByClassNameAndFieldName(className, fieldName)
+        } else
+            null
+
+        return member
+    }
+
+    private fun addRefToField(className: String, fieldName: String, classMethod: ClassMethod) {
+        val target = addFieldRef(className, fieldName)
+        if (target != null)
+            classMethod.callRecords.add((target))
     }
 
 
@@ -72,12 +74,16 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                 for (expr in method.fullExpressions) {
 
 
+                    //fields
+                    addRefToField(expr.target.type, expr.target.name, method)
+                    addRefToField(expr.receiver.type, expr.receiver.name, method)
 
-                    //2
-                    //3/
-                    //4
+                    for (param in expr.method.parameters) {
+                        addRefToField(param.type, param.name, method)
+                    }
 
 
+                    //method
                     val targetMethod = expr.method.name
                     val targetClass = expr.receiver.type
                     val parameters = expr.method.parameters.map { it.type }
@@ -87,7 +93,8 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                         val classMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
                             targetClass,
                             targetMethod,
-                            parameters)
+                            parameters
+                        )
 
                         if (classMethod != null) {
                             val callRef = MethodReference(
@@ -100,176 +107,6 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    fun buildFunctionReverseCallRecords(projectClasses: List<KotlinClass>) {
-
-        for (cls in projectClasses) {
-            for (method in cls.functionCalls) {
-                for (call in method.callRecords) {
-
-                    val methodInfo = MethodInfo(
-                        name = call.method.name,
-                        returnType = call.method.returnType,
-                        parameters = call.method.parameters
-                    )
-
-                    // Найдём целевой метод
-                    val targetMethod
-                        = searchEngine.findMethodByClassNameAndMethodNameAndParams(call.parentClass.name, call.method.name, call.method.parameters.map { it.type })
-
-                    if (targetMethod != null) {
-                        // Добавляем ссылку на обратный вызов
-                        targetMethod.reverseCallRecords.add(
-                            MethodCallReference(
-                                fullName = method.fullName, // вызывающий метод
-                                method = methodInfo,
-                                parentClass = call.parentClass
-                            )
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    fun bindPropertyCalls(projectClasses: List<KotlinClass>) {
-        for (cls in projectClasses) {
-            val fieldsByName = cls.ktProperties.associateBy { it.name ?: "__no_name__" }
-
-            for (method in cls.functionCalls) {
-                val fn = method.function
-                val body = fn.bodyExpression ?: continue
-
-                val nameRefs = body.collectDescendantsOfType<KtNameReferenceExpression>()
-
-                for (ref in nameRefs) {
-                    val propName = ref.getReferencedName()
-                    val property = fieldsByName[propName] ?: continue
-
-                    // Находим или создаём ClassProperty для этого свойства
-                    val classProperty = cls.propertyReferences.firstOrNull { it.property == property }
-                        ?: continue//ClassProperty(property = property).also { cls.propertyReferences.add(it) }
-
-                    // Добавляем ссылку на метод, который использует это свойство
-                    classProperty.callRecords.add(
-                        MethodCallReference(
-                            fullName = method.fullName,
-                            parentClass = cls
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    fun bindParameterCalls(projectClasses: List<KotlinClass>) {
-        for (cls in projectClasses) {
-            // Индекс параметров по имени
-            val paramsByName = cls.ktParameters.associateBy { it.name ?: "__no_name__" }
-
-            for (method in cls.functionCalls) {
-                val fn = method.function
-                val body = fn.bodyExpression ?: continue
-
-                val nameRefs = body.collectDescendantsOfType<KtNameReferenceExpression>()
-
-                for (ref in nameRefs) {
-                    val paramName = ref.getReferencedName()
-                    val parameter = paramsByName[paramName] ?: continue
-
-                    // Находим или создаём ClassParameter
-                    val classParam = cls.parameterReferences.firstOrNull { it.property == parameter }
-                        ?: continue//ClassParameter(property = parameter).also { cls.parameterReferences.add(it) }
-
-                    // Добавляем ссылку на метод, который использует этот параметр
-                    classParam.callRecord.add(
-                        MethodCallReference(
-                            fullName = method.fullName,
-                            parentClass = cls
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    fun buildReverseCallRecords(projectClasses: List<KotlinClass>) {
-        // 2. Очищаем обратные ссылки у всех методов
-        projectClasses.flatMap { it.functionCalls }.forEach { it.reverseCallRecords.clear() }
-
-        // 3. Проходим по каждому методу и его прямым вызовам
-        for (cls in projectClasses) {
-            for (method in cls.functionCalls) {
-                for (call in method.callRecords) {
-
-                    val calledMethod = searchEngine.findByFullMethodName(call.fullName) ?: continue
-
-                    // Добавляем текущий метод в reverseCallRecords вызываемого метода
-                    calledMethod.reverseCallRecords.add(
-                        MethodCallReference(
-                            fullName = method.fullName,
-                            parentClass = cls
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-
-    fun resolveArgumentTypes(
-        selector: KtCallExpression,
-        allFields: Map<String, KtCallableDeclaration>,
-        fn: KtNamedFunction
-    ): List<String> {
-        return selector.valueArguments.map { arg ->
-            val expr = arg.getArgumentExpression()
-            when (expr) {
-                is KtDotQualifiedExpression -> {
-                    // Пример: EnvelopeStatus.SCHEDULED
-                    val typeName = expr.receiverExpression.text
-                    if (typeName.isNotBlank()) typeName else "Any"
-                }
-
-                is KtNameReferenceExpression -> {
-                    val name = expr.getReferencedName()
-
-                    // 1. Сначала проверяем параметры метода
-                    val paramType = fn.valueParameters.find { it.name == name }?.typeReference?.text
-                    if (paramType != null) return@map paramType
-
-                    // 2. Проверяем поля класса
-                    val fieldType = allFields[name]?.typeReference?.text
-                    if (fieldType != null) return@map fieldType
-
-                    // 3. Если не нашли — Any
-                    val parent = expr.parent
-                    if (parent is KtDotQualifiedExpression) {
-                        val enumType = parent.receiverExpression.text
-                        if (enumType.isNotBlank()) return@map enumType
-                    }
-
-                    // 4️⃣ По умолчанию Any
-                    name // или "Any" если хочешь совсем безопасно
-                }
-
-                is KtCallExpression -> {
-                    // Если передан вызов метода, пока можно использовать имя метода
-                    expr.calleeExpression?.text ?: "Any"
-                }
-
-                is KtConstantExpression, is KtStringTemplateExpression -> {
-                    // Литералы
-                    when (expr) {
-                        is KtConstantExpression -> expr.node.elementType.toString() // Int, Boolean и т.д.
-                        else -> "String"
-                    }
-                }
-
-                else -> "Any"
             }
         }
     }

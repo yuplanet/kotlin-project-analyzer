@@ -3,8 +3,8 @@ package org.example.core.interfaces
 import org.example.data.reference.ObjectReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
+import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
-import org.jetbrains.kotlinx.jspo.compiler.fir.services.ClassProperty
 
 interface IProjectSearchEngine {
 
