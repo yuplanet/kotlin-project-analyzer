@@ -1,12 +1,8 @@
-package org.example.data.reference
-
-import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.MethodInfo
-import org.example.data.symbol.VariableInfo
+package org.example.data.symbol
 
 
 // только класс
-sealed  class ObjectReference {
+sealed class ObjectReference {
     abstract var name: String
     abstract var parentClass: KotlinClass
 }

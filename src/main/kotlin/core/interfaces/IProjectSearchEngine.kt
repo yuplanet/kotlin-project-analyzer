@@ -1,9 +1,7 @@
 package org.example.core.interfaces
 
-import org.example.data.reference.ObjectReference
+import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.ClassParameter
-import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
 
 interface IProjectSearchEngine {
@@ -13,12 +11,7 @@ interface IProjectSearchEngine {
 
 
     //==== fields Properties
-
     fun findObjectRefByClassNameAndFieldName(className: String, fieldName: String): ObjectReference?
-
-    fun findPropertyRefByClassNameAndFieldName(className: String, fieldName: String): ClassProperty?
-
-    fun findParameterRefByClassNameAndFieldName(className: String, fieldName: String): ClassParameter?
 
 
     // ===== Methods =====

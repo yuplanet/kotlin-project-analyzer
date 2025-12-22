@@ -1,8 +1,12 @@
 package org.example.core.search
 
 import org.example.core.interfaces.IProjectSearchEngine
+import org.example.data.symbol.FieldReference
+import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.VariableInfo
+import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtParameter
 
 
@@ -44,6 +48,36 @@ class SearcherEngine: IProjectSearchEngine {
         }
     }
 
+    override fun findObjectRefByClassNameAndFieldName(
+        className: String,
+        fieldName: String
+    ): ObjectReference? {
+
+        val ktClass = findByClassName(className)
+        if (ktClass == null)
+            null
+
+
+        var field = ktClass?.parameterReferences?.firstOrNull {
+            it.name == fieldName
+        }
+
+        if (field != null) {
+            val reference = FieldReference(fieldName, ktClass!!, VariableInfo(name = fieldName, type = field.type))
+            return reference
+        }
+
+
+        val paramd = ktClass?.propertyReferences?.firstOrNull {
+            it.name == fieldName
+        }
+        if (paramd != null) {
+            val reference = FieldReference(fieldName, ktClass!!, VariableInfo(name = fieldName, type = paramd.type))
+            return reference
+        }
+
+        return null
+    }
     //Methods
 
     override fun findByFullMethodName(methodName: String): ClassMethod? {
@@ -58,6 +92,24 @@ class SearcherEngine: IProjectSearchEngine {
         }
 
         return result
+    }
+
+    override fun isEnumClass(className: String): Boolean {
+
+        val ktClass = findByClassName(className)
+        if (ktClass == null)
+            false
+
+        return ktClass?.ktClassObjectType == ObjectType.EnumClass
+    }
+
+    override fun isStaticClass(className: String): Boolean {
+
+        val ktClass = findByClassName(className)
+        if (ktClass == null)
+            false
+
+        return ktClass?.ktClassObjectType == ObjectType.Object
     }
 
 

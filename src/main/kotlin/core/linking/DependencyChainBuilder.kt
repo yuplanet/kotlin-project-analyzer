@@ -57,7 +57,7 @@ class DependencyChainBuilder: IDependencyChainBuilder {
         for (m in allRelevantMethods) {
             for (reverseCall in m.reverseCallRecords) {
                 val callerMethod = reverseCall.parentClass.functionCalls
-                    .firstOrNull { it.fullName == reverseCall.fullName }
+                    .firstOrNull { it.fullName == reverseCall.name }
 
                 callerMethod?: continue
 

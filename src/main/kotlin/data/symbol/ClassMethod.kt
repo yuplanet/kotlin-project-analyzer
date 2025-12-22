@@ -1,6 +1,5 @@
 package org.example.data.symbol
 
-import org.example.data.reference.ObjectReference
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
@@ -16,8 +15,6 @@ data class ClassMethod(
     val fullName: String,
     val function: KtNamedFunction,
     val parameterTypeNames: List<String>,
-
-
 
     //content
     var properties: MutableList<ClassProperty> = mutableListOf(),
