@@ -1,5 +1,6 @@
 package org.example.data.symbol
 
+import org.example.data.symbol.expression.BaseExpression
 import org.example.data.symbol.expression.VariableAssignmentExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
@@ -21,7 +22,7 @@ data class ClassMethod(
     var properties: MutableList<ClassProperty> = mutableListOf(),
     var parameters: MutableList<ClassParameter> = mutableListOf(),
 
-    var fullExpressions: MutableList<VariableAssignmentExpression> = mutableListOf(),
+    var fullExpressions: MutableList<BaseExpression> = mutableListOf(),
 
     //params
     var ktProperties: List<KtProperty> = listOf(),

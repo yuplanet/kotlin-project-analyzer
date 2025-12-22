@@ -15,7 +15,7 @@ class ExpressionTypeResolver(
     private val currentMethod: ClassMethod): IExpressionTypeResolver {
 
     private val ktFile: KtFile
-    private var expressions: List<VariableAssignmentExpression>
+    private var expressions: List<Any>
     private val classVariables: MutableList<VariableInfo> = mutableListOf()
     private val methodVariables: MutableList<VariableInfo> = mutableListOf()
 

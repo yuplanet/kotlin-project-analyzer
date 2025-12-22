@@ -1,5 +1,6 @@
 package org.example.core.linking
 
+import org.codehaus.groovy.ast.expr.VariableExpression
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtFunctionExpressionCollector
@@ -7,6 +8,7 @@ import org.example.data.symbol.MethodReference
 import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.expression.VariableAssignmentExpression
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
 
@@ -74,12 +76,14 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
             for (method in cls.functionCalls) {
 
-                for (expr in method.fullExpressions) {
+                for (exprBase in method.fullExpressions) {
 
+
+                    var expr = exprBase as VariableAssignmentExpression
 
                     //fields
-                    addRefToField(expr.target.type, expr.target.name, method)
-                    addRefToField(expr.receiver.type, expr.receiver.name, method)
+                    addRefToField(expr.target!!.type, expr.target!!.name, method)
+                    addRefToField(expr.receiver!!.type, expr.receiver.name, method)
 
                     for (param in expr.method.parameters) {
                         addRefToField(param.type, param.name, method)
@@ -121,12 +125,13 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
             for (method in cls.functionCalls) {
 
-                for (expr in method.fullExpressions) {
+                for (exprBase in method.fullExpressions) {
 
+                    var expr = exprBase as VariableAssignmentExpression
 
                     //fields
-                    addRefToField(expr.target.type, expr.target.name, method)
-                    addRefToField(expr.receiver.type, expr.receiver.name, method)
+                    addRefToField(expr.target!!.type, expr.target!!.name, method)
+                    addRefToField(expr.receiver!!.type, expr.receiver.name, method)
 
                     for (param in expr.method.parameters) {
                         addRefToField(param.type, param.name, method)
