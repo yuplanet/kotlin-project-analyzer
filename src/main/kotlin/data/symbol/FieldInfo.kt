@@ -1,7 +1,8 @@
 package org.example.data.symbol
 
-data  class FieldInfo (
+class FieldInfo (
     var className: String = "",  // имя переменной
-    var fieldName: String = "",// её тип
-    var fieldType: String = "",// её тип
-)
+
+    override var name: String = "",// её тип
+    override var type: String = "",// её тип
+): VariableInfo(name, type)

@@ -117,8 +117,8 @@ class ExpressionTypeResolver(
 
     private fun getVariableTypeFromFieldInfo(field: FieldInfo, variableName: String): String? {
         val tp =
-            if (field.fieldName == variableName)
-                field.fieldType
+            if (field.name == variableName)
+                field.type
             else null
 
         return tp

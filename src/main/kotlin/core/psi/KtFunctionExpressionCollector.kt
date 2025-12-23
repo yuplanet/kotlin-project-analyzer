@@ -68,8 +68,8 @@ class KtFunctionExpressionCollector {
 
         val targetField = FieldInfo(
             className = receiverType,
-            fieldName = fieldName,
-            fieldType = fieldType
+            name = fieldName,
+            type = fieldType
         )
 
         // Source (вызов метода RHS)
@@ -229,8 +229,8 @@ class KtFunctionExpressionCollector {
 
         val sourceField = FieldInfo(
             className = sourceParts.first(),
-            fieldName = sourceFieldName,
-            fieldType = sourceType
+            name = sourceFieldName,
+            type = sourceType
         )
 
         return VariableToFieldAssignmentExpression(

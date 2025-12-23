@@ -1,13 +1,16 @@
 package org.example.core.linking
 
-import org.codehaus.groovy.ast.expr.VariableExpression
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtFunctionExpressionCollector
 import org.example.data.symbol.MethodReference
 import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
+import org.example.data.symbol.FieldInfo
+import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.MethodInfo
+import org.example.data.symbol.VariableInfo
 import org.example.data.symbol.expression.FieldAssignmentExpression
 import org.example.data.symbol.expression.FieldToFieldAssignmentExpression
 import org.example.data.symbol.expression.VariableAssignmentExpression
@@ -46,6 +49,38 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         }
     }
 
+    private fun getRefToMethod(callingClass: String, callingMethod: MethodInfo): MethodReference? {
+
+        val parentCLass = searchEngine.findByClassName(callingClass)
+
+
+        return if (parentCLass != null) {
+            MethodReference(
+                parentClass = parentCLass,
+                name = callingMethod.name,
+                method = callingMethod,
+            )
+        } else null
+    }
+
+    private fun getRefToField(callingClass: String, callingField: VariableInfo): FieldReference? {
+
+        val parentCLass = searchEngine.findByClassName(callingClass)
+
+        return if (parentCLass != null) {
+            val field = FieldInfo(
+                name =  callingField.name,
+                type =  callingField.type,
+                className = callingClass
+            )
+
+            FieldReference(
+                parentClass = parentCLass,
+                name = callingField.name,
+                field = field,
+            )
+        } else null
+    }
 
     private fun addFieldRef(className: String, fieldName: String): ObjectReference? {
 
@@ -74,44 +109,15 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                     when (exprBase) {
 
-                        is VariableAssignmentExpression -> {
-                            val expr = exprBase
-
-                            // Ссылки на поля
-                            expr.target?.let { addRefToField(it.type, it.name, method) }
-                            expr.receiver?.let { addRefToField(it.type, it.name, method) }
-
-                            // Ссылки на параметры метода
-                            for (param in expr.method.parameters) {
-                                addRefToField(param.type, param.name, method)
-                            }
-
-                            // Ссылки на методы
-                            expr.receiver?.let { receiver ->
-                                val callingClass = searchEngine.findByClassName(receiver.type)
-                                val targetMethod = expr.method.name
-                                val parameters = expr.method.parameters.map { it.type }
-
-                                if (callingClass != null) {
-                                    val classMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                                        receiver.type, targetMethod, parameters
-                                    )
-                                    if (classMethod != null) {
-                                        method.callRecords.add(
-                                            MethodReference(targetMethod, expr.method, callingClass)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        is VariableAssignmentExpression -> buildVariableAssignmentExpressionReference(cls,method, exprBase as VariableAssignmentExpression)
 
                         is VariableToFieldAssignmentExpression -> {
                             exprBase.target?.let { addRefToField(it.type, it.name, method) }
-                            exprBase.source?.let { addRefToField(it.fieldType, it.fieldName, method) }
+                            exprBase.source?.let { addRefToField(it.type, it.name, method) }
                         }
 
                         is FieldAssignmentExpression -> {
-                            exprBase.target?.let { addRefToField(it.fieldType, it.fieldName, method) }
+                            exprBase.target?.let { addRefToField(it.type, it.name, method) }
                             exprBase.source?.let { addRefToField(it.type, it.name, method) }
 
                             exprBase.source?.let { source ->
@@ -131,8 +137,8 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                         }
 
                         is FieldToFieldAssignmentExpression -> {
-                            exprBase.target?.let { addRefToField(it.fieldType, it.fieldName, method) }
-                            exprBase.source?.let { addRefToField(it.fieldType, it.fieldName, method) }
+                            exprBase.target?.let { addRefToField(it.type, it.name, method) }
+                            exprBase.source?.let { addRefToField(it.type, it.name, method) }
                         }
                     }
                 }
@@ -140,6 +146,29 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         }
     }
 
+
+    fun buildVariableAssignmentExpressionReference(currentClass: KotlinClass, method: ClassMethod, expr: VariableAssignmentExpression) {
+
+        //calling method!!!
+        if (expr.receiver != null) {
+            val ref = getRefToMethod(expr.receiver.type, expr.method)
+            ref?.let { method.callRecords.add(it) }
+        } else if (expr.receiver == null || expr.receiver.type == "this") {
+            val ref = getRefToMethod(currentClass.name, expr.method)
+            ref?.let { method.callRecords.add(it) }
+        }
+
+        for (param in expr.method.parameters) {
+            val ref = getRefToField(currentClass.name, param)
+            ref?.let { method.callRecords.add(it) }
+        }
+        //calling field
+    }
+
+    fun buildReverseMethodReference(currentClass: KotlinClass, method: ClassMethod, expr: VariableAssignmentExpression) {
+
+
+    }
 
     fun buildFunctionCallRecords2(projectClasses: List<KotlinClass>) {
 
