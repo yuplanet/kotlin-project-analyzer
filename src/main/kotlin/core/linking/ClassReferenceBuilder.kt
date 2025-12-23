@@ -111,10 +111,8 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                         is VariableAssignmentExpression -> buildVariableAssignmentExpressionReference(cls,method, exprBase as VariableAssignmentExpression)
 
-                        is VariableToFieldAssignmentExpression -> {
-                            exprBase.target?.let { addRefToField(it.type, it.name, method) }
-                            exprBase.source?.let { addRefToField(it.type, it.name, method) }
-                        }
+                        is VariableToFieldAssignmentExpression -> buildVariableToFieldAssignmentExpression(cls,method, exprBase as VariableToFieldAssignmentExpression)
+
 
                         is FieldAssignmentExpression -> {
                             exprBase.target?.let { addRefToField(it.type, it.name, method) }
@@ -163,6 +161,22 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
             ref?.let { method.callRecords.add(it) }
         }
         //calling field
+    }
+
+    fun buildVariableToFieldAssignmentExpression(currentClass: KotlinClass, method: ClassMethod, expr:VariableToFieldAssignmentExpression) {
+        {
+            //calling method!!!
+            if (expr.target != null) {
+                val ref = getRefToField(currentClass.name, expr.target)
+                ref?.let { method.callRecords.add(it) }
+
+            }
+            //calling method!!!
+            if (expr.source != null) {
+                val ref = getRefToField(currentClass.name, expr.source)
+                ref?.let { method.callRecords.add(it) }
+            }
+        }
     }
 
     fun buildReverseMethodReference(currentClass: KotlinClass, method: ClassMethod, expr: VariableAssignmentExpression) {
