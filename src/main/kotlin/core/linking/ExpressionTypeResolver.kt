@@ -254,7 +254,8 @@ class ExpressionTypeResolver(
 
         if (type == null) {
             // системный тип через импорты
-            type = resolveTypeFromImports(expr.receiver!!.name, ktFile) ?: "_"
+            type  = expr.receiver?.let {resolveTypeFromImports(it.name , ktFile) }
+            type = type ?: "_"
         }
 
         return type

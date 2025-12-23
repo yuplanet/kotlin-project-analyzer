@@ -378,8 +378,8 @@ class KtFunctionExpressionCollector {
                 val isInnerCall = isInnerCall(currentElement)
 
                 if (isComplex || isInnerCall) {
-                    val (tmpName, tmpValue) = variableStorage.add("${expression.receiver!!.name}.${expression.method.rawContent}")
-                    expression.target!!.name = tmpName
+                    val (tmpName, tmpValue) = variableStorage.add("${expression.receiver?.name}.${expression.method.rawContent}")
+                    expression.target?.name = tmpName
                 }
             }
 

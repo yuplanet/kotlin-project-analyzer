@@ -15,6 +15,7 @@ import org.example.data.symbol.expression.FieldAssignmentExpression
 import org.example.data.symbol.expression.FieldToFieldAssignmentExpression
 import org.example.data.symbol.expression.VariableAssignmentExpression
 import org.example.data.symbol.expression.VariableToFieldAssignmentExpression
+import java.io.File
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
 
@@ -35,13 +36,56 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         buildReverseFunctionCallRecords(projectClasses)
     }
 
-    fun collectExpressions(projectClasses: List<KotlinClass>) {
+    fun collectExpressions(projectClasses: List<KotlinClass>)  {
+        val logDirectory = File("logs")
+        if (!logDirectory.exists()) logDirectory.mkdirs()  // создаём папку logs
+
+        for (cls in projectClasses) {
+            val logFile = File(logDirectory, "${cls.name}_expressions.log")
+
+            logFile.printWriter().use { out ->
+                out.println("Class: ${cls.name}")
+                out.println("Path: ${cls.path}")
+                out.println("Methods expressions:")
+
+                for (method in cls.functionCalls) {
+                    out.println("\nMethod: ${method.name}")
+
+                    // Собираем expressions для метода
+                    val expressionCollector = KtFunctionExpressionCollector()
+                    expressionCollector.collectExpressions(method, cls, searchEngine)
+
+                    for (expr in method.fullExpressions) {
+                        when (expr) {
+                            is VariableAssignmentExpression -> {
+                                out.println("VariableAssignment -> target: ${expr.target?.name}, receiver: ${expr.receiver?.name}, method: ${expr.method?.name}")
+                            }
+                            is FieldAssignmentExpression -> {
+                                out.println("FieldAssignment -> target: ${expr.target?.name}, source: ${expr.source?.name}")
+                            }
+                            is VariableToFieldAssignmentExpression -> {
+                                out.println("VariableToField -> target: ${expr.target?.name}, source: ${expr.source?.name}")
+                            }
+                            is FieldToFieldAssignmentExpression -> {
+                                out.println("FieldToField -> target: ${expr.target?.name}, source: ${expr.source?.name}")
+                            }
+                            else -> {
+                                out.println("Unknown expression: $expr")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun collectExpressions2(projectClasses: List<KotlinClass>) {
 
         for (cls in projectClasses) {
 
             for (method in cls.functionCalls) {
-                //if (method.name != "sendScheduledEnvelopeNotification")
-                //    continue
+                if (method.name != "sendScheduledEnvelopeNotification")
+                    continue
 
                 val expressionCollector = KtFunctionExpressionCollector();
                 expressionCollector.collectExpressions(method, cls, searchEngine)
@@ -181,60 +225,6 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
             ref?.let { method.callRecords.add(it) }
         }
     }
-
-    fun buildReverseMethodReference(currentClass: KotlinClass, method: ClassMethod, expr: VariableAssignmentExpression) {
-
-
-    }
-
-    fun buildFunctionCallRecords2(projectClasses: List<KotlinClass>) {
-
-        for (cls in projectClasses) {
-
-            for (method in cls.functionCalls) {
-
-                for (exprBase in method.fullExpressions) {
-
-
-                    var expr = exprBase as VariableAssignmentExpression
-
-                    //fields
-                    addRefToField(expr.target!!.type, expr.target!!.name, method)
-                    addRefToField(expr.receiver!!.type, expr.receiver.name, method)
-
-                    for (param in expr.method.parameters) {
-                        addRefToField(param.type, param.name, method)
-                    }
-
-
-                    //method
-                    val targetMethod = expr.method.name
-                    val targetClass = expr.receiver.type
-                    val parameters = expr.method.parameters.map { it.type }
-                    val callingClass = searchEngine.findByClassName(targetClass)
-
-                    if (callingClass != null) {
-                        val classMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                            targetClass,
-                            targetMethod,
-                            parameters
-                        )
-
-                        if (classMethod != null) {
-                            val callRef = MethodReference(
-                                name = targetMethod,
-                                method = expr.method,
-                                parentClass = callingClass
-                            )
-                            // Добавляем в callRecords вызывающего метода
-                            method.callRecords.add(callRef)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
 
     fun buildReverseFunctionCallRecords(projectClasses: List<KotlinClass>){
 
