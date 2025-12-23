@@ -3,10 +3,11 @@ package org.example.core.linking
 import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.expression.VariableAssignmentExpression
+import org.example.data.symbol.FieldInfo
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.VariableInfo
 import org.example.data.symbol.enum.ObjectType
+import org.example.data.symbol.expression.*
 import org.jetbrains.kotlin.psi.KtFile
 
 class ExpressionTypeResolver(
@@ -15,7 +16,7 @@ class ExpressionTypeResolver(
     private val currentMethod: ClassMethod): IExpressionTypeResolver {
 
     private val ktFile: KtFile
-    private var expressions: List<Any>
+    private var expressions: List<BaseExpression>
     private val classVariables: MutableList<VariableInfo> = mutableListOf()
     private val methodVariables: MutableList<VariableInfo> = mutableListOf()
 
@@ -44,25 +45,96 @@ class ExpressionTypeResolver(
 
         if (type == null) {
             for (expressionBase in expressions) {
-
-                val expression = expressionBase as VariableAssignmentExpression
-                if (expression.target!=null){
-                    if (expression.target!!.name == variableName) {
-                        type = expression.target!!.type
-                        return type
-                    }
-                }
-                for (param in expression.method.parameters) {
-                    if (param.name == variableName) {
-                        type = param.type
-                        return type
-                    }
-                }
+                getTypeFromBaseExpression(expressionBase, variableName)
             }
         }
 
         return type
     }
+
+    private fun getTypeFromBaseExpression(expressionBase: BaseExpression, variableName: String): String? {
+
+        if (expressionBase is VariableAssignmentExpression) {
+            val expression = expressionBase as VariableAssignmentExpression
+
+            if (expression.target != null) {
+
+                var variableType = getVariableTypeFromVariableInfo(expression.target!!, variableName)
+                if (variableType != null)
+                    return variableType
+            }
+
+
+            for (param in expression.method.parameters) {
+                val variableType = getVariableTypeFromVariableInfo(param, variableName)
+                if (variableType != null)
+                    return variableType
+            }
+        } else if (expressionBase is FieldAssignmentExpression) {
+            val expression = expressionBase as FieldAssignmentExpression
+
+            if (expression.target != null) {
+                val variableType = getVariableTypeFromFieldInfo(expression.target!!, variableName)
+                if (variableType != null)
+                    return variableType
+            }
+
+            if (expression.source != null) {
+
+                val variableType = getVariableTypeFromVariableInfo(expression.source, variableName)
+                if (variableType != null)
+                    return variableType
+            } else if (expressionBase is FieldToFieldAssignmentExpression) {
+                val expression = expressionBase as FieldToFieldAssignmentExpression
+                if (expression.target != null) {
+                    val variableType = getVariableTypeFromFieldInfo(expression.target!!, variableName)
+                    if (variableType != null)
+                        return variableType
+                }
+                if (expression.source != null) {
+                    val variableType = getVariableTypeFromFieldInfo(expression.source, variableName)
+                    if (variableType != null)
+                        return variableType
+                }
+            } else if (expressionBase is VariableToFieldAssignmentExpression) {
+                val expression = expressionBase as VariableToFieldAssignmentExpression
+                if (expression.target != null) {
+                    val variableType = getVariableTypeFromVariableInfo(expression.target, variableName)
+                    if (variableType != null)
+                        return variableType
+                }
+                if (expression.source != null) {
+                    val variableType = getVariableTypeFromFieldInfo(expression.source, variableName)
+                    if (variableType != null)
+                        return variableType
+                }
+            } else
+                return null
+        }
+        return null
+    }
+
+
+    private fun getVariableTypeFromFieldInfo(field: FieldInfo, variableName: String): String? {
+        val tp =
+            if (field.fieldName == variableName)
+                field.fieldType
+            else null
+
+        return tp
+    }
+
+
+    private fun getVariableTypeFromVariableInfo(variableInfo: VariableInfo, variableName: String): String? {
+        val tp =
+            if (variableInfo.name == variableName)
+                variableInfo.type
+            else null
+
+        return tp
+    }
+
+
 
     override fun getReceiverType(variableName: String): String? {
 
@@ -113,10 +185,9 @@ class ExpressionTypeResolver(
                         break
                     }
                 }
-
-                return foundType
             }
-            return null
+            return foundType
+
         }
     }
 
