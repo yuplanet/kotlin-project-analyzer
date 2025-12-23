@@ -5,7 +5,9 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.linking.ExpressionTypeResolver
 import org.example.data.symbol.*
 import org.example.data.symbol.expression.FieldAssignmentExpression
+import org.example.data.symbol.expression.FieldToFieldAssignmentExpression
 import org.example.data.symbol.expression.VariableAssignmentExpression
+import org.example.data.symbol.expression.VariableToFieldAssignmentExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
@@ -82,6 +84,8 @@ class KtFunctionExpressionCollector {
         val source: VariableInfo? = if (right is KtCallExpression) {
             val tmp = "tmp${tmpCounter++}"
             val callExpr = buildVariableAssignmentExpression(right, null)
+//to do add here
+            currentClassMethod.fullExpressions.add(callExpr)
             tmpList.add(tmp to callExpr.method.rawContent)
             VariableInfo(tmp, callExpr.method.returnType)
         } else {
@@ -199,6 +203,71 @@ class KtFunctionExpressionCollector {
     }
 
 
+
+
+    private fun buildVariableToFieldAssignmentExpression(
+        left: KtNameReferenceExpression,  // a
+        right: KtDotQualifiedExpression   // b.c или более длинная цепочка
+    ): VariableToFieldAssignmentExpression {
+
+        // --- Target (переменная a) ---
+        val targetName = left.getReferencedName()
+        val targetType = typeResolver.getReceiverType(targetName) ?: "_"
+        val targetVar = VariableInfo(targetName, targetType)
+
+        // --- Source (цепочка b.c.d...) ---
+        val sourceParts = mutableListOf<String>()
+        var current: KtExpression? = right
+        while (current != null) {
+            when (current) {
+                is KtDotQualifiedExpression -> {
+                    val selector = current.selectorExpression as? KtNameReferenceExpression
+                    selector?.let { sourceParts.add(it.getReferencedName()) }
+                    current = current.receiverExpression
+                }
+                is KtNameReferenceExpression -> {
+                    sourceParts.add(current.getReferencedName())
+                    current = null
+                }
+                else -> current = null
+            }
+        }
+        sourceParts.reverse() // чтобы было в порядке b.c.d
+        val sourceFieldName = sourceParts.joinToString(".")
+        val sourceType = typeResolver.getReceiverType(sourceParts.first()) ?: "_"
+
+        val sourceField = FieldInfo(
+            className = sourceParts.first(),
+            fieldName = sourceFieldName,
+            fieldType = sourceType
+        )
+
+        return VariableToFieldAssignmentExpression(
+            target = targetVar,
+            source = sourceField
+        )
+    }
+
+    private fun buildFieldToFieldAssignmentExpression(
+        left: KtDotQualifiedExpression,
+        right: KtDotQualifiedExpression
+    ): FieldToFieldAssignmentExpression {
+
+        val lhsReceiver = left.receiverExpression.text
+        val lhsField = (left.selectorExpression as? KtNameReferenceExpression)?.getReferencedName() ?: "_"
+
+        val rhsReceiver = right.receiverExpression.text
+        val rhsField = (right.selectorExpression as? KtNameReferenceExpression)?.getReferencedName() ?: "_"
+
+        val lhsFieldInfo = FieldInfo(lhsReceiver, lhsField, typeResolver.getReceiverType(lhsReceiver) ?: "_")
+        val rhsFieldInfo = FieldInfo(rhsReceiver, rhsField, typeResolver.getReceiverType(rhsReceiver) ?: "_")
+
+        return FieldToFieldAssignmentExpression(
+            target = lhsFieldInfo,
+            source = rhsFieldInfo
+        )
+    }
+
     //psi element - это все что угодно!!!
     private fun handlePsiElement(currentElement: PsiElement, callingContext: Any?=null) {
 
@@ -242,19 +311,47 @@ class KtFunctionExpressionCollector {
             is KtBinaryExpression -> {
                 if (currentElement.operationToken == KtTokens.EQ) {
                     val left = currentElement.left
-                    val right = currentElement.right
+                    val right = currentElement.right ?: return
 
-                    if (left is KtDotQualifiedExpression && right is KtCallExpression) {
-                        val expression = buildFieldAssignmentExpression(left, right)
-                        currentClassMethod.fullExpressions.add(expression)
+                    when {
+                        // 1. LHS поле, RHS вызов метода
+                        left is KtDotQualifiedExpression && right is KtCallExpression -> {
+                            val expression = buildFieldAssignmentExpression(left, right)
+                            currentClassMethod.fullExpressions.add(expression)
 
-                        // Передаём tmp как context для вложенных вызовов
-                        val sourceTmp = expression.source
-                        handlePsiElement(right, sourceTmp)
-                        return
+                            // tmp для RHS, чтобы вложенные вызовы видели контекст
+                            val sourceTmp = expression.source
+                            handlePsiElement(right, sourceTmp)
+                        }
+
+                        // 2. LHS переменная, RHS цепочка полей
+                        left is KtNameReferenceExpression && right is KtDotQualifiedExpression -> {
+                            val expression = buildVariableToFieldAssignmentExpression(left, right)
+                            currentClassMethod.fullExpressions.add(expression)
+                        }
+
+                        // 3. LHS переменная, RHS вызов метода
+                        left is KtNameReferenceExpression && right is KtCallExpression -> {
+                            val expression = buildVariableAssignmentExpression(right, VariableInfo(left.getReferencedName(), "_"))
+                            currentClassMethod.fullExpressions.add(expression)
+                        }
+
+                        // 4. LHS поле, RHS поле (FieldToFieldAssignment)
+                        left is KtDotQualifiedExpression && right is KtDotQualifiedExpression -> {
+                            val expression = buildFieldToFieldAssignmentExpression(left, right)
+                            currentClassMethod.fullExpressions.add(expression)
+                        }
+
+                        else -> {
+                            // fallback — можно просто рекурсивно пройтись
+                            handlePsiElement(left, callingContext)
+                            handlePsiElement(right, callingContext)
+                        }
                     }
+                    return
                 }
             }
+
 
 
 
