@@ -4,8 +4,10 @@ import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.linking.ExpressionTypeResolver
 import org.example.data.symbol.*
+import org.example.data.symbol.expression.FieldAssignmentExpression
 import org.example.data.symbol.expression.VariableAssignmentExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.isAncestor
@@ -56,6 +58,41 @@ class KtFunctionExpressionCollector {
     }
 
 
+    // buildFieldAssignmentExpression
+    private fun buildFieldAssignmentExpression(
+        left: KtDotQualifiedExpression,
+        right: KtExpression
+    ): FieldAssignmentExpression {
+
+        // Target (поле a.b)
+        val receiverExpr = left.receiverExpression
+        val fieldExpr = left.selectorExpression as? KtNameReferenceExpression
+
+        val receiverName = receiverExpr?.text ?: "_"
+        val fieldName = fieldExpr?.getReferencedName() ?: "_"
+        val receiverType = typeResolver.getReceiverType(receiverName) ?: "_"
+
+        val targetField = FieldInfo(
+            className = receiverName,
+            fieldName = fieldName,
+            fieldType = receiverType
+        )
+
+        // Source (вызов метода RHS)
+        val source: VariableInfo? = if (right is KtCallExpression) {
+            val tmp = "tmp${tmpCounter++}"
+            val callExpr = buildVariableAssignmentExpression(right, null)
+            tmpList.add(tmp to callExpr.method.rawContent)
+            VariableInfo(tmp, callExpr.method.returnType)
+        } else {
+            null
+        }
+
+        return FieldAssignmentExpression(
+            target = targetField,
+            source = source
+        )
+    }
 
 
     private fun buildVariableAssignmentExpression(currentExpression: KtCallExpression, target: VariableInfo?): VariableAssignmentExpression {
@@ -163,7 +200,7 @@ class KtFunctionExpressionCollector {
 
 
     //psi element - это все что угодно!!!
-    private fun handlePsiElement(currentElement: PsiElement, callingContext: VariableInfo?=null) {
+    private fun handlePsiElement(currentElement: PsiElement, callingContext: Any?=null) {
 
         when (currentElement) {
             is KtProperty -> {
@@ -202,11 +239,33 @@ class KtFunctionExpressionCollector {
             }
 
 
+            is KtBinaryExpression -> {
+                if (currentElement.operationToken == KtTokens.EQ) {
+                    val left = currentElement.left
+                    val right = currentElement.right
+
+                    if (left is KtDotQualifiedExpression && right is KtCallExpression) {
+                        val expression = buildFieldAssignmentExpression(left, right)
+                        currentClassMethod.fullExpressions.add(expression)
+
+                        // Передаём tmp как context для вложенных вызовов
+                        val sourceTmp = expression.source
+                        handlePsiElement(right, sourceTmp)
+                        return
+                    }
+                }
+            }
+
+
 
 
 
             //main // a=b(), b(),c.b()
-            is KtCallExpression -> {
+            is KtCallExpression ->  {
+                if (isRhsOfBinaryAssign(currentElement))
+                    return // этот вызов будет обработан через buildFieldAssignmentExpression
+
+
                 // Сначала обрабатываем аргументы рекурсивно
                 currentElement.valueArguments.forEach { arg ->
                     arg.getArgumentExpression()?.let { handlePsiElement(it, callingContext) }
@@ -216,7 +275,7 @@ class KtFunctionExpressionCollector {
                     ?: (currentElement.parent as? KtSafeQualifiedExpression)?.receiverExpression
 
                 // Для сложных выражений, включающих вызовы, лучше проверять:
-                var currentTarget = callingContext?: null
+                val currentTarget: VariableInfo? = callingContext as? VariableInfo
 
                 // Имя метода — сам вызов
                 val expression = buildVariableAssignmentExpression(currentElement, currentTarget)
@@ -268,7 +327,24 @@ class KtFunctionExpressionCollector {
         }
     }
 
-    fun isInnerCall(call: KtCallExpression): Boolean {
+
+    private fun isRhsOfBinaryAssign(call: KtCallExpression): Boolean {
+        var element: PsiElement? = call
+        while (element != null) {
+            val parent = element.parent
+            if (parent is KtBinaryExpression &&
+                parent.operationToken == KtTokens.EQ &&
+                parent.right?.isAncestor(call) == true
+            ) {
+                return true
+            }
+            element = parent
+        }
+        return false
+    }
+
+
+    private fun isInnerCall(call: KtCallExpression): Boolean {
         val parentCall = call.parent?.getStrictParentOfType<KtCallExpression>() ?: return false
 
         return parentCall.valueArguments.any { arg ->
