@@ -8,7 +8,10 @@ import org.example.data.symbol.MethodReference
 import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.expression.FieldAssignmentExpression
+import org.example.data.symbol.expression.FieldToFieldAssignmentExpression
 import org.example.data.symbol.expression.VariableAssignmentExpression
+import org.example.data.symbol.expression.VariableToFieldAssignmentExpression
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
 
@@ -34,21 +37,13 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         for (cls in projectClasses) {
 
             for (method in cls.functionCalls) {
-                if (method.name != "sendScheduledEnvelopeNotification")
-                    continue
+                //if (method.name != "sendScheduledEnvelopeNotification")
+                //    continue
 
                 val expressionCollector = KtFunctionExpressionCollector();
                 expressionCollector.collectExpressions(method, cls, searchEngine)
             }
         }
-    }
-
-
-    private fun isStaticOrEnum(className: String): Boolean {
-        val isTargetEnum = searchEngine.isEnumClass(className)
-        val isTargetStatic = searchEngine.isStaticClass(className)
-
-        return isTargetEnum || isTargetStatic
     }
 
 
@@ -69,8 +64,84 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
             classMethod.callRecords.add((target))
     }
 
-
     fun buildFunctionCallRecords(projectClasses: List<KotlinClass>) {
+
+        for (cls in projectClasses) {
+            for (method in cls.functionCalls)
+
+            {
+                for (exprBase in method.fullExpressions) {
+
+                    when (exprBase) {
+
+                        is VariableAssignmentExpression -> {
+                            val expr = exprBase
+
+                            // Ссылки на поля
+                            expr.target?.let { addRefToField(it.type, it.name, method) }
+                            expr.receiver?.let { addRefToField(it.type, it.name, method) }
+
+                            // Ссылки на параметры метода
+                            for (param in expr.method.parameters) {
+                                addRefToField(param.type, param.name, method)
+                            }
+
+                            // Ссылки на методы
+                            expr.receiver?.let { receiver ->
+                                val callingClass = searchEngine.findByClassName(receiver.type)
+                                val targetMethod = expr.method.name
+                                val parameters = expr.method.parameters.map { it.type }
+
+                                if (callingClass != null) {
+                                    val classMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                                        receiver.type, targetMethod, parameters
+                                    )
+                                    if (classMethod != null) {
+                                        method.callRecords.add(
+                                            MethodReference(targetMethod, expr.method, callingClass)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        is VariableToFieldAssignmentExpression -> {
+                            exprBase.target?.let { addRefToField(it.type, it.name, method) }
+                            exprBase.source?.let { addRefToField(it.fieldType, it.fieldName, method) }
+                        }
+
+                        is FieldAssignmentExpression -> {
+                            exprBase.target?.let { addRefToField(it.fieldType, it.fieldName, method) }
+                            exprBase.source?.let { addRefToField(it.type, it.name, method) }
+
+                            exprBase.source?.let { source ->
+                                val callingClass = searchEngine.findByClassName(source.type)
+                                val targetMethod = source.name
+                                if (callingClass != null) {
+                                    val classMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                                        source.type, targetMethod, emptyList()
+                                    )
+                                    if (classMethod != null) {
+                                        method.callRecords.add(
+                                            MethodReference(targetMethod, source, callingClass)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        is FieldToFieldAssignmentExpression -> {
+                            exprBase.target?.let { addRefToField(it.fieldType, it.fieldName, method) }
+                            exprBase.source?.let { addRefToField(it.fieldType, it.fieldName, method) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    fun buildFunctionCallRecords2(projectClasses: List<KotlinClass>) {
 
         for (cls in projectClasses) {
 
