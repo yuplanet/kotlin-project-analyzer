@@ -43,10 +43,11 @@ class ExpressionTypeResolver(
             type = methodVariables.firstOrNull { it.name == variableName }?.type
 
         if (type == null) {
-            for (expression in expressions) {
+            for (expressionBase in expressions) {
 
-                if (expression.target.name == variableName) {
-                    type = expression.target.type
+              val  expression = expressionBase as VariableAssignmentExpression
+                        if (expression.target!!.name == variableName) {
+                    type = expression.target!!.type
                     return type
                 }
 
@@ -101,18 +102,33 @@ class ExpressionTypeResolver(
 
         var type = if (method.rawContent.contains("(")) {
             val methodName = method.name.substringBefore("(")
-            val type = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                className = expr.receiver.type,
-                methodName = methodName,
-                params = method.parameters.map { it.type },
 
-                )?.returnType
+            val type = if(expr.receiver == null)
+            {
+                searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                    className = currentClass.name,
+                    methodName = methodName,
+                    params = method.parameters.map { it.type },
+
+                    )?.returnType
+            }
+            else{
+                searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                    className = expr.receiver.type,
+                    methodName = methodName,
+                    params = method.parameters.map { it.type },
+
+                    )?.returnType
+            }
+
+
 
             type
         } else if (method.rawContent.contains(".")) {
             val member = method.name.substringAfter(".")
 
-            var classType = expr.receiver.type
+            var classType = expr.receiver?.type?: currentClass.name
+
             val methodClass = searchEngine.findByClassName(classType)
 
             when (methodClass?.ktClassObjectType) {
@@ -129,7 +145,7 @@ class ExpressionTypeResolver(
 
         if (type == null) {
             // системный тип через импорты
-            type = resolveTypeFromImports(expr.receiver.name, ktFile) ?: "_"
+            type = resolveTypeFromImports(expr.receiver!!.name, ktFile) ?: "_"
         }
 
         return type
