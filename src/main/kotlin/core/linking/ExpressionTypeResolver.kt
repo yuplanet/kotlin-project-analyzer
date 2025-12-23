@@ -83,6 +83,43 @@ class ExpressionTypeResolver(
         return type
     }
 
+    override fun getFieldType(className: String, fieldName: String): String? {
+        val cl = searchEngine.findByClassName(className)
+
+        if (cl == null)
+            return null
+
+        else if (cl.ktClassObjectType == ObjectType.EnumClass)
+            return className
+
+        else {
+            var foundType: String? = null
+
+            // Сначала ищем в свойствах KtProperty
+
+            for (prop in cl.ktProperties) {
+                if (prop.name == fieldName) {
+                    foundType = prop.typeReference?.text ?: "_"
+                    break
+                }
+            }
+
+            // Если не нашли в свойствах, ищем в параметрах KtParameter
+
+            if (foundType == null) {
+                for (param in cl.ktParameters) {
+                    if (param.name == fieldName) {
+                        foundType = param.typeReference?.text ?: "_"
+                        break
+                    }
+                }
+
+                return foundType
+            }
+            return null
+        }
+    }
+
     override fun getMethodParameterType(param: String): String? {
         var type = getVariableType(param)
 

@@ -21,7 +21,6 @@ class KtFunctionExpressionCollector {
     private lateinit var mainClass: KotlinClass
     private lateinit var typeResolver: IExpressionTypeResolver
 
-
     private val variableStorage = TemporaryVariableStorage()
 
     fun getRawCallText(call: KtCallExpression): String {
@@ -61,14 +60,16 @@ class KtFunctionExpressionCollector {
         val receiverExpr = left.receiverExpression
         val fieldExpr = left.selectorExpression as? KtNameReferenceExpression
 
-        val receiverName = receiverExpr?.text ?: "_"
+        val receiverName = receiverExpr.text
+        val receiverType = typeResolver.getReceiverType(receiverName) ?: receiverName
+
         val fieldName = fieldExpr?.getReferencedName() ?: "_"
-        val receiverType = typeResolver.getReceiverType(receiverName) ?: "_"
+        val fieldType = typeResolver.getFieldType(receiverType, fieldName)?: fieldName
 
         val targetField = FieldInfo(
-            className = receiverName,
+            className = receiverType,
             fieldName = fieldName,
-            fieldType = receiverType
+            fieldType = fieldType
         )
 
         // Source (вызов метода RHS)

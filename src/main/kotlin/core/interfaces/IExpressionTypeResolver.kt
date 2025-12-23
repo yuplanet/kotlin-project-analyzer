@@ -14,6 +14,8 @@ interface IExpressionTypeResolver {
 
     fun getReceiverType(variableName: String): String?
 
+    fun getFieldType(className: String, fieldName: String): String?
+
     fun getMethodParameterType(param: String): String?
 
     fun getMethodOrFieldReturnType(expr: VariableAssignmentExpression): String?
