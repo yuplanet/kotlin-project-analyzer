@@ -151,10 +151,8 @@ class KtFunctionExpressionCollector {
             }
         }
 
-        if (expression.method.returnType.isNullOrEmpty() || expression.method.returnType == "_") {
-            expression.method.returnType = methodReturnType ?: "Unit"
-        }
-        
+        expression.method.returnType = methodReturnType ?: "Unit"
+
         if (methodReturnType.isNullOrEmpty() || methodReturnType == "_")
             expression.target?.type?.let {expression.method.returnType = it  }
         else

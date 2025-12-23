@@ -45,12 +45,13 @@ class ExpressionTypeResolver(
         if (type == null) {
             for (expressionBase in expressions) {
 
-              val  expression = expressionBase as VariableAssignmentExpression
-                        if (expression.target!!.name == variableName) {
-                    type = expression.target!!.type
-                    return type
+                val expression = expressionBase as VariableAssignmentExpression
+                if (expression.target!=null){
+                    if (expression.target!!.name == variableName) {
+                        type = expression.target!!.type
+                        return type
+                    }
                 }
-
                 for (param in expression.method.parameters) {
                     if (param.name == variableName) {
                         type = param.type
