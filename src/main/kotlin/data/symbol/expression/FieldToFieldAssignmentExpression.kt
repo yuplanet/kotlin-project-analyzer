@@ -4,5 +4,5 @@ import org.example.data.symbol.FieldInfo
 
 data class FieldToFieldAssignmentExpression (
     var target: FieldInfo? = null,
-    val source: FieldInfo? = null
+    val source: FieldInfo = FieldInfo(),
 ): BaseExpression()

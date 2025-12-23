@@ -16,22 +16,13 @@ import org.jetbrains.kotlin.psi.psiUtil.isAncestor
 
 class KtFunctionExpressionCollector {
 
-    val tmpList = mutableListOf<Pair<String, String>>()
-// Добавление
-    var tmpCounter = 1
-
     private lateinit var currentClassMethod: ClassMethod
     private lateinit var searchEngine: IProjectSearchEngine
     private lateinit var mainClass: KotlinClass
     private lateinit var typeResolver: IExpressionTypeResolver
-//
-    fun getLastTempRecordByKey(key: String): Pair<String, String>? {
-        return tmpList.asReversed().firstOrNull { it.first == key }
-    }
 
-    fun getLastTempRecordByValue(value: String): Pair<String, String>? {
-        return tmpList.asReversed().firstOrNull { it.second == value }
-    }
+
+    private val variableStorage = TemporaryVariableStorage()
 
     fun getRawCallText(call: KtCallExpression): String {
         var element: PsiElement = call
@@ -82,12 +73,11 @@ class KtFunctionExpressionCollector {
 
         // Source (вызов метода RHS)
         val source: VariableInfo? = if (right is KtCallExpression) {
-            val tmp = "tmp${tmpCounter++}"
             val callExpr = buildVariableAssignmentExpression(right, null)
 //to do add here
             currentClassMethod.fullExpressions.add(callExpr)
-            tmpList.add(tmp to callExpr.method.rawContent)
-            VariableInfo(tmp, callExpr.method.returnType)
+            val data = variableStorage.add( callExpr.method.rawContent)
+            VariableInfo(data.first, callExpr.method.returnType)
         } else {
             null
         }
@@ -107,7 +97,7 @@ class KtFunctionExpressionCollector {
         val receiverText: String? = receiverExpression?.text
         val isInternalCall = receiverText == null
 
-        var receiveRecord = receiverText?.let {  getLastTempRecordByValue(it)?.first}
+        var receiveRecord = receiverText?.let {  variableStorage.getLastByValue(it)?.first}
 
         var receiverName = receiveRecord ?: when (receiverExpression) {
             is KtNameReferenceExpression -> receiverExpression.getReferencedName()
@@ -143,12 +133,12 @@ class KtFunctionExpressionCollector {
                     val innerText = innerReceiver?.text
 
                     if (innerText != null) {
-                        tmpList.asReversed().firstOrNull { it.second == innerText }.toString() ?: rawText
+                        variableStorage.getLastByValue(innerText) ?.second ?: rawText
                     } else rawText
                 }
 
                 else -> {
-                    var customParam = getLastTempRecordByValue(rawText) ?: getLastTempRecordByValue(rawText)
+                    var customParam = variableStorage.getLastByValue(rawText)
 
                     customParam?.first ?: rawText
                 }
@@ -344,7 +334,7 @@ class KtFunctionExpressionCollector {
 
                         else -> {
                             // fallback — можно просто рекурсивно пройтись
-                            handlePsiElement(left, callingContext)
+                            left?.let {handlePsiElement(it,callingContext )  }
                             handlePsiElement(right, callingContext)
                         }
                     }
@@ -387,9 +377,8 @@ class KtFunctionExpressionCollector {
                 val isInnerCall = isInnerCall(currentElement)
 
                 if (isComplex || isInnerCall) {
-                    val value = "tmp${tmpCounter++}"
-                    tmpList.add(value to "${expression.receiver!!.name}.${expression.method.rawContent}" )
-                    expression.target!!.name = value
+                    val (tmpName, tmpValue) = variableStorage.add("${expression.receiver!!.name}.${expression.method.rawContent}")
+                    expression.target!!.name = tmpName
                 }
             }
 
@@ -404,7 +393,6 @@ class KtFunctionExpressionCollector {
                 currentElement.receiverExpression?.let { handlePsiElement(it, callingContext) }
                 currentElement.selectorExpression?.let { handlePsiElement(it, callingContext) }
             }
-
 
             ///others
             is KtBlockExpression -> currentElement.statements.forEach { handlePsiElement(it, callingContext) }
