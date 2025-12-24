@@ -1,6 +1,6 @@
 package org.example.core.interfaces
 
-import org.example.data.symbol.expression.VariableAssignmentExpression
+import org.example.data.symbol.expression.VariableFromMethodExpression
 
 interface IExpressionTypeResolver {
 
@@ -18,5 +18,5 @@ interface IExpressionTypeResolver {
 
     fun getMethodParameterType(param: String): String?
 
-    fun getMethodOrFieldReturnType(expr: VariableAssignmentExpression): String?
+    fun getMethodOrFieldReturnType(expr: VariableFromMethodExpression): String?
 }

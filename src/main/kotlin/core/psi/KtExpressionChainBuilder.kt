@@ -4,17 +4,20 @@ import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.linking.ExpressionTypeResolver
 import org.example.data.symbol.*
-import org.example.data.symbol.expression.FieldAssignmentExpression
-import org.example.data.symbol.expression.FieldToFieldAssignmentExpression
-import org.example.data.symbol.expression.VariableAssignmentExpression
-import org.example.data.symbol.expression.VariableToFieldAssignmentExpression
+import org.example.data.symbol.expression.FieldFromVariableExpression
+import org.example.data.symbol.expression.FieldInfo
+import org.example.data.symbol.expression.FieldFromFieldExpression
+import org.example.data.symbol.expression.MethodInfo
+import org.example.data.symbol.expression.VariableFromMethodExpression
+import org.example.data.symbol.expression.VariableInfo
+import org.example.data.symbol.expression.VariableFromFieldExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.isAncestor
 
-class KtFunctionExpressionCollector {
+class KtExpressionChainBuilder {
 
     private lateinit var currentClassMethod: ClassMethod
     private lateinit var searchEngine: IProjectSearchEngine
@@ -54,7 +57,7 @@ class KtFunctionExpressionCollector {
     private fun buildFieldAssignmentExpression(
         left: KtDotQualifiedExpression,
         right: KtExpression
-    ): FieldAssignmentExpression {
+    ): FieldFromVariableExpression {
 
         // Target (поле a.b)
         val receiverExpr = left.receiverExpression
@@ -78,19 +81,19 @@ class KtFunctionExpressionCollector {
 //to do add here
             currentClassMethod.fullExpressions.add(callExpr)
             val data = variableStorage.add( callExpr.method.rawContent)
-            VariableInfo(data.first, callExpr.method.returnType)
+            VariableInfo(data.first, callExpr.method.type)
         } else {
             null
         }
 
-        return FieldAssignmentExpression(
+        return FieldFromVariableExpression(
             target = targetField,
             source = source
         )
     }
 
 
-    private fun buildVariableAssignmentExpression(currentExpression: KtCallExpression, target: VariableInfo?): VariableAssignmentExpression {
+    private fun buildVariableAssignmentExpression(currentExpression: KtCallExpression, target: VariableInfo?): VariableFromMethodExpression {
         //receiver
         val receiverExpression = (currentExpression.parent as? KtDotQualifiedExpression)?.receiverExpression
             ?: (currentExpression.parent as? KtSafeQualifiedExpression)?.receiverExpression
@@ -155,12 +158,12 @@ class KtFunctionExpressionCollector {
 
         val method = MethodInfo(
             name = methodName,
-            returnType = "Unit",
+            type = "Unit",
             parameters = params.toMutableList(),
             rawContent = getRawCallText(currentExpression)
         )
 
-        val expression = VariableAssignmentExpression(
+        val expression = VariableFromMethodExpression(
             target = target,
             receiver = receiver,
             method = method,
@@ -183,12 +186,12 @@ class KtFunctionExpressionCollector {
             }
         }
 
-        expression.method.returnType = methodReturnType ?: "Unit"
+        expression.method.type = methodReturnType ?: "Unit"
 
         if (methodReturnType.isNullOrEmpty() || methodReturnType == "_")
-            expression.target?.type?.let {expression.method.returnType = it  }
+            expression.target?.type?.let {expression.method.type = it  }
         else
-            expression.target?.type = expression.method.returnType
+            expression.target?.type = expression.method.type
 
         return expression
     }
@@ -199,7 +202,7 @@ class KtFunctionExpressionCollector {
     private fun buildVariableToFieldAssignmentExpression(
         left: KtNameReferenceExpression,  // a
         right: KtDotQualifiedExpression   // b.c или более длинная цепочка
-    ): VariableToFieldAssignmentExpression {
+    ): VariableFromFieldExpression {
 
         // --- Target (переменная a) ---
         val targetName = left.getReferencedName()
@@ -233,7 +236,7 @@ class KtFunctionExpressionCollector {
             type = sourceType
         )
 
-        return VariableToFieldAssignmentExpression(
+        return VariableFromFieldExpression(
             target = targetVar,
             source = sourceField
         )
@@ -242,7 +245,7 @@ class KtFunctionExpressionCollector {
     private fun buildFieldToFieldAssignmentExpression(
         left: KtDotQualifiedExpression,
         right: KtDotQualifiedExpression
-    ): FieldToFieldAssignmentExpression {
+    ): FieldFromFieldExpression {
 
         val lhsReceiver = left.receiverExpression.text
         val lhsField = (left.selectorExpression as? KtNameReferenceExpression)?.getReferencedName() ?: "_"
@@ -253,7 +256,7 @@ class KtFunctionExpressionCollector {
         val lhsFieldInfo = FieldInfo(lhsReceiver, lhsField, typeResolver.getReceiverType(lhsReceiver) ?: "_")
         val rhsFieldInfo = FieldInfo(rhsReceiver, rhsField, typeResolver.getReceiverType(rhsReceiver) ?: "_")
 
-        return FieldToFieldAssignmentExpression(
+        return FieldFromFieldExpression(
             target = lhsFieldInfo,
             source = rhsFieldInfo
         )
@@ -323,7 +326,9 @@ class KtFunctionExpressionCollector {
 
                         // 3. LHS переменная, RHS вызов метода
                         left is KtNameReferenceExpression && right is KtCallExpression -> {
-                            val expression = buildVariableAssignmentExpression(right, VariableInfo(left.getReferencedName(), "_"))
+                            val expression = buildVariableAssignmentExpression(right,
+                                VariableInfo(left.getReferencedName(), "_")
+                            )
                             currentClassMethod.fullExpressions.add(expression)
                         }
 
@@ -437,6 +442,8 @@ class KtFunctionExpressionCollector {
             arg.getArgumentExpression()?.isAncestor(call) == true
         }
     }
+
+
 
     fun collectExpressions(method: ClassMethod, kotlinClass: KotlinClass, searchEngine: IProjectSearchEngine) {
 

@@ -3,9 +3,9 @@ package org.example.core.linking
 import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.FieldInfo
+import org.example.data.symbol.expression.FieldInfo
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.VariableInfo
+import org.example.data.symbol.expression.VariableInfo
 import org.example.data.symbol.enum.ObjectType
 import org.example.data.symbol.expression.*
 import org.jetbrains.kotlin.psi.KtFile
@@ -54,8 +54,8 @@ class ExpressionTypeResolver(
 
     private fun getTypeFromBaseExpression(expressionBase: BaseExpression, variableName: String): String? {
 
-        if (expressionBase is VariableAssignmentExpression) {
-            val expression = expressionBase as VariableAssignmentExpression
+        if (expressionBase is VariableFromMethodExpression) {
+            val expression = expressionBase as VariableFromMethodExpression
 
             if (expression.target != null) {
 
@@ -70,8 +70,8 @@ class ExpressionTypeResolver(
                 if (variableType != null)
                     return variableType
             }
-        } else if (expressionBase is FieldAssignmentExpression) {
-            val expression = expressionBase as FieldAssignmentExpression
+        } else if (expressionBase is FieldFromVariableExpression) {
+            val expression = expressionBase as FieldFromVariableExpression
 
             if (expression.target != null) {
                 val variableType = getVariableTypeFromFieldInfo(expression.target!!, variableName)
@@ -84,8 +84,8 @@ class ExpressionTypeResolver(
                 val variableType = getVariableTypeFromVariableInfo(expression.source, variableName)
                 if (variableType != null)
                     return variableType
-            } else if (expressionBase is FieldToFieldAssignmentExpression) {
-                val expression = expressionBase as FieldToFieldAssignmentExpression
+            } else if (expressionBase is FieldFromFieldExpression) {
+                val expression = expressionBase as FieldFromFieldExpression
                 if (expression.target != null) {
                     val variableType = getVariableTypeFromFieldInfo(expression.target!!, variableName)
                     if (variableType != null)
@@ -96,8 +96,8 @@ class ExpressionTypeResolver(
                     if (variableType != null)
                         return variableType
                 }
-            } else if (expressionBase is VariableToFieldAssignmentExpression) {
-                val expression = expressionBase as VariableToFieldAssignmentExpression
+            } else if (expressionBase is VariableFromFieldExpression) {
+                val expression = expressionBase as VariableFromFieldExpression
                 if (expression.target != null) {
                     val variableType = getVariableTypeFromVariableInfo(expression.target, variableName)
                     if (variableType != null)
@@ -205,7 +205,7 @@ class ExpressionTypeResolver(
     /// 1 class.Method(var)
     /// 2 class.Method()
     /// 3 class.field
-    override fun getMethodOrFieldReturnType(expr: VariableAssignmentExpression): String? {
+    override fun getMethodOrFieldReturnType(expr: VariableFromMethodExpression): String? {
 
         val method = expr.method
 

@@ -1,7 +1,6 @@
 package org.example.data.symbol
 
 import org.example.data.symbol.expression.BaseExpression
-import org.example.data.symbol.expression.VariableAssignmentExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty

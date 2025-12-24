@@ -5,7 +5,7 @@ import org.example.data.symbol.FieldReference
 import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.VariableInfo
+import org.example.data.symbol.expression.VariableInfo
 import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtParameter
 

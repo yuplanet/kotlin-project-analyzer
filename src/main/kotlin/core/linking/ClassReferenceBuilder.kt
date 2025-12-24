@@ -2,19 +2,19 @@ package org.example.core.linking
 
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
-import org.example.core.psi.KtFunctionExpressionCollector
+import org.example.core.psi.KtExpressionChainBuilder
 import org.example.data.symbol.MethodReference
 import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.FieldInfo
+import org.example.data.symbol.expression.FieldInfo
 import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.MethodInfo
-import org.example.data.symbol.VariableInfo
-import org.example.data.symbol.expression.FieldAssignmentExpression
-import org.example.data.symbol.expression.FieldToFieldAssignmentExpression
-import org.example.data.symbol.expression.VariableAssignmentExpression
-import org.example.data.symbol.expression.VariableToFieldAssignmentExpression
+import org.example.data.symbol.expression.MethodInfo
+import org.example.data.symbol.expression.VariableInfo
+import org.example.data.symbol.expression.FieldFromVariableExpression
+import org.example.data.symbol.expression.FieldFromFieldExpression
+import org.example.data.symbol.expression.VariableFromMethodExpression
+import org.example.data.symbol.expression.VariableFromFieldExpression
 import java.io.File
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
@@ -27,7 +27,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
 
         // 11 collect function expressions
-        collectExpressions(projectClasses)
+        collectExpressions2(projectClasses)
 
         //Methods
         buildFunctionCallRecords(projectClasses) // to do
@@ -52,21 +52,21 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                     out.println("\nMethod: ${method.name}")
 
                     // Собираем expressions для метода
-                    val expressionCollector = KtFunctionExpressionCollector()
+                    val expressionCollector = KtExpressionChainBuilder()
                     expressionCollector.collectExpressions(method, cls, searchEngine)
 
                     for (expr in method.fullExpressions) {
                         when (expr) {
-                            is VariableAssignmentExpression -> {
+                            is VariableFromMethodExpression -> {
                                 out.println("VariableAssignment -> target: ${expr.target?.name}, receiver: ${expr.receiver?.name}, method: ${expr.method?.name}")
                             }
-                            is FieldAssignmentExpression -> {
+                            is FieldFromVariableExpression -> {
                                 out.println("FieldAssignment -> target: ${expr.target?.name}, source: ${expr.source?.name}")
                             }
-                            is VariableToFieldAssignmentExpression -> {
+                            is VariableFromFieldExpression -> {
                                 out.println("VariableToField -> target: ${expr.target?.name}, source: ${expr.source?.name}")
                             }
-                            is FieldToFieldAssignmentExpression -> {
+                            is FieldFromFieldExpression -> {
                                 out.println("FieldToField -> target: ${expr.target?.name}, source: ${expr.source?.name}")
                             }
                             else -> {
@@ -84,11 +84,13 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         for (cls in projectClasses) {
 
             for (method in cls.functionCalls) {
-                if (method.name != "sendScheduledEnvelopeNotification")
-                    continue
+                //if (method.name != "sendScheduledEnvelopeNotification")
+                //    continue
 
-                val expressionCollector = KtFunctionExpressionCollector();
+                val expressionCollector = KtExpressionChainBuilder();
                 expressionCollector.collectExpressions(method, cls, searchEngine)
+
+                println(1)
             }
         }
     }
@@ -153,20 +155,20 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                     when (exprBase) {
 
-                        is VariableAssignmentExpression -> buildVariableAssignmentExpressionReference(cls,method, exprBase as VariableAssignmentExpression)
+                        is VariableFromMethodExpression -> buildVariableAssignmentExpressionReference(cls,method, exprBase as VariableFromMethodExpression)
 
-                        is VariableToFieldAssignmentExpression -> buildVariableToFieldAssignmentExpression(cls,method, exprBase as VariableToFieldAssignmentExpression)
+                        is VariableFromFieldExpression -> buildVariableToFieldAssignmentExpression(cls,method, exprBase as VariableFromFieldExpression)
 
-                        is FieldAssignmentExpression -> buildFieldAssignmentExpression(cls,method, exprBase as FieldAssignmentExpression)
+                        is FieldFromVariableExpression -> buildFieldAssignmentExpression(cls,method, exprBase as FieldFromVariableExpression)
 
-                        is FieldToFieldAssignmentExpression ->buildFieldToFieldAssignmentExpression(cls,method, exprBase as FieldToFieldAssignmentExpression)
+                        is FieldFromFieldExpression ->buildFieldToFieldAssignmentExpression(cls,method, exprBase as FieldFromFieldExpression)
                     }
                 }
             }
         }
     }
 
-    fun buildFieldToFieldAssignmentExpression(currentClass: KotlinClass, method: ClassMethod, expr: FieldToFieldAssignmentExpression){
+    fun buildFieldToFieldAssignmentExpression(currentClass: KotlinClass, method: ClassMethod, expr: FieldFromFieldExpression){
         //calling method!!!
         if (expr.target != null) {
             var ref = getRefToField(currentClass.name, expr.target!!)
@@ -180,7 +182,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         }
     }
 
-    fun buildFieldAssignmentExpression(currentClass: KotlinClass, method: ClassMethod, expr: FieldAssignmentExpression){
+    fun buildFieldAssignmentExpression(currentClass: KotlinClass, method: ClassMethod, expr: FieldFromVariableExpression){
         //calling method!!!
         if (expr.target != null) {
             var ref = getRefToField(currentClass.name, expr.target!!)
@@ -194,7 +196,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         }
     }
 
-    fun buildVariableAssignmentExpressionReference(currentClass: KotlinClass, method: ClassMethod, expr: VariableAssignmentExpression) {
+    fun buildVariableAssignmentExpressionReference(currentClass: KotlinClass, method: ClassMethod, expr: VariableFromMethodExpression) {
 
         //calling method!!!
         if (expr.receiver != null) {
@@ -212,7 +214,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         //calling field
     }
 
-    fun buildVariableToFieldAssignmentExpression(currentClass: KotlinClass, method: ClassMethod, expr:VariableToFieldAssignmentExpression) {
+    fun buildVariableToFieldAssignmentExpression(currentClass: KotlinClass, method: ClassMethod, expr:VariableFromFieldExpression) {
         //calling method!!!
         if (expr.target != null) {
             val ref = getRefToField(currentClass.name, expr.target)
@@ -234,7 +236,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                 for (exprBase in method.fullExpressions) {
 
-                    var expr = exprBase as VariableAssignmentExpression
+                    var expr = exprBase as VariableFromMethodExpression
 
                     //fields
                     addRefToField(expr.target!!.type, expr.target!!.name, method)

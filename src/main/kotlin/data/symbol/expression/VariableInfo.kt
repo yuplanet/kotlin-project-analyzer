@@ -1,4 +1,4 @@
-package org.example.data.symbol
+package org.example.data.symbol.expression
 
 open class VariableInfo(
     open var name: String = "",  // имя переменной
