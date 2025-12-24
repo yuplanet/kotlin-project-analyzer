@@ -25,7 +25,7 @@ object KtFileMapper {
             val annotation = KtClassHelper.getAnnotations(cls)
 
             val ktClass = KotlinClass(
-                ktClass = cls,
+                ktClassObject = cls,
                 path = filePath,
                 name = className,
                 ktParameters = cls.primaryConstructorParameters,

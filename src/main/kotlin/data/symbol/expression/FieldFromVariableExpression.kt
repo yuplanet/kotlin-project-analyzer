@@ -5,7 +5,6 @@ package org.example.data.symbol.expression
  *
  * ```
  * Class.Field = variable
- * variable
  * ```
  */
 

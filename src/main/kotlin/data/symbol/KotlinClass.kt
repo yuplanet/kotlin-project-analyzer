@@ -7,50 +7,30 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 
-class KotlinClass {
+class KotlinClass(
+    var path: String,
+    var name: String,
 
-    val ktClassObject: KtClassOrObject
-    var ktClassObjectType: ObjectType
-    var annotations: List<String>
 
-    var ktFile: KtFile//to do add to int
+    var ktFile: KtFile,
 
-    var superClasses: MutableList<KotlinClass> = mutableListOf()
-    var subClasses: MutableList<KotlinClass> = mutableListOf()
+    var ktClassObjectType: ObjectType,
+    var annotations: List<String> = emptyList(),
+    val ktClassObject: KtClassOrObject,
 
-    var name: String
-    var path: String
-    var fullName: String
 
-    var propertyReferences: MutableList<ClassProperty> = mutableListOf()
-    var parameterReferences: MutableList<ClassParameter> = mutableListOf()
+    var propertyReferences: MutableList<ClassProperty> = mutableListOf(),
+    var parameterReferences: MutableList<ClassParameter> = mutableListOf(),
+    val functionCalls: MutableList<ClassMethod> = mutableListOf(),
 
-    val functionCalls: MutableList<ClassMethod> = mutableListOf()
+    var ktParameters: List<KtParameter> = emptyList(),
+    var ktProperties: List<KtProperty> = emptyList(),
+    var ktFunctions: List<KtNamedFunction> = emptyList(),
 
-    var ktProperties: MutableList<KtProperty>
-    var ktParameters: MutableList<KtParameter>
-    var ktFunctions: MutableList<KtNamedFunction>
+    var subClasses: MutableList<KotlinClass> = mutableListOf(),
+    var superClasses: MutableList<KotlinClass> = mutableListOf(),
 
-    constructor(
-        ktClass: KtClassOrObject,
-        path: String,
-        name: String,
-        ktParameters: List<KtParameter>,
-        ktProperties: List<KtProperty>,
-        ktClassObjectType: ObjectType,
-        annotations: List<String>,
-        ktFunctions: List<KtNamedFunction>,
-        ktFile: KtFile,
-        ) {
-        this.ktClassObject = ktClass
-        this.fullName = path
-        this.name = name
-        this.path = path
-        this.ktFile = ktFile
-        this.ktProperties = ktProperties.toMutableList()
-        this.ktParameters = ktParameters.toMutableList()
-        this.ktClassObjectType = ktClassObjectType
-        this.annotations = annotations
-        this.ktFunctions = ktFunctions.toMutableList()
-    }
+
+) {
+    val fullName: String = path
 }
