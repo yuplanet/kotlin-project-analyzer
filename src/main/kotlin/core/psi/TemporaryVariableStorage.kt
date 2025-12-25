@@ -1,6 +1,9 @@
 package org.example.core.psi
 
-class TemporaryVariableStorage {
+import org.example.core.interfaces.ITemporaryVariableStorage
+
+
+class TemporaryVariableStorage: ITemporaryVariableStorage {
 
     private data class VariableRecord(
         var temporaryName: String = "",
@@ -11,13 +14,13 @@ class TemporaryVariableStorage {
     private var tmpCounter = 1
 
 
-    fun add(value: String): Pair<String, String> {
+    override fun add(value: String): Pair<String, String> {
         val tmpName = "tmp${tmpCounter++}"
         storage.add(VariableRecord(tmpName, value))
         return tmpName to value
     }
 
-    fun add(name: String, value: String): Pair<String, String>? {
+    override fun add(name: String, value: String): Pair<String, String>? {
         // Проверяем, есть ли уже запись с таким значением
         storage.firstOrNull { it.value == value }?.let { return null }
 
@@ -27,29 +30,29 @@ class TemporaryVariableStorage {
     }
 
     // Получить значение по ключу
-    fun getValueByKey(key: String): String? {
+    override fun getValueByKey(key: String): String? {
         return storage.asReversed().firstOrNull { it.temporaryName == key }?.value
     }
 
-    fun getByKey(key: String): Pair<String, String>? {
+    override fun getByKey(key: String): Pair<String, String>? {
         return storage.asReversed().firstOrNull { it.temporaryName == key }?.let { it.temporaryName to it.value }
     }
 
 
     /** Получить последнюю добавленную запись */
-    fun getLast(): Pair<String, String>? {
+    override fun getLast(): Pair<String, String>? {
         return storage.lastOrNull()?.let { it.temporaryName to it.value }
     }
 
     /** Получить последнюю запись по значению */
-    fun getLastByValue(value: String): Pair<String, String>? {
+    override fun getLastByValue(value: String): Pair<String, String>? {
         val record = storage.asReversed().firstOrNull { it.value == value }
         if (record != null) return record.temporaryName to record.value
         return null
     }
 
     /** Получить последнюю запись по ключу */
-    fun getLastByKey(key: String): Pair<String, String>? {
+    override fun getLastByKey(key: String): Pair<String, String>? {
         return storage.asReversed().firstOrNull { it.temporaryName == key }?.let { it.temporaryName to it.value }
     }
 }

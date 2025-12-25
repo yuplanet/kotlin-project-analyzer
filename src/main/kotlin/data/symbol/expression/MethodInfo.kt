@@ -9,4 +9,8 @@ data class MethodInfo (
     var parameters: MutableList<VariableInfo> = mutableListOf(),
     var rawContent: String = "",
 
+
+    var receiverName: String = "",
+    var receiverClass: String = "",
+
 ): VariableInfo(name, type)

@@ -3,18 +3,15 @@ package org.example.core.linking
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtExpressionChainBuilder
-import org.example.data.symbol.MethodReference
-import org.example.data.symbol.ObjectReference
-import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.expression.FieldInfo
-import org.example.data.symbol.FieldReference
-import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.expression.MethodInfo
-import org.example.data.symbol.expression.VariableInfo
-import org.example.data.symbol.expression.FieldFromVariableExpression
+import org.example.core.psi.KtExpressionChainBuilder2
+import org.example.data.symbol.*
 import org.example.data.symbol.expression.FieldFromFieldExpression
-import org.example.data.symbol.expression.VariableFromMethodExpression
+import org.example.data.symbol.expression.FieldFromVariableExpression
+import org.example.data.symbol.expression.FieldInfo
+import org.example.data.symbol.expression.MethodInfo
 import org.example.data.symbol.expression.VariableFromFieldExpression
+import org.example.data.symbol.expression.VariableFromMethodExpression
+import org.example.data.symbol.expression.VariableInfo
 import java.io.File
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
@@ -52,7 +49,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                     out.println("\nMethod: ${method.name}")
 
                     // Собираем expressions для метода
-                    val expressionCollector = KtExpressionChainBuilder()
+                    val expressionCollector = KtExpressionChainBuilder2()
                     expressionCollector.collectExpressions(method, cls, searchEngine)
 
                     for (expr in method.fullExpressions) {
@@ -84,11 +81,11 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         for (cls in projectClasses) {
 
             for (method in cls.functionCalls) {
-                //if (method.name != "sendScheduledEnvelopeNotification")
-                //    continue
+                if (method.name != "sendScheduledEnvelopeNotification")
+                    continue
 
-                val expressionCollector = KtExpressionChainBuilder();
-                expressionCollector.collectExpressions(method, cls, searchEngine)
+                val expressionCollector = KtExpressionChainBuilder(method, searchEngine, cls);
+                expressionCollector.collectExpressions()
 
                 println(1)
             }

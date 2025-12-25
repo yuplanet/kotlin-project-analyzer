@@ -3,9 +3,7 @@ package org.example.core.linking
 import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.expression.FieldInfo
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.expression.VariableInfo
 import org.example.data.symbol.enum.ObjectType
 import org.example.data.symbol.expression.*
 import org.jetbrains.kotlin.psi.KtFile
@@ -15,15 +13,12 @@ class ExpressionTypeResolver(
     private val currentClass: KotlinClass,
     private val currentMethod: ClassMethod): IExpressionTypeResolver {
 
-    private val ktFile: KtFile
-    private var expressions: List<BaseExpression>
+    private val ktFile: KtFile = currentClass.ktFile
+    private var expressions: List<BaseExpression> = currentMethod.fullExpressions
     private val classVariables: MutableList<VariableInfo> = mutableListOf()
     private val methodVariables: MutableList<VariableInfo> = mutableListOf()
 
     init {
-
-        expressions = currentMethod.fullExpressions
-        ktFile = currentClass.ktFile
 
         // 1️⃣ Свойства класса
         currentClass.propertyReferences.forEach { prop ->
