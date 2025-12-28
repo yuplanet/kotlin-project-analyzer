@@ -9,12 +9,13 @@ import org.example.data.symbol.expression.*
 import org.jetbrains.kotlin.psi.KtFile
 
 class ExpressionTypeResolver(
+
     private val searchEngine: IProjectSearchEngine,
     private val currentClass: KotlinClass,
     private val currentMethod: ClassMethod): IExpressionTypeResolver {
 
     private val ktFile: KtFile = currentClass.ktFile
-    private var expressions: List<BaseExpression> = currentMethod.fullExpressions
+    private var expressions: List<AssignmentExpression> = currentMethod.fullExpressions
     private val classVariables: MutableList<VariableInfo> = mutableListOf()
     private val methodVariables: MutableList<VariableInfo> = mutableListOf()
 
@@ -39,96 +40,39 @@ class ExpressionTypeResolver(
             type = methodVariables.firstOrNull { it.name == variableName }?.type
 
         if (type == null) {
-            for (expressionBase in expressions) {
-                getTypeFromBaseExpression(expressionBase, variableName)
+            for (expression in expressions) {
+                getVariableTypeFromExpression(expression, variableName)
             }
         }
 
         return type
     }
 
-    private fun getTypeFromBaseExpression(expressionBase: BaseExpression, variableName: String): String? {
+    private fun getVariableTypeFromExpression(expression: AssignmentExpression, variableName: String): String? {
 
-        if (expressionBase is VariableFromMethodExpression) {
-            val expression = expressionBase as VariableFromMethodExpression
+        if(expression.target is VariableInfo)
+        {
+            if (expression.target.name == variableName)
+                return expression.target.type
 
-            if (expression.target != null) {
-
-                var variableType = getVariableTypeFromVariableInfo(expression.target!!, variableName)
-                if (variableType != null)
-                    return variableType
-            }
-
-
-            for (param in expression.method.parameters) {
-                val variableType = getVariableTypeFromVariableInfo(param, variableName)
-                if (variableType != null)
-                    return variableType
-            }
-        } else if (expressionBase is FieldFromVariableExpression) {
-            val expression = expressionBase as FieldFromVariableExpression
-
-            if (expression.target != null) {
-                val variableType = getVariableTypeFromFieldInfo(expression.target!!, variableName)
-                if (variableType != null)
-                    return variableType
-            }
-
-            if (expression.source != null) {
-
-                val variableType = getVariableTypeFromVariableInfo(expression.source, variableName)
-                if (variableType != null)
-                    return variableType
-            } else if (expressionBase is FieldFromFieldExpression) {
-                val expression = expressionBase as FieldFromFieldExpression
-                if (expression.target != null) {
-                    val variableType = getVariableTypeFromFieldInfo(expression.target!!, variableName)
-                    if (variableType != null)
-                        return variableType
-                }
-                if (expression.source != null) {
-                    val variableType = getVariableTypeFromFieldInfo(expression.source, variableName)
-                    if (variableType != null)
-                        return variableType
-                }
-            } else if (expressionBase is VariableFromFieldExpression) {
-                val expression = expressionBase as VariableFromFieldExpression
-                if (expression.target != null) {
-                    val variableType = getVariableTypeFromVariableInfo(expression.target, variableName)
-                    if (variableType != null)
-                        return variableType
-                }
-                if (expression.source != null) {
-                    val variableType = getVariableTypeFromFieldInfo(expression.source, variableName)
-                    if (variableType != null)
-                        return variableType
-                }
-            } else
-                return null
         }
-        return null
-    }
+        else if (expression.target is FieldInfo)
+        {
+            val field = expression.target as FieldInfo
 
-
-    private fun getVariableTypeFromFieldInfo(field: FieldInfo, variableName: String): String? {
-        val tp =
             if (field.name == variableName)
-                field.type
-            else null
+                return field.type
+        }
+        else if (expression.target is MethodInfo){
 
-        return tp
+            val method = expression.target as MethodInfo
+
+
+        }
+
+
+        return "t"
     }
-
-
-    private fun getVariableTypeFromVariableInfo(variableInfo: VariableInfo, variableName: String): String? {
-        val tp =
-            if (variableInfo.name == variableName)
-                variableInfo.type
-            else null
-
-        return tp
-    }
-
 
 
     override fun getReceiverType(variableName: String): String? {
@@ -200,23 +144,19 @@ class ExpressionTypeResolver(
     /// 1 class.Method(var)
     /// 2 class.Method()
     /// 3 class.field
-    override fun getMethodOrFieldReturnType(expr: VariableFromMethodExpression): String? {
+    override fun getMethodOrFieldReturnType(expr: AssignmentExpression): String? {
 
-        val method = expr.method
+        if (expr.source is MethodInfo) {
 
-        var type = if (method.rawContent.contains("(")) {
-            val methodName = method.name.substringBefore("(")
-
-            val type = if(expr.receiver == null)
-            {
+            val method = expr.source
+            val type = if (expr.receiver == null) {
                 searchEngine.findMethodByClassNameAndMethodNameAndParams(
                     className = currentClass.name,
                     methodName = methodName,
                     params = method.parameters.map { it.type },
 
                     )?.returnType
-            }
-            else{
+            } else {
                 searchEngine.findMethodByClassNameAndMethodNameAndParams(
                     className = expr.receiver.type,
                     methodName = methodName,
@@ -231,7 +171,7 @@ class ExpressionTypeResolver(
         } else if (method.rawContent.contains(".")) {
             val member = method.name.substringAfter(".")
 
-            var classType = expr.receiver?.type?: currentClass.name
+            var classType = expr.receiver?.type ?: currentClass.name
 
             val methodClass = searchEngine.findByClassName(classType)
 
@@ -249,7 +189,7 @@ class ExpressionTypeResolver(
 
         if (type == null) {
             // системный тип через импорты
-            type  = expr.receiver?.let {resolveTypeFromImports(it.name , ktFile) }
+            type = expr.receiver?.let { resolveTypeFromImports(it.name, ktFile) }
             type = type ?: "_"
         }
 
