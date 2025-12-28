@@ -41,7 +41,8 @@ class ExpressionTypeResolver(
 
         if (type == null) {
             for (expression in expressions) {
-                getVariableTypeFromExpression(expression, variableName)
+                type = getVariableTypeFromExpression(expression, variableName)
+                if (type != null) break
             }
         }
 
@@ -50,28 +51,22 @@ class ExpressionTypeResolver(
 
     private fun getVariableTypeFromExpression(expression: AssignmentExpression, variableName: String): String? {
 
-        if(expression.target is VariableInfo)
-        {
-            if (expression.target.name == variableName)
-                return expression.target.type
-
-        }
-        else if (expression.target is FieldInfo)
+        if (expression.target is FieldInfo)
         {
             val field = expression.target as FieldInfo
 
             if (field.name == variableName)
                 return field.type
         }
-        else if (expression.target is MethodInfo){
 
-            val method = expression.target as MethodInfo
-
+        if(expression.target is VariableInfo)
+        {
+            if (expression.target.name == variableName)
+                return expression.target.type
 
         }
 
-
-        return "t"
+        return null
     }
 
 
@@ -145,56 +140,46 @@ class ExpressionTypeResolver(
     /// 2 class.Method()
     /// 3 class.field
     override fun getMethodOrFieldReturnType(expr: AssignmentExpression): String? {
+        var type: String? = null
 
         if (expr.source is MethodInfo) {
+            val method = expr.source as MethodInfo
 
-            val method = expr.source
-            val type = if (expr.receiver == null) {
-                searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                    className = currentClass.name,
-                    methodName = methodName,
-                    params = method.parameters.map { it.type },
-
-                    )?.returnType
+            // Определяем, какой класс для поиска метода
+            val classNameForMethod = if (method.receiverName.isNullOrEmpty() || method.receiverName == "this") {
+                currentClass.name
             } else {
-                searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                    className = expr.receiver.type,
-                    methodName = methodName,
-                    params = method.parameters.map { it.type },
-
-                    )?.returnType
+               method.receiverName
             }
 
-
-
-            type
-        } else if (method.rawContent.contains(".")) {
-            val member = method.name.substringAfter(".")
-
-            var classType = expr.receiver?.type ?: currentClass.name
-
+            // Ищем метод через searchEngine
+            type = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+                className = classNameForMethod,
+                methodName = method.name,
+                params = method.parameters.map { it.type }
+            )?.returnType
+        }
+        else if (expr.source is FieldInfo) {
+            val field = expr.source as FieldInfo
+            val classType = field.classType.ifEmpty { currentClass.name }
             val methodClass = searchEngine.findByClassName(classType)
 
-            when (methodClass?.ktClassObjectType) {
+            type = when (methodClass?.ktClassObjectType) {
                 ObjectType.EnumClass -> classType
-
-                ObjectType.Class -> {
-                    methodClass.propertyReferences.firstOrNull { it.name == member }?.type
-                        ?: methodClass.parameterReferences.firstOrNull { it.name == member }?.type
-                }
-
+                ObjectType.Class -> methodClass.propertyReferences.firstOrNull { it.name == field.name }?.type
+                    ?: methodClass.parameterReferences.firstOrNull { it.name == field.name }?.type
                 else -> null
             }
-        } else null
 
-        if (type == null) {
-            // системный тип через импорты
-            type = expr.receiver?.let { resolveTypeFromImports(it.name, ktFile) }
-            type = type ?: "_"
+            // fallback через instanceName
+            if (type == null) {
+                type = resolveTypeFromImports(field.className, ktFile) ?: "_"
+            }
         }
 
         return type
     }
+
 
     // Функция для резолва полного имени класса через импорты
     private fun resolveTypeFromImports(typeName: String, ktFile: KtFile): String? {

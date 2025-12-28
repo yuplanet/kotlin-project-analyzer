@@ -279,12 +279,19 @@ class KtExpressionChainBuilder(
             source = getField(rhs)
         }
 
+        // Если target всё ещё null, создаем tmp через storage
+        if (target == null && rhs != null) {
+            val tmpName = variableStorage.add(rhs) // возвращает имя tmp
+            target = VariableInfo(tmpName.first, tmpName.second) // тип пока можно определить через IExpressionTypeResolver
+        }
+
         val expr = AssignmentExpression(
             target = target,
             source = source,
             operationType = AssigmentExpressionType.FieldFromField,
             isParent = true
         )
+
 
         currentMethod.fullExpressions.add(expr)
 
