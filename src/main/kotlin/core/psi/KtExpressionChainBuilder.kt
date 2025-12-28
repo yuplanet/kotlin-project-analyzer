@@ -149,27 +149,31 @@ class KtExpressionChainBuilder(
                 val receiverExpr = qualifiedExpr.receiverExpression
                 val selectorExpr = qualifiedExpr.selectorExpression
 
-                // 1️⃣ Обрабатываем receiver рекурсивно
-                val callingReceiver: VariableInfo? = if (isNestedExpression(receiverExpr)) {
+
+                receiverExpr.text
+                // 1️⃣ Рекурсивно обрабатываем receiver
+                val callingReceiver: VariableInfo? = if (receiverExpr is KtCallExpression || receiverExpr is KtDotQualifiedExpression) {
+
                     handlePsiElement(receiverExpr, callingContext)
-                    // Берем tmp-переменную после рекурсии
                     variableStorage.getLastByValue(receiverExpr.text)?.let { VariableInfo(it.first, "_") }
                 } else {
+
                     getVariableOrField(receiverExpr)
                 }
 
-                // 2️⃣ Если selector — вызов метода, спускаемся в него
-                if (selectorExpr is KtCallExpression) {
+                selectorExpr?.text
+                // 2️⃣ Рекурсивно обрабатываем selector, если это вызов
+                if (selectorExpr is KtCallExpression || selectorExpr is KtDotQualifiedExpression) {
                     handlePsiElement(selectorExpr, callingReceiver)
                 }
 
                 // 3️⃣ Создаем FieldInfo для текущей dot-цепочки
-                val fieldExpr = buildAssignmentExpression(null,qualifiedExpr)
+                val fieldExpr = buildAssignmentExpression(null, qualifiedExpr)
                 currentMethod.fullExpressions.add(fieldExpr)
 
-                // 4️⃣ Если выражение вложенное — создаем tmp
+                // 4️⃣ Если выражение вложенное, создаем tmp
                 if (isNestedExpression(qualifiedExpr)) {
-                    val tmpName = variableStorage.add(fieldExpr.source?.name)
+                    val (tmpName, _) = variableStorage.add(fieldExpr.source.name)
                     fieldExpr.target?.name = tmpName
                 }
             }
@@ -205,8 +209,8 @@ class KtExpressionChainBuilder(
 
                 // Создаём AssignmentExpression
                 val expr = AssignmentExpression(
-                    target = if (isNestedExpression(left)) variableStorage.getLastByValue(left.text)?.let { VariableInfo(it.first) } else getVariableOrField(left),
-                    source = rhsSource,
+                    target = if (isNestedExpression(left)) variableStorage.getLastByValue(left!!.text)?.let { VariableInfo(it.first) } else getVariableOrField(left!!),
+                    source = rhsSource!!,
                     operationType = AssigmentExpressionType.FieldFromField,
                     isParent = true
                 )
@@ -281,13 +285,13 @@ class KtExpressionChainBuilder(
 
         // Если target всё ещё null, создаем tmp через storage
         if (target == null && rhs != null) {
-            val tmpName = variableStorage.add(rhs) // возвращает имя tmp
+            val tmpName = variableStorage.add("hs.") // возвращает имя tmp
             target = VariableInfo(tmpName.first, tmpName.second) // тип пока можно определить через IExpressionTypeResolver
         }
 
         val expr = AssignmentExpression(
             target = target,
-            source = source,
+            source = source!!,
             operationType = AssigmentExpressionType.FieldFromField,
             isParent = true
         )

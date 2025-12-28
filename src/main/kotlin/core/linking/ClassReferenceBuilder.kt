@@ -3,11 +3,7 @@ package org.example.core.linking
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.psi.KtExpressionChainBuilder
-import org.example.core.psi.KtExpressionChainBuilder2
 import org.example.data.symbol.*
-import org.example.data.symbol.expression.FieldInfo
-import org.example.data.symbol.expression.MethodInfo
-import org.example.data.symbol.expression.VariableInfo
 import java.io.File
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
@@ -39,8 +35,8 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                     out.println("\nMethod: ${method.name}")
 
                     // Собираем expressions для метода
-                    val expressionCollector = KtExpressionChainBuilder2()
-                    expressionCollector.collectExpressions(method, cls, searchEngine)
+                    val expressionCollector = KtExpressionChainBuilder(method, cls, searchEngine)
+                    expressionCollector.collectExpressions()
 
                         // for (expr in method.fullExpressions) {
                    //     when (expr) {
@@ -74,7 +70,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                 if (method.name != "sendScheduledEnvelopeNotification")
                     continue
 
-                val expressionCollector = KtExpressionChainBuilder(method, searchEngine, cls);
+                val expressionCollector = KtExpressionChainBuilder(method, cls, searchEngine);
                 expressionCollector.collectExpressions()
 
                 println(1)
