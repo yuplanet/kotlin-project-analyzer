@@ -5,27 +5,27 @@ data class MethodInfo (
     /**
      * Имя Метода
      */
-    override var name: String = "",// её тип
+    override var name: String = "unknown",// её тип
 
 
     /**
      * Тип Метода
      */
-    override var type: String = "",// её тип
+    override var type: String = "unknown",// её тип
 
 
     var parameters: MutableList<VariableInfo> = mutableListOf(),
-    var rawContent: String = "",
+    var rawContent: String = "unknown",
 
     /**
      * Имя переменной, через которую вызывается метод
      */
-    var receiverName: String = "",
+    var receiverName: String = "unknown",
 
     /**
      * тип переменной, через которую вызывается метод
      */
-    var receiverClass: String = "",
+    var receiverClass: String = "unknown",
 
 ): VariableInfo(name, type)
 

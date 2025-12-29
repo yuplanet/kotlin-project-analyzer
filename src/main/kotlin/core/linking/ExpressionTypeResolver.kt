@@ -37,143 +37,63 @@ class ExpressionTypeResolver(
 
     override fun getVariableType(variableName: String): String? {
 
-        var type = classVariables.firstOrNull { it.name == variableName }?.type
+        var type: String? = null
 
-        if (type == null)
-            type = methodVariables.firstOrNull { it.name == variableName }?.type
+        if (variableName.contains(".")) {
 
-        if (type == null) {
-            for (expression in expressions) {
-                type = getVariableTypeFromExpression(expression, variableName)
-                if (type != null) break
-            }
+            type = getEnumOrObjectType(variableName)
+            if (type != null)
+                return type
         }
-
-        return type
-    }
-
-    private fun getVariableTypeFromExpression(expression: AssignmentExpression, variableName: String): String? {
-
-        if (expression.target is FieldInfo) {
-            val field = expression.target as FieldInfo
-
-            if (field.name == variableName)
-                return field.type
-        }
-
-        expression.target?.let {
-            expression.target!!.name == variableName
-            return expression.target!!.type
-        }
-
-        return null
-    }
-
-
-    override fun getReceiverType(variableName: String): String? {
 
         var receive = variableName.replace("this.", "")
         //1 class property fields
         //2 method vars
         //3 imports, className
         //Члены класса
-        var type = getVariableType(receive)
+        type = findTypeInsideClass(receive)
 
         if (type == null)
             type = resolveTypeFromImports(receive, ktFile)
 
-        if (type == null)
-            type = getByClassName(receive)
 
         // 3️⃣ Если не нашли — неизвестно
         return type
     }
 
-    override fun getFieldType(className: String, fieldName: String): String? {
-        val cl = searchEngine.findByClassName(className)
+    override fun getTypeByClassAndField(className: String, fieldName: String): String? {
+        val cl = searchEngine.findByClassName(className) ?: return null
 
-        if (cl == null)
-            return null
-
-        else if (cl.ktClassObjectType == ObjectType.EnumClass)
+        if (cl.ktClassObjectType == ObjectType.EnumClass)
             return className
 
-        else {
-            var foundType: String? = null
+        for (prop in cl.ktProperties) {
 
-            // Сначала ищем в свойствах KtProperty
-
-            for (prop in cl.ktProperties) {
-                if (prop.name == fieldName) {
-                    foundType = prop.typeReference?.text ?: "_"
-                    break
-                }
-            }
-
-            // Если не нашли в свойствах, ищем в параметрах KtParameter
-
-            if (foundType == null) {
-                for (param in cl.ktParameters) {
-                    if (param.name == fieldName) {
-                        foundType = param.typeReference?.text ?: "_"
-                        break
-                    }
-                }
-            }
-            return foundType
-
-        }
-    }
-
-    override fun getMethodParameterType(param: String): String? {
-        var type = getVariableType(param)
-
-        if (type == null)
-            type = getEnumOrObjectType(param)
-
-        return  type
-
-    }
-
-    //возвращает тип по методу с переменной вида
-    /// 1 class.Method(var)
-    /// 2 class.Method()
-    /// 3 class.field
-    override fun getMethodOrFieldReturnType(expr: AssignmentExpression): String? {
-        var type: String? = null
-
-        if (expr.source is MethodInfo) {
-
-            type = getMethodReturnType(expr.source as MethodInfo)
-        }
-        else if (expr.source is FieldInfo) {
-            val field = expr.source as FieldInfo
-            val classType = field.classType.ifEmpty { currentClass.name }
-            val methodClass = searchEngine.findByClassName(classType)
-
-            type = when (methodClass?.ktClassObjectType) {
-                ObjectType.EnumClass -> classType
-                ObjectType.Class -> methodClass.propertyReferences.firstOrNull { it.name == field.name }?.type
-                    ?: methodClass.parameterReferences.firstOrNull { it.name == field.name }?.type
-                else -> null
-            }
-
-            // fallback через instanceName
-            if (type == null) {
-                type = resolveTypeFromImports(field.className, ktFile) ?: "_"
-            }
+            if (prop.name == fieldName)
+                return prop.typeReference?.text ?: "_"
         }
 
-        return type
+        // Если не нашли в свойствах, ищем в параметрах KtParameter
+
+        for (param in cl.ktParameters) {
+
+            if (param.name == fieldName)
+                return param.typeReference?.text ?: "_"
+        }
+        return null
     }
+
+
 
     override fun getMethodReturnType(method: MethodInfo): String? {
+
         // Определяем, какой класс для поиска метода
-        val classNameForMethod = if (method.receiverName.isNullOrEmpty() || method.receiverName == "this") {
-            currentClass.name
-        } else {
-            method.receiverName
-        }
+        val classNameForMethod =
+            if (method.receiverName.isEmpty() || method.receiverName == "this" || method.receiverName == "this.") {
+                currentClass.name
+            } else {
+                method.receiverName
+            }
 
         // Ищем метод через searchEngine
         val type = searchEngine.findMethodByClassNameAndMethodNameAndParams(
@@ -182,7 +102,7 @@ class ExpressionTypeResolver(
             params = method.parameters.map { it.type }
         )?.returnType
 
-        return  type
+        return type
     }
 
 
@@ -201,31 +121,87 @@ class ExpressionTypeResolver(
         return null
     }
 
+///////текущий класс
 
-    private fun getEnumOrObjectType(param: String): String? {
+    private fun getEnumOrObjectType(variable: String, className: String? =null):String? {
 
-        val type = if (param.contains(".")) {
-            val className = param.substringBefore(".")
-            val fieldName = param.substringAfter(".")
+        return if (variable.contains(".")) {
+            var parentClass = variable.substringBefore(".")
+            val fieldName = variable.substringAfter(".")
 
-            val engineClass = searchEngine.findByClassName(className)
+            if (parentClass == "this")
+                parentClass = currentClass.name
 
-            when (engineClass?.ktClassObjectType) {
-                ObjectType.EnumClass -> engineClass.name
 
-                ObjectType.Class -> {
-                    engineClass.propertyReferences.firstOrNull { it.name == fieldName }?.type
-                        ?: engineClass.parameterReferences.firstOrNull { it.name == fieldName }?.type
-                }
+            getEnumOrObjectTypeInsideClass(fieldName, parentClass)
+        } else
+            getEnumOrObjectTypeInsideClass(variable, currentClass.name)
 
-                else -> null
+    }
+
+
+    //ищет тип static класса или поля класса
+    private fun getEnumOrObjectTypeInsideClass(fieldName: String, className: String): String? {
+
+        val engineClass = searchEngine.findByClassName(className) ?: return null
+
+        if (engineClass.ktClassObjectType == ObjectType.EnumClass) {
+
+            return engineClass.name
+
+        } else if (engineClass.ktClassObjectType == ObjectType.Class) {
+
+            var type = engineClass.propertyReferences.firstOrNull { it.name == fieldName }?.type
+
+            if (type == null)
+                type = engineClass.parameterReferences.firstOrNull { it.name == fieldName }?.type
+
+            return type
+        }
+        return null
+    }
+
+
+    //ищет тип внутри членов класса
+    private fun findTypeInsideClass(variableName: String): String? {
+
+        var type = classVariables.firstOrNull { it.name == variableName }?.type
+
+        if (type == null)
+            type = methodVariables.firstOrNull { it.name == variableName }?.type
+
+        if (type == null) {
+            for (expression in expressions) {
+                type = getVariableTypeFromExpression(expression, variableName)
+                if (type != null) break
             }
-        } else null
+        }
 
         return type
     }
 
-    fun getByClassName(className: String): String? {
-        return searchEngine.findByClassName(className)?.name
+    //ищет тип внутри истории класса
+    private fun getVariableTypeFromExpression(expression: AssignmentExpression, variableName: String): String? {
+        val target = expression.target
+
+        if (target is MethodInfo) {
+            val method = expression.target as MethodInfo
+
+            for (parameter in method.parameters) {
+                if (parameter.name == variableName)
+                    return parameter.type
+            }
+        } else if (target is FieldInfo) {
+            val field = expression.target as FieldInfo
+
+            if (field.name == variableName)
+                return field.type
+        } else if (target is VariableInfo) {
+
+            if (target.name == variableName)
+                return target.type
+        }
+
+        return null
     }
 }

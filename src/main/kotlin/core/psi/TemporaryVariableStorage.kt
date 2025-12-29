@@ -16,8 +16,11 @@ class TemporaryVariableStorage : ITemporaryVariableStorage {
     // Добавление новой записи с автоматическим temp
     override fun add(value: String): Pair<String, String> {
         val tmpName = "tmp${tmpCounter++}"
+
         val previousRecord = storage.lastOrNull()
+
         storage.add(VariableRecord(tmpName, value, previousRecord))
+
         return tmpName to value
     }
 

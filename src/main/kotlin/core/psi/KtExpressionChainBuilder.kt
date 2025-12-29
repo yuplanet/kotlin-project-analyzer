@@ -28,6 +28,7 @@ class KtExpressionChainBuilder(
     private var typeResolver: IExpressionTypeResolver = ExpressionTypeResolver(searchEngine, mainClass, currentMethod)
     private val variableStorage: ITemporaryVariableStorage = TemporaryVariableStorage()
 
+    val unknownType = "unknown"
 
     fun collectExpressions() {
         currentMethod.function.bodyExpression?.let { handlePsiElement(it) } // it: KtExpression
@@ -36,107 +37,65 @@ class KtExpressionChainBuilder(
     }
 
 
-    fun handlePsiElement(currentElement: PsiElement, contextVar: VariableInfo? = null): VariableInfo {
+    fun handlePsiElement(currentElement: PsiElement, contextVar: VariableInfo? = null): VariableInfo? {
 
-        val f = when (currentElement) {
+        when (currentElement) {
 
             is KtIfExpression -> {
-                val thenVar = currentElement.then?.let { handlePsiElement(it, contextVar) }
-                val elseVar = currentElement.`else`?.let { handlePsiElement(it, contextVar) }
-
-                thenVar ?: elseVar ?: run {
-                    val (tmpName, _) = variableStorage.add("if_tmp")
-                    VariableInfo(tmpName, "_")
-                }
+                currentElement.then?.let { handlePsiElement(it, contextVar) }
+                currentElement.`else`?.let { handlePsiElement(it, contextVar) }
             }
 
-
             is KtWhenExpression -> {
-                var lastVar: VariableInfo? = null
                 currentElement.entries.forEach { entry ->
-                    entry.expression?.let { lastVar = handlePsiElement(it, contextVar) }
-                }
-
-                lastVar ?: run {
-                    val (tmpName, _) = variableStorage.add("when_tmp")
-                    VariableInfo(tmpName, "_")
+                    entry.expression?.let { handlePsiElement(it, contextVar) }
                 }
             }
 
             is KtForExpression -> {
                 currentElement.body?.let { handlePsiElement(it, contextVar) }
-                    ?: run {
-                        val (tmpName, _) = variableStorage.add("for_tmp")
-                        VariableInfo(tmpName, "_")
-                    }
             }
 
             is KtWhileExpression -> {
                 currentElement.body?.let { handlePsiElement(it, contextVar) }
-                    ?: run {
-                        val (tmpName, _) = variableStorage.add("while_tmp")
-                        VariableInfo(tmpName, "_")
-                    }
             }
 
             is KtDoWhileExpression -> {
                 currentElement.body?.let { handlePsiElement(it, contextVar) }
-                    ?: run {
-                        val (tmpName, _) = variableStorage.add("dowhile_tmp")
-                        VariableInfo(tmpName, "_")
-                    }
             }
 
-
             is KtTryExpression -> {
-                val tryVar = handlePsiElement(currentElement.tryBlock, contextVar)
-                val catchVar =
-                    currentElement.catchClauses.mapNotNull { it.catchBody?.let { handlePsiElement(it, contextVar) } }
-                        .lastOrNull()
-                val finallyVar = currentElement.finallyBlock?.finalExpression?.let { handlePsiElement(it, contextVar) }
+                handlePsiElement(currentElement.tryBlock, contextVar)
 
-                tryVar ?: catchVar ?: finallyVar ?: run {
-                    val (tmpName, _) = variableStorage.add("try_tmp")
-                    VariableInfo(tmpName, "_")
-                }
+                currentElement.catchClauses.mapNotNull { it.catchBody?.let { handlePsiElement(it, contextVar) } }
+                    .lastOrNull()
+                currentElement.finallyBlock?.finalExpression?.let { handlePsiElement(it, contextVar) }
             }
 
             is KtNameReferenceExpression -> {
-                // Пытаемся найти существующую переменную или поле
                 val existingVar = getVariableOrField(currentElement)
-                if (existingVar != null) {
 
-                    if (existingVar.type == "_" || existingVar.type.isNullOrEmpty()) {
-                        existingVar.type = typeResolver.getReceiverType(existingVar.name) ?: "_"
-                    }
+                if (existingVar.type == unknownType)
+                    existingVar.type = typeResolver.getVariableType(existingVar.name) ?: unknownType
 
-                    // Если нашли — возвращаем сам VariableInfo
-                    existingVar
-                } else {
-                    // Если не нашли — создаём tmp
-                    val (tmpName, _) = variableStorage.add(currentElement.text)
-                    val type = typeResolver.getVariableType(tmpName) ?: "_"
-                    VariableInfo(tmpName, type)
-                }
+                existingVar
             }
 
             is KtProperty -> {
-                val varName = currentElement.name ?: "__no_name__"
-                val varType = currentElement.typeReference?.text ?: "_"
+                val varName = currentElement.name ?: unknownType
+                val varType = currentElement.typeReference?.text ?: unknownType
 
-                // Создаем объект свойства класса
                 val property = ClassProperty(varName, varType, currentElement)
                 currentMethod.properties.add(property)
 
                 val callingVar = VariableInfo(varName, varType)
 
-                // Возвращаем VariableInfo для текущего свойства
                 return callingVar
             }
 
             is KtParameter -> {
-                val varName = currentElement.name ?: "__no_name__"
-                val varType = currentElement.typeReference?.text ?: "_"
+                val varName = currentElement.name ?: unknownType
+                val varType = currentElement.typeReference?.text ?: unknownType
 
                 val parameter = ClassParameter(varName, varType, currentElement)
                 currentMethod.parameters.add(parameter)
@@ -149,25 +108,31 @@ class KtExpressionChainBuilder(
 
             is KtCallExpression -> {
 
-                val callExpr = currentElement
+                for (arg in currentElement.valueArguments) {
 
-                // Рекурсивно обрабатываем аргументы метода
-                callExpr.valueArguments.forEach { arg ->
-                    arg.getArgumentExpression()?.let { handlePsiElement(it, null) }
+                    val expression = arg.getArgumentExpression()
+
+                    if (expression != null)
+                        handlePsiElement(expression, null)
+
                 }
 
-                // Получаем target (ресивер) для метода
-                val receiverVar =  contextVar as MethodInfo
+                val method = if (contextVar is MethodInfo) {
+                    contextVar as MethodInfo
+                } else {
+                    MethodInfo()
+                }
+
 
                 // 3️⃣ источник
-                val methodInfo = getMethod(callExpr, receiverVar)
+                processMethod(currentElement, method)
 
-                val pair = variableStorage.add(methodInfo.rawContent)
+                val pair = variableStorage.add(method.rawContent)
 
                 // Сохраняем выражение
                 val expr = AssignmentExpression(
-                    target = VariableInfo(pair.first, methodInfo.type),
-                    source = methodInfo,
+                    target = VariableInfo(pair.first, method.type),
+                    source = method,
                     operationType = AssigmentExpressionType.FieldFromVariable,
                     isParent = true
                 )
@@ -182,63 +147,21 @@ class KtExpressionChainBuilder(
 
                 val qualifiedExpr = currentElement as KtQualifiedExpression
 
-                val receiverExpr = qualifiedExpr.receiverExpression
+                val receiverExpr: KtExpression? = qualifiedExpr.receiverExpression
                 val selectorExpr = qualifiedExpr.selectorExpression
 
-                // Обрабатываем receiver (через кого идёт вызов)
-                val receiverVar: VariableInfo = if (receiverExpr != null) {
-                    handlePsiElement(receiverExpr)
-                } else {
-                    //to do
-                    val (tmpName, _) = variableStorage.add("this")
-                    VariableInfo(tmpName, mainClass.name)
-                }
 
-                // Обрабатываем selector
-                val result: VariableInfo = when (selectorExpr) {
+                val (tmpName, _) = variableStorage.add("this")
 
-                    is KtCallExpression -> {
+                val receiverVar: VariableInfo =
+                    processSelectorExpression(receiverExpr, VariableInfo(tmpName, mainClass.name)) ?: VariableInfo(
+                        tmpName,
+                        mainClass.name
+                    )
 
-                        val methodInfo = MethodInfo(
-                            receiverName = receiverVar.name,
-                            receiverClass = receiverVar.type
-                        )
-
-                        // parent = parent (тот, кто ждёт результат), receiver = receiverVar (через кого идёт вызов)
-                        handlePsiElement(selectorExpr, methodInfo)
-                    }
-
-                    is KtDotQualifiedExpression, is KtSafeQualifiedExpression -> {
-
-                        val resolvedField = getVariableOrField(selectorExpr.receiverExpression ?: selectorExpr)
-
-                        if (isNestedExpression(selectorExpr)) {
-                            val (tmpName, _) = variableStorage.add(resolvedField.name)
-                            val tmpVar = VariableInfo(tmpName, resolvedField.type)
-
-                            val expr = AssignmentExpression(
-                                target = tmpVar,
-                                source = resolvedField,
-                                operationType = AssigmentExpressionType.FieldFromVariable,
-                                isParent = true
-                            )
-                            currentMethod.fullExpressions.add(expr)
-
-                            selectorExpr.selectorExpression?.let {
-                                handlePsiElement(it, tmpVar)
-                            }
-                            tmpVar
-                        } else {
-                            resolvedField
-                        }
-                    }
-
-                    else -> receiverVar
-                }
-
+                val result: VariableInfo? = processSelectorExpression(selectorExpr, receiverVar)
                 result
             }
-
 
 
             is KtBinaryExpression -> {
@@ -251,7 +174,6 @@ class KtExpressionChainBuilder(
                 val rhs = currentElement.right ?: error("Right-hand side missing")
 
                 val lhsVar = handlePsiElement(lhs)
-                val rhsVar = handlePsiElement(rhs)
 
 
                 //lleft
@@ -264,18 +186,18 @@ class KtExpressionChainBuilder(
                     lhsResolved = VariableInfo(tmpName, "_")
                 }
 
-                var rhsResolved: VariableInfo? = null
-                if (rhsVar != null) {
-                    rhsResolved = rhsVar
-                } else {
-                    val (tmpName, _) = variableStorage.add(rhs.text)
-                    rhsResolved = VariableInfo(tmpName, "_")
+                val rhsResolved = when (rhs) {
+                    is KtCallExpression, is KtDotQualifiedExpression, is KtSafeQualifiedExpression ->
+                        processSelectorExpression(rhs, lhsResolved) // lhsResolved как contextVar
+                    else -> handlePsiElement(rhs) ?: run {
+                        val (tmpName, _) = variableStorage.add(rhs.text)
+                        VariableInfo(tmpName, "_")
+                    }
                 }
-
 
                 val expr = AssignmentExpression(
                     target = lhsResolved,
-                    source = rhsResolved,
+                    source = rhsResolved ?: VariableInfo((variableStorage.add(rhs.text)).first, "_"),
                     operationType = AssigmentExpressionType.FieldFromField,
                     isParent = true
                 )
@@ -343,7 +265,8 @@ class KtExpressionChainBuilder(
                 }
             }
         }
-        return f!!
+
+        return null
     }
 
     //helper
@@ -357,6 +280,7 @@ class KtExpressionChainBuilder(
                 // Если левая или правая часть — сложная
                 isNestedExpression(expr.left) || isNestedExpression(expr.right)
             }
+
             is KtCallExpression -> {
                 // Если есть receiver или аргументы с вызовами
                 val receiver = (expr.parent as? KtDotQualifiedExpression)?.receiverExpression
@@ -364,22 +288,25 @@ class KtExpressionChainBuilder(
                     isNestedExpression(it.getArgumentExpression())
                 }
             }
+
             is KtDotQualifiedExpression, is KtSafeQualifiedExpression -> {
                 val receiver = (expr as KtQualifiedExpression).receiverExpression
                 receiver is KtCallExpression || receiver is KtDotQualifiedExpression || isNestedExpression(receiver)
             }
+
             else -> false
         }
     }
 
 
-    fun getMethod(expression: KtCallExpression, method: MethodInfo?): MethodInfo {
-
-//Method
+    fun processMethod(expression: KtCallExpression, method: MethodInfo?) {
+//Metho
         val methodName = expression.calleeExpression?.text ?: "" // мя метода
+
         val params = expression.valueArguments.mapNotNull { arg ->
+
             val argExpr = arg.getArgumentExpression()
-            val rawText = argExpr?.text ?: "?"
+            val rawText = argExpr?.text ?: ""
 
             // Определяем имя параметра с подстановкой tmpMap для сложных выражений
             var paramName = when (argExpr) {
@@ -400,23 +327,30 @@ class KtExpressionChainBuilder(
 
             if (paramName.isBlank()) return@mapNotNull null
 
-            val paramType = typeResolver.getMethodParameterType(paramName) ?: "_"
-            VariableInfo(paramName, paramType)
+            val paramType = typeResolver.getVariableType(paramName) ?: unknownType
 
-            // Пытаемся найти тип в уже известных FullExpression
+            VariableInfo(paramName, paramType)
         }
 
-        val method = MethodInfo(
-            name = methodName,
-            type = "Unit",
-            parameters = params.toMutableList(),
-            rawContent = getRawCallText(expression)
-        )
+        val processedMethod =  if (method != null) {
+            method.name = methodName
+            method.parameters = params.toMutableList()
+            method.rawContent = getRawCallText(expression)
 
-        val methodType =typeResolver.getMethodReturnType(method)
-        method.type = methodType?:"Unit"
+            method
+        }
+        else {
+            MethodInfo(
+                name = methodName,
+                type = unknownType,
+                parameters = params.toMutableList(),
+                rawContent = getRawCallText(expression)
+            )
+        }
 
-        return method
+
+        val methodType = typeResolver.getMethodReturnType(processedMethod)?:unknownType
+        processedMethod.type = methodType
     }
 
     fun getVariableOrField(expr: KtExpression): VariableInfo {
@@ -441,7 +375,7 @@ class KtExpressionChainBuilder(
     }
 
 
-    fun getVariable(variableExpr: KtNameReferenceExpression):VariableInfo? {
+    fun getVariable(variableExpr: KtNameReferenceExpression): VariableInfo {
         val name = variableExpr.getReferencedName()
 
         val type = typeResolver.getVariableType(name) ?: "_"
@@ -470,7 +404,7 @@ class KtExpressionChainBuilder(
     }
 
 
-    fun getRawCallText(call: KtCallExpression): String {
+    private fun getRawCallText(call: KtCallExpression): String {
         var element: PsiElement = call
 
         while (true) {
@@ -490,6 +424,7 @@ class KtExpressionChainBuilder(
                     else
                         break
                 }
+
                 else -> break
             }
         }
@@ -497,18 +432,52 @@ class KtExpressionChainBuilder(
     }
 
 
-    private fun isRhsOfBinaryAssign(call: KtCallExpression): Boolean {
-        var element: PsiElement? = call
-        while (element != null) {
-            val parent = element.parent
-            if (parent is KtBinaryExpression &&
-                parent.operationToken == KtTokens.EQ &&
-                parent.right?.isAncestor(call) == true
-            ) {
-                return true
-            }
-            element = parent
+    private fun processSelectorExpression(
+        selectorExpr: KtExpression?,
+        receiverVar: VariableInfo?
+    ): VariableInfo?
+
+    {
+        if (selectorExpr == null) return receiverVar
+
+        if (selectorExpr is KtCallExpression) {
+
+
+            val methodInfo = MethodInfo(
+                receiverName = receiverVar.name,
+                receiverClass = receiverVar.type
+            )
+
+            // parent = parent (тот, кто ждёт результат), receiver = receiverVar (через кого идёт вызов)
+            handlePsiElement(selectorExpr, methodInfo)
         }
-        return false
+        else if (selectorExpr is KtDotQualifiedExpression || selectorExpr is KtSafeQualifiedExpression) {
+
+                val resolvedField = getVariableOrField(selectorExpr.receiverExpression ?: selectorExpr)
+
+                if (isNestedExpression(selectorExpr)) {
+                    val (tmpName, _) = variableStorage.add(resolvedField.name)
+                    val tmpVar = VariableInfo(tmpName, resolvedField.type)
+
+                    val expr = AssignmentExpression(
+                        target = tmpVar,
+                        source = resolvedField,
+                        operationType = AssigmentExpressionType.FieldFromVariable,
+                        isParent = true
+                    )
+                    currentMethod.fullExpressions.add(expr)
+
+                    selectorExpr.selectorExpression?.let {
+                        handlePsiElement(it, tmpVar)
+                    }
+                    tmpVar
+                } else {
+                    resolvedField
+                }
+            }
+
+            else -> receiverVar
+        }
     }
+
 }

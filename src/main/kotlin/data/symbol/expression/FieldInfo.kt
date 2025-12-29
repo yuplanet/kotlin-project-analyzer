@@ -5,17 +5,17 @@ class FieldInfo (
     /**
      *  Имя экземпляра
      */
-    var className: String = "",  // имя переменной
+    var className: String = "unknown",  // имя переменной
 
     /**
      * тип класса (если Object то совпадает с именем )
      */
-    var classType: String = "",  // имя переменной
+    var classType: String = "unknown",  // имя переменной
 
     /**
      * имя поля Class.Field <- name
      */
-    override var name: String = "",// её тип
+    override var name: String = "unknown",// её тип
 
 
     /**
