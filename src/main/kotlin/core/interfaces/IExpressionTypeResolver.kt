@@ -1,6 +1,7 @@
 package org.example.core.interfaces
 
 import org.example.data.symbol.expression.AssignmentExpression
+import org.example.data.symbol.expression.MethodInfo
 
 interface IExpressionTypeResolver {
 
@@ -19,4 +20,6 @@ interface IExpressionTypeResolver {
     fun getMethodParameterType(param: String): String?
 
     fun getMethodOrFieldReturnType(expr: AssignmentExpression): String?
+
+    fun getMethodReturnType(method: MethodInfo): String?
 }

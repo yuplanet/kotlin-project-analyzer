@@ -5,7 +5,10 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.enum.ObjectType
-import org.example.data.symbol.expression.*
+import org.example.data.symbol.expression.AssignmentExpression
+import org.example.data.symbol.expression.FieldInfo
+import org.example.data.symbol.expression.MethodInfo
+import org.example.data.symbol.expression.VariableInfo
 import org.jetbrains.kotlin.psi.KtFile
 
 class ExpressionTypeResolver(
@@ -51,19 +54,16 @@ class ExpressionTypeResolver(
 
     private fun getVariableTypeFromExpression(expression: AssignmentExpression, variableName: String): String? {
 
-        if (expression.target is FieldInfo)
-        {
+        if (expression.target is FieldInfo) {
             val field = expression.target as FieldInfo
 
             if (field.name == variableName)
                 return field.type
         }
 
-        if(expression.target is VariableInfo)
-        {
-            if (expression.target.name == variableName)
-                return expression.target.type
-
+        expression.target?.let {
+            expression.target!!.name == variableName
+            return expression.target!!.type
         }
 
         return null
@@ -143,21 +143,8 @@ class ExpressionTypeResolver(
         var type: String? = null
 
         if (expr.source is MethodInfo) {
-            val method = expr.source as MethodInfo
 
-            // Определяем, какой класс для поиска метода
-            val classNameForMethod = if (method.receiverName.isNullOrEmpty() || method.receiverName == "this") {
-                currentClass.name
-            } else {
-               method.receiverName
-            }
-
-            // Ищем метод через searchEngine
-            type = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-                className = classNameForMethod,
-                methodName = method.name,
-                params = method.parameters.map { it.type }
-            )?.returnType
+            type = getMethodReturnType(expr.source as MethodInfo)
         }
         else if (expr.source is FieldInfo) {
             val field = expr.source as FieldInfo
@@ -178,6 +165,24 @@ class ExpressionTypeResolver(
         }
 
         return type
+    }
+
+    override fun getMethodReturnType(method: MethodInfo): String? {
+        // Определяем, какой класс для поиска метода
+        val classNameForMethod = if (method.receiverName.isNullOrEmpty() || method.receiverName == "this") {
+            currentClass.name
+        } else {
+            method.receiverName
+        }
+
+        // Ищем метод через searchEngine
+        val type = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+            className = classNameForMethod,
+            methodName = method.name,
+            params = method.parameters.map { it.type }
+        )?.returnType
+
+        return  type
     }
 
 
