@@ -23,3 +23,11 @@ class FieldInfo (
      */
     override var type: String = "",// её тип
 ): VariableInfo(name, type)
+
+
+
+//Class.Field.
+
+
+// Class - var
+// Field - var

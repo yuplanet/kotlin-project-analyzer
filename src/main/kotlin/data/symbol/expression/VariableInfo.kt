@@ -1,8 +1,10 @@
 package org.example.data.symbol.expression
 
 open class VariableInfo(
+
     open var name: String = "unknown",  // имя переменной
     open var type: String = "unknown",// её тип
+
 ) {
     fun isEnum(): Boolean {
 

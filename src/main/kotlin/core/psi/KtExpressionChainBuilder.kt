@@ -16,7 +16,6 @@ import org.example.data.symbol.expression.VariableInfo
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.isAncestor
 
 class KtExpressionChainBuilder(
     private val currentMethod: ClassMethod,
@@ -32,10 +31,7 @@ class KtExpressionChainBuilder(
 
     fun collectExpressions() {
         currentMethod.function.bodyExpression?.let { handlePsiElement(it) } // it: KtExpression
-
-        print(1)
     }
-
 
     fun handlePsiElement(currentElement: PsiElement, contextVar: VariableInfo? = null): VariableInfo? {
 
@@ -114,7 +110,6 @@ class KtExpressionChainBuilder(
 
                     if (expression != null)
                         handlePsiElement(expression, null)
-
                 }
 
                 val method = if (contextVar is MethodInfo) {
@@ -133,8 +128,6 @@ class KtExpressionChainBuilder(
                 val expr = AssignmentExpression(
                     target = VariableInfo(pair.first, method.type),
                     source = method,
-                    operationType = AssigmentExpressionType.FieldFromVariable,
-                    isParent = true
                 )
 
                 currentMethod.fullExpressions.add(expr)
@@ -147,9 +140,8 @@ class KtExpressionChainBuilder(
 
                 val qualifiedExpr = currentElement as KtQualifiedExpression
 
-                val receiverExpr: KtExpression? = qualifiedExpr.receiverExpression
-                receiverExpr?.text
-
+                val receiverExpr: KtExpression = qualifiedExpr.receiverExpression
+                receiverExpr.text
 
                 val selectorExpr = qualifiedExpr.selectorExpression
                 selectorExpr?.text
@@ -162,15 +154,14 @@ class KtExpressionChainBuilder(
                         mainClass.name
                     )
 
-                val result: VariableInfo? = processSelectorExpression(selectorExpr, receiverVar)
+                val result: VariableInfo? = processSelectorExpression(selectorExpr!!, receiverVar)
                 result
             }
 
 
             is KtBinaryExpression -> {
-                if (currentElement.operationToken != KtTokens.EQ) {
+                if (currentElement.operationToken != KtTokens.EQ)
                     return null
-                }
 
                 val leftExpression = currentElement.left ?: error("Left-hand side missing")
                 val rightExpression = currentElement.right ?: error("Right-hand side missing")
@@ -179,7 +170,6 @@ class KtExpressionChainBuilder(
                 rightExpression.text
 
                 val leftExpressionVariable = handlePsiElement(leftExpression)
-
 
                 //lleft
                 var target: VariableInfo =
@@ -191,11 +181,10 @@ class KtExpressionChainBuilder(
                     VariableInfo(tmpName, unknownType)
                 }
 
-
                 val tempSource: VariableInfo? =
 
                 if(rightExpression is KtCallExpression || rightExpression is KtDotQualifiedExpression || rightExpression is KtSafeQualifiedExpression)
-                    processSelectorExpression(rightExpression, target)
+                    processSelectorExpression(rightExpression, null)
                 else
                     handlePsiElement(rightExpression)
 
@@ -207,8 +196,6 @@ class KtExpressionChainBuilder(
                 val expr = AssignmentExpression(
                     target = target,
                     source = source,
-                    operationType = AssigmentExpressionType.FieldFromField,
-                    isParent = true
                 )
 
                 currentMethod.fullExpressions.add(expr)
@@ -381,7 +368,7 @@ class KtExpressionChainBuilder(
     fun getVariable(variableExpr: KtNameReferenceExpression): VariableInfo {
         val name = variableExpr.getReferencedName()
 
-        val type = typeResolver.getVariableType(name) ?: "_"
+        val type = typeResolver.getVariableType(name) ?: unknownType
         val target = VariableInfo(name, type)
 
         return target
@@ -401,7 +388,6 @@ class KtExpressionChainBuilder(
             fieldName
         ) ?: unknownType
 
-
         return FieldInfo(
             classType = type,
             className = receiverName,
@@ -416,7 +402,9 @@ class KtExpressionChainBuilder(
 
         while (true) {
             val parent = element.parent
+
             when (parent) {
+
                 is KtDotQualifiedExpression -> {
                     // Поднимаемся ТОЛЬКО если текущий элемент — receiver
                     if (parent.receiverExpression == element)
@@ -440,44 +428,42 @@ class KtExpressionChainBuilder(
 
 
     private fun processSelectorExpression(
-        selectorExpr: KtExpression?,
+        currentExpression: KtExpression,
         receiverVar: VariableInfo?
     ): VariableInfo? {
-        if (selectorExpr == null) return receiverVar
 
-        if (selectorExpr is KtCallExpression) {
-
+        if (currentExpression is KtCallExpression) {
             val methodInfo = if (receiverVar != null) {
                 MethodInfo(
                     receiverName = receiverVar.name,
                     receiverClass = receiverVar.type
                 )
             } else {
-
-                MethodInfo()
+                MethodInfo(
+                    receiverName = "this.",
+                    receiverClass = mainClass.name
+                )
             }
 
             // parent = parent (тот, кто ждёт результат), receiver = receiverVar (через кого идёт вызов)
-            return handlePsiElement(selectorExpr, methodInfo)
+            return handlePsiElement(currentExpression, methodInfo)
 
 
-        } else if (selectorExpr is KtDotQualifiedExpression || selectorExpr is KtSafeQualifiedExpression) {
+        } else if (currentExpression is KtDotQualifiedExpression || currentExpression is KtSafeQualifiedExpression) {
 
-            val innerReceiver = getVariableOrField(selectorExpr.receiverExpression) ?: VariableInfo()
+            val innerReceiver = getVariableOrField(currentExpression.receiverExpression) ?: VariableInfo()
 
-            return if (isNestedExpression(selectorExpr)) {
+            return if (isNestedExpression(currentExpression)) {
                 val (tmpName, _) = variableStorage.add(innerReceiver.name)
                 val tmpVar = VariableInfo(tmpName, innerReceiver.type)
 
                 val expr = AssignmentExpression(
                     target = tmpVar,
                     source = innerReceiver,
-                    operationType = AssigmentExpressionType.FieldFromVariable,
-                    isParent = true
                 )
                 currentMethod.fullExpressions.add(expr)
 
-                selectorExpr.selectorExpression?.let {
+                currentExpression.selectorExpression?.let {
                     handlePsiElement(it, tmpVar)
                 }
                 tmpVar
