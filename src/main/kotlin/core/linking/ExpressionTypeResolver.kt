@@ -52,6 +52,9 @@ class ExpressionTypeResolver(
         if (type == null)
             type = resolveTypeFromImports(receive, ktFile)
 
+        if(type == null)
+            type = getEnumOrObjectTypeFromDotExpression(variableName)
+
         // 3️⃣ Если не нашли — неизвестно
         return type
     }
@@ -80,7 +83,7 @@ class ExpressionTypeResolver(
         return null
     }
 
-    override fun getMethodReturnType(methodName: String, receiverClass: String, params: List<String>): String? {
+    override fun getMethodReturnTypeByNameReceiveAndParamTypes(methodName: String, receiverClass: String, params: List<String>): String? {
 
         val methodClassName =
             if (receiverClass.isEmpty() || receiverClass == "this" || receiverClass == "this.") {
@@ -102,7 +105,7 @@ class ExpressionTypeResolver(
         return type
     }
 
-    override fun getMethodReturnType(methodName: String, receiverClass: String, params: List<ExpressionValue>): String? {
+    override fun getMethodReturnTypeByNameReceiveAndParamExpressions(methodName: String, receiverClass: String, params: List<ExpressionValue>): String? {
         val methodClassName =
             if (receiverClass.isEmpty() || receiverClass == "this" || receiverClass == "this.") {
                 currentClass.name
@@ -163,7 +166,7 @@ class ExpressionTypeResolver(
 
             return engineClass.name
 
-        } else if (engineClass.ktClassObjectType == ObjectType.Class) {
+        } else {
 
             var type = engineClass.propertyReferences.firstOrNull { it.name == fieldName }?.type
 
@@ -172,7 +175,6 @@ class ExpressionTypeResolver(
 
             return type
         }
-        return null
     }
 
     private fun variableIsDotExpression(variable: String): Boolean {

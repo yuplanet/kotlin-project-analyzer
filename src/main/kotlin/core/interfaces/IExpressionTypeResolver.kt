@@ -1,7 +1,6 @@
 package org.example.core.interfaces
 
 import org.example.data.symbol.expression.ExpressionValue
-import org.example.data.symbol.expression.MethodValue
 
 interface IExpressionTypeResolver {
 
@@ -17,8 +16,7 @@ interface IExpressionTypeResolver {
 
     fun getVariableTypeByNameAndClass(className: String, variableName: String): String?
 
-    fun getMethodReturnType(methodName: String, receiverClass: String, params: List<String>): String?
+    fun getMethodReturnTypeByNameReceiveAndParamTypes(methodName: String, receiverClass: String, params: List<String>): String?
 
-    fun getMethodReturnType(methodName: String, receiverClass: String, params: List<ExpressionValue>): String?
-
+    fun getMethodReturnTypeByNameReceiveAndParamExpressions(methodName: String, receiverClass: String, params: List<ExpressionValue>): String?
 }

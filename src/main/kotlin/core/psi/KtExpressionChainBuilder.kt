@@ -126,7 +126,7 @@ class KtExpressionChainBuilder(
         val target: ExpressionValue? = when (element) {
 
             is KtNameReferenceExpression -> {
-                val value = getVariableOrFieldValueFromExpression(element)
+                var value = getVariableOrFieldValueFromExpression(element)
                 return value
             }
 
@@ -162,18 +162,16 @@ class KtExpressionChainBuilder(
             }
 
             is KtCallExpression -> {
-
+                element.text
                 for (arg in element.valueArguments) {
 
                     val expression = arg.getArgumentExpression()
+                    arg.text
 
-                    if (expression != null)
-                        handlePsiElement(expression, null)
+                    expression?.let { handlePsiElement(it, null) }
                 }
 
                 var receiver = context?.let {  getReceiveVariable(it)}
-
-
 
                 val method =  completeMethod(element, receiver)
 
@@ -199,7 +197,12 @@ class KtExpressionChainBuilder(
                 rightExpression?.text
 
                 /// left . right
-                var target: ExpressionValue? = getVariableOrFieldValueFromExpression(leftExpression)
+                var target: ExpressionValue? = handlePsiElement(leftExpression)
+
+                if(target is VariableValue && target.variableType == unknownType && rightExpression?.text!=null) {
+                    val type = typeResolver.getVariableTypeByNameAndClass(leftExpression.text, rightExpression.text)
+                    target =  VariableValue(rightExpression.text, type?:unknownType)
+                }
 
                 val source: ExpressionValue? = rightExpression?.let {
                     handlePsiElement(it, target)
@@ -214,11 +217,8 @@ class KtExpressionChainBuilder(
                 if (element.operationToken != KtTokens.EQ)
                     return null
 
-                val leftExpression = element.left ?: error("Left-hand side missing")
-                val rightExpression = element.right ?: error("Right-hand side missing")
-
-                leftExpression.text
-                rightExpression.text
+                val leftExpression = element.left ?: error("Left-hand side missing ${element.left?.text}")
+                val rightExpression = element.right ?: error("Right-hand side missing ${element.right?.text}")
 
                 // 1️⃣ обрабатываем правую часть (источник)
                 val source = handlePsiElement(rightExpression, null)
@@ -276,12 +276,12 @@ class KtExpressionChainBuilder(
                     val innerText = innerReceiver?.text
 
                     if (innerText != null) {
-                        variableStorage.getLastByValue(innerText)?.second ?: rawText
+                        ""//variableStorage.getByRawValue(innerText)?.second ?: rawText
                     } else rawText
                 }
 
                 else -> {
-                    variableStorage.getLastByValue(rawText)?.second ?: rawText
+                    ""//variableStorage.getLastByValue(rawText)?.second ?: rawText
                 }
             }
 
@@ -313,7 +313,7 @@ class KtExpressionChainBuilder(
             method.innerCall = true
         }
 
-        val methodType = typeResolver.getMethodReturnType(
+        val methodType = typeResolver.getMethodReturnTypeByNameReceiveAndParamTypes(
             methodName = methodName,
             receiverClass = receiver?.variableType?:unknownType,
             params.map { it.variableType }

@@ -15,7 +15,7 @@ class ExpressionValueStorage : ITemporaryVariableStorage {
     private var storage = mutableListOf<VariableRecord>()
     private var tmpCounter = 1
 
-    override fun add(expr: ExpressionValue) {
+    override fun add(expr: ExpressionValue): String {
         val tmpName = "tmp${tmpCounter++}"
 
         val record = VariableRecord(
@@ -24,6 +24,8 @@ class ExpressionValueStorage : ITemporaryVariableStorage {
             value = expr
         )
         storage.add(record)
+
+        return tmpName
     }
 
     override fun getByRawValue(rawValue: String): ExpressionValue? {
