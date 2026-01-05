@@ -31,6 +31,9 @@ dependencies {
     // Kotlin compiler + PSI
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.1.20")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.20")
+
+    implementation("org.slf4j:slf4j-api")
+    implementation("ch.qos.logback:logback-classic")
 }
 
 tasks.test {

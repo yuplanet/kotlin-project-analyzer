@@ -9,7 +9,6 @@ interface IProjectSearchEngine {
     fun init(projectClasses: List<KotlinClass>)
 
 
-
     //==== fields Properties
     fun findObjectRefByClassNameAndFieldName(className: String, fieldName: String): ObjectReference?
 

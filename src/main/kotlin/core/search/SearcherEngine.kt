@@ -5,7 +5,7 @@ import org.example.data.symbol.FieldReference
 import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.expression.VariableInfo
+import org.example.data.symbol.expression.VariableValue
 import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtParameter
 
@@ -33,7 +33,6 @@ class SearcherEngine: IProjectSearchEngine {
             val key = cls.path.hashCode() // метод, который возвращает hashCode fullName
             classFullNameDictionary.computeIfAbsent(key) { mutableListOf() }.add(cls)
 
-
             val nameKey = cls.name.hashCode()
             classSimpleNameDictionary.computeIfAbsent(nameKey) { mutableListOf() }.add(cls)
         }
@@ -57,22 +56,20 @@ class SearcherEngine: IProjectSearchEngine {
         if (ktClass == null)
             null
 
-
         var field = ktClass?.parameterReferences?.firstOrNull {
             it.name == fieldName
         }
 
         if (field != null) {
-            val reference = FieldReference(fieldName, ktClass!!, VariableInfo(name = fieldName, type = field.type))
+            val reference = FieldReference(fieldName, ktClass!!, VariableValue(variableName = fieldName, variableType = field.type))
             return reference
         }
-
 
         val paramd = ktClass?.propertyReferences?.firstOrNull {
             it.name == fieldName
         }
         if (paramd != null) {
-            val reference = FieldReference(fieldName, ktClass!!, VariableInfo(name = fieldName, type = paramd.type))
+            val reference = FieldReference(fieldName, ktClass!!, VariableValue(variableName = fieldName, variableType = paramd.type))
             return reference
         }
 
