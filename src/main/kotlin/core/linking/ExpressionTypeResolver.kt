@@ -5,11 +5,7 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.enum.ObjectType
-import org.example.data.symbol.expression.AssignmentExpression
-import org.example.data.symbol.expression.ExpressionValue
-import org.example.data.symbol.expression.FieldValue
-import org.example.data.symbol.expression.MethodValue
-import org.example.data.symbol.expression.VariableValue
+import org.example.data.symbol.expression.*
 import org.jetbrains.kotlin.psi.KtFile
 
 class ExpressionTypeResolver(
@@ -36,7 +32,7 @@ class ExpressionTypeResolver(
         }
     }
 
-    override fun getVariableType(variableName: String): String? {
+    override fun getVariableTypeByName(variableName: String): String? {
 
         var type: String? = null
 
@@ -44,7 +40,6 @@ class ExpressionTypeResolver(
             type = getEnumOrObjectTypeFromDotExpression(variableName)
             type?.let { return it }
         }
-
 
         var receive = variableName.replace("this.", "")
 
@@ -61,7 +56,8 @@ class ExpressionTypeResolver(
         return type
     }
 
-    override fun getFieldTypeByClass(className: String, fieldName: String): String? {
+
+    override fun getVariableTypeByNameAndClass(className: String, variableName: String): String? {
 
         val cl = searchEngine.findByClassName(className) ?: return null
 
@@ -70,7 +66,7 @@ class ExpressionTypeResolver(
 
         for (prop in cl.ktProperties) {
 
-            if (prop.name == fieldName)
+            if (prop.name == variableName)
                 prop.typeReference?.text?.let { return it }
         }
 
@@ -78,35 +74,53 @@ class ExpressionTypeResolver(
 
         for (param in cl.ktParameters) {
 
-            if (param.name == fieldName)
+            if (param.name == variableName)
                 param.typeReference?.text?.let { return it }
         }
         return null
     }
 
+    override fun getMethodReturnType(methodName: String, receiverClass: String, params: List<String>): String? {
 
-    override fun getMethodReturnType(method: MethodValue): String? {
-
-        // Определяем, какой класс для поиска метода
         val methodClassName =
-            if (method.receiverName.isEmpty() || method.receiverName == "this" || method.receiverName == "this.") {
+            if (receiverClass.isEmpty() || receiverClass == "this" || receiverClass == "this.") {
                 currentClass.name
             } else {
-                method.receiverName
+                receiverClass
             }
-
 
         val type = searchEngine
             .findMethodByClassNameAndMethodNameAndParams(
                 className = methodClassName,
-                methodName = method.methodName,
-                params = method.parameters.map { getExpressionValueTargetType(it)?:"unknown" }
+                methodName = methodName,
+                params = params
             )
             ?.returnType
 
+
+        //to do
         return type
     }
 
+    override fun getMethodReturnType(methodName: String, receiverClass: String, params: List<ExpressionValue>): String? {
+        val methodClassName =
+            if (receiverClass.isEmpty() || receiverClass == "this" || receiverClass == "this.") {
+                currentClass.name
+            } else {
+                receiverClass
+            }
+
+        val type = searchEngine
+            .findMethodByClassNameAndMethodNameAndParams(
+                className = methodClassName,
+                methodName = methodName,
+                params = params.map { getExpressionValueTargetType(it) ?: "unknown" }
+            )
+            ?.returnType
+
+        //to do
+        return type
+    }
 
     // Функция для резолва полного имени класса через импорты
     private fun resolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
@@ -173,7 +187,7 @@ class ExpressionTypeResolver(
     //ищет тип внутри членов класса
     private fun findTypeInsideClass(variableName: String): String? {
 
-        var type = classVariables.lastOrNull() { it.variableName == variableName }?.variableType
+        var type = classVariables.lastOrNull{ it.variableName == variableName }?.variableType
 
         if (type == null)
             type = methodVariables.lastOrNull { it.variableName == variableName }?.variableType
@@ -181,7 +195,7 @@ class ExpressionTypeResolver(
         if (type == null) {
             for (expression in expressions) {
                 type = getVariableTypeFromExpression(expression, variableName)
-                if (type != null) break
+                type?.let { return it }
             }
         }
 

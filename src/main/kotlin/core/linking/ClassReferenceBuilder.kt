@@ -2,7 +2,7 @@ package org.example.core.linking
 
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
-import org.example.core.psi.NewKtExpressionChainBuilder
+import org.example.core.psi.KtExpressionChainBuilder
 import org.example.data.symbol.KotlinClass
 
 class ClassReferenceBuilder (): IClassReferenceBuilder {
@@ -29,7 +29,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
                 //val expressionCollectorw = NewKtExpressionChainBuilder(method, cls, searchEngine);
                 //expressionCollectorw.collectTopLevelExpressions(method.function)
 
-                val expressionCollector = NewKtExpressionChainBuilder(method, cls, searchEngine);
+                val expressionCollector = KtExpressionChainBuilder(method, cls, searchEngine);
                 expressionCollector.collectTopLevelExpressions()
 
                 println(1)

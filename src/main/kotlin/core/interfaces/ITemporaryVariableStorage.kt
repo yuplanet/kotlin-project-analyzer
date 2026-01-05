@@ -1,15 +1,15 @@
 package org.example.core.interfaces
 
+import org.example.data.symbol.expression.ExpressionValue
+import org.example.data.symbol.expression.VariableValue
+
 interface ITemporaryVariableStorage {
 
-    fun add(value: String): Pair<String, String>
-    fun add(name: String, value: String): Pair<String, String>?
+    fun add(expr: ExpressionValue): String
 
-    fun getByKey(key: String): Pair<String, String>?
-    fun getValueByKey(key: String): String?
+    fun getByRawValue(rawValue: String): ExpressionValue?
 
-    fun getLast(): Pair<String, String>?
-    fun getLastByKey(key: String): Pair<String, String>?
+    fun getByVariableBody(expr: ExpressionValue) : String?
 
-    fun getLastByValue(value: String): Pair<String, String>?
+    fun getVariableByName(variableName: String): VariableValue?
 }

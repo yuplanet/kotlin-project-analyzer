@@ -18,6 +18,8 @@ class FieldValue (
     var qualifierType: String = "unknown",
 
 
+    override var rawValue: String = ""
+
 ): ExpressionValue()
 
 //Class.Field.

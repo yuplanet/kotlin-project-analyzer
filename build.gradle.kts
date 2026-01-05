@@ -32,11 +32,11 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.1.20")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.20")
 
-    implementation("org.slf4j:slf4j-api")
-    implementation("ch.qos.logback:logback-classic")
+    implementation("org.slf4j:slf4j-api:2.0.9")
+    implementation("ch.qos.logback:logback-classic:1.4.14")
 }
 
-tasks.test {
+    tasks.test {
     useJUnitPlatform()
 }
 

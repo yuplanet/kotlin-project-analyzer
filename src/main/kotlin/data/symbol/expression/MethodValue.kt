@@ -14,15 +14,19 @@ data class MethodValue (
 
 
     var parameters: MutableList<ExpressionValue> = mutableListOf(),
-    var rawContent: String = "unknown",
 
     /**
      * Имя переменной, через которую вызывается метод
      */
-
     var receiverName: String = "unknown",
     var receiverClassName: String = "unknown",
 
     var innerCall: Boolean = false,
 
-): ExpressionValue()
+
+    var methodSignature: String = "unknown",
+    override var rawValue: String = "",
+
+): ExpressionValue(){
+
+}
