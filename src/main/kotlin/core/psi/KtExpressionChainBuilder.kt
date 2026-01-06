@@ -126,26 +126,30 @@ class KtExpressionChainBuilder(
         val target: ExpressionValue? = when (element) {
 
             is KtNameReferenceExpression -> {
-                var value = getVariableOrFieldValueFromExpression(element)
+                var value = getVariableValueFromExpression(element)
+                //needs static
+                logInfo("variable ${value.variableName} ${value.variableType}", recursionDepth)
                 return value
             }
 
             is KtProperty -> {
 
-                val target = getVariableOrFieldValueFromExpression(element)
-
                 val initializer = element.initializer
                 var source: ExpressionValue? = null
 
                 initializer?.let {
+
                     logInfo(element.text, recursionDepth + 1)
                     source = handlePsiElement(it)
                 }
 
-                if (target is VariableValue) {
-                    val property = ClassProperty(target.variableName, target.variableType, element)
-                    currentMethod.properties.add(property)
-                }
+                val name = element.name ?: "unknown"
+                val type = element.typeReference?.text ?: unknownType
+
+                val target = VariableValue(name, type)
+
+                val property = ClassProperty(name, type, element)
+                currentMethod.properties.add(property)
 
                 addExpression(target, source)
                 return target
@@ -388,7 +392,46 @@ class KtExpressionChainBuilder(
         return target
     }
 
+    private fun normalizeTypes(target: ExpressionValue, source: ExpressionValue) {
 
+        fun fixTypes(target: ExpressionValue, sourceType: String) {
+            when (target) {
+                is VariableValue -> target.variableType = sourceType
+                is FieldValue -> target.fieldType = sourceType
+                is MethodValue -> target.methodReturnType = sourceType
+            }
+        }
+
+        val targetType = getExpressionValueType(target)
+        val sourceType = getExpressionValueType(source)
+
+        if (hasValidType(targetType) && !hasValidType(sourceType)) {
+            fixTypes(source, targetType)
+        } else if (hasValidType(sourceType) && !hasValidType(targetType)) {
+            fixTypes(target, sourceType)
+        }
+    }
+
+    private fun getExpressionValueType(value: ExpressionValue):String {
+
+        if (value is VariableValue)
+            return value.variableType
+        else if (value is FieldValue)
+            return value.fieldType
+        else if (value is MethodValue)
+            return value.methodReturnType
+        return unknownType
+    }
+
+    private fun hasValidType(value: ExpressionValue): Boolean {
+
+        val type = getExpressionValueType(value)
+        return hasValidType(type)
+    }
+
+    private fun hasValidType(type: String): Boolean {
+        return type != unknownType && type.isNotEmpty()
+    }
 
     ///////// others
     private fun addExpression(target: ExpressionValue?, source: ExpressionValue?, operationType: AssigmentExpressionType = AssigmentExpressionType.Undefined) {

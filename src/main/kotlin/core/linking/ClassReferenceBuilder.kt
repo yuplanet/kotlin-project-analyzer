@@ -17,7 +17,6 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
         this.searchEngine = searchEngine
 
-
         // 11 collect function expressions
         collectExpressions(projectClasses)
         collectCalls(projectClasses)
@@ -34,8 +33,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
                 val expressionCollector = KtExpressionChainBuilder(method, cls, searchEngine);
                 expressionCollector.collectTopLevelExpressions()
-
-                println(1)
+                println()
             }
         }
     }
