@@ -5,31 +5,31 @@ class FieldValue (
     /**
      * имя поля Class.Field <- name
      */
-    var fieldName: String = "unknown",// её тип
+    var fieldName: String = "",// её тип
 
     /**
      * тип поля Class.Field <- name type
      */
-    var fieldType: String = "unknown",// её тип
+    var fieldType: String = "",// её тип
 
     /**
      * имя класса name -> Class.Field
      */
-    var qualifier: String = "unknown",
+    var qualifier: String = "",
 
     /**
      * тип класса name type -> Class.Field
      */
-    var qualifierType: String = "unknown",
+    var qualifierType: String = "",
 
 ): ExpressionValue() {
-    override var rawValue: String = "unknown"
+    override var rawValue: String = ""
         get() = "$qualifier.$fieldName"
 
-    override var valueType: String = "unknown"
+    override var valueType: String = ""
         get() = fieldType
 
-    var fieldSignature: String = "unknown"
+    var fieldSignature: String = ""
         get() = "$qualifierType.$fieldType"
 }
 

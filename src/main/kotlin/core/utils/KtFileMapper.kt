@@ -20,7 +20,9 @@ object KtFileMapper {
 
         for (cls in classes) {
             val filePath = ktFile.name
+            val classFullName = filePath.substringBeforeLast(".kt")
             val className = cls.name ?: filePath.substringAfterLast("/").substringBeforeLast(".kt")
+
             val type = KtClassHelper.getEntityType(cls)
             val annotation = KtClassHelper.getAnnotations(cls)
 
@@ -28,6 +30,8 @@ object KtFileMapper {
                 ktClassObject = cls,
                 path = filePath,
                 name = className,
+                fullName = classFullName,
+
                 ktParameters = cls.primaryConstructorParameters,
                 ktProperties = cls.declarations.filterIsInstance<KtProperty>(),
                 ktFunctions = KtFileExtractor.getClassMethods(cls),

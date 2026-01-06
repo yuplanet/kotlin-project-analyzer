@@ -5,12 +5,12 @@ data class MethodValue (
     /**
      * Имя Метода
      */
-     var methodName: String = "unknown",// её тип
+     var methodName: String = "",// её тип
 
     /**
      *  Возвращаемый тип
      */
-    var methodReturnType: String = "unknown",// её тип
+    var methodReturnType: String = "",// её тип
 
 
     var parameters: MutableList<ExpressionValue> = mutableListOf(),
@@ -18,12 +18,12 @@ data class MethodValue (
     /**
      * Имя переменной, через которую вызывается метод
      */
-    var receiverName: String = "unknown",
+    var receiverName: String = "",
 
     /**
      * Тип переменной, через которую вызывается метод
      */
-    var receiverClassName: String = "unknown",
+    var receiverClassName: String = "",
 
 
     /**
@@ -33,13 +33,13 @@ data class MethodValue (
 
 ): ExpressionValue() {
 
-    override var rawValue: String = "unknown"
+    override var rawValue: String = ""
         get() = "$receiverName.$methodName(${getRawParameters()})"
 
-    override var valueType: String = "unknown"
+    override var valueType: String = ""
         get() = methodReturnType
 
-    var methodSignature: String = "unknown"
+    var methodSignature: String = ""
         get() = "$receiverClassName.$methodName(${getParameterSignatures()})"
 
 

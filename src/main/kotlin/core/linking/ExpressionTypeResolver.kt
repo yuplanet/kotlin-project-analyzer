@@ -49,11 +49,11 @@ class ExpressionTypeResolver(
         //Члены класса
         type = findTypeInsideClass(receive)
 
-        if (type == null)
-            type = resolveTypeFromImports(receive, ktFile)
-
         if(type == null)
             type = getEnumOrObjectTypeFromDotExpression(variableName)
+
+        if (type == null)
+            type = resolveTypeFromImports(receive, ktFile)
 
         // 3️⃣ Если не нашли — неизвестно
         return type

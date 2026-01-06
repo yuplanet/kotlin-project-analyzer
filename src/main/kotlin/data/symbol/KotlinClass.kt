@@ -9,9 +9,8 @@ import org.jetbrains.kotlin.psi.KtProperty
 
 class KotlinClass(
     var path: String,
+    val fullName: String,
     var name: String,
-
-
     var ktFile: KtFile,
 
     var ktClassObjectType: ObjectType,
@@ -31,6 +30,4 @@ class KotlinClass(
     var superClasses: MutableList<KotlinClass> = mutableListOf(),
 
 
-) {
-    val fullName: String = path
-}
+)
