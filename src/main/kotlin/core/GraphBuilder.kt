@@ -57,7 +57,7 @@ class GraphBuilder() {
         initSearchEngine()
 
         //3
-        buildClassReferences(developClasses, devSearchEngine)
+        //buildClassReferences(developClasses, devSearchEngine)
         buildClassReferences(featureClasses, featSearchEngine)
 
         //4 analizy

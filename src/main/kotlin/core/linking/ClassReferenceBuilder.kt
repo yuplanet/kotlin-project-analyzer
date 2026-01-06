@@ -28,8 +28,8 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         for (cls in projectClasses) {
 
             for (method in cls.functionCalls) {
-               //if (method.name != "sendScheduledEnvelopeNotification")
-               //    continue
+                if (method.name != "sendScheduledEnvelopeNotification")
+                    continue
 
                 val expressionCollector = KtExpressionChainBuilder(method, cls, searchEngine);
                 expressionCollector.collectTopLevelExpressions()

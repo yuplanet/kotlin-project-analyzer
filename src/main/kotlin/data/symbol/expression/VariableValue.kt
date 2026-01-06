@@ -5,6 +5,13 @@ class VariableValue(
     var variableName: String = "unknown",  // имя переменной
     var variableType: String = "unknown",// её тип
 
-    override var rawValue: String = "",
+): ExpressionValue() {
+    override var rawValue: String = "unknown"
+        get() = variableName
 
-    ): ExpressionValue()
+    override var valueType: String = "unknown"
+        get() = variableType
+
+    var variableSignature: String = "unknown"
+        get() = variableType
+}

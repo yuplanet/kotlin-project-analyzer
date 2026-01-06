@@ -1,5 +1,6 @@
 package org.example.core.psi
 
+import com.intellij.rml.dfa.analyzes.input.Bool
 import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.interfaces.ITemporaryVariableStorage
@@ -118,7 +119,8 @@ class KtExpressionChainBuilder(
     fun handlePsiElement(
         element: PsiElement,
         context: ExpressionValue? = null,
-        recursionDepth: Int = 1
+        recursionDepth: Int = 1,
+        hasTarget: Boolean = false
     ): ExpressionValue? {
 
         logInfo(element.text, recursionDepth)
@@ -210,7 +212,7 @@ class KtExpressionChainBuilder(
             is KtSafeQualifiedExpression, -> {
 
                 val dotExpression = element as KtQualifiedExpression
-
+                element.text
                 val leftExpression: KtExpression = dotExpression.receiverExpression
                 leftExpression.text
 

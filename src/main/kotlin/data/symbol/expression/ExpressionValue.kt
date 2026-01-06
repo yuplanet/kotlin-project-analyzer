@@ -1,5 +1,7 @@
 package org.example.data.symbol.expression
 
 open class ExpressionValue (
-    open var rawValue: String = ""
+
+    open val valueType: String = "unknown",
+    open var rawValue: String = "unknown",
 )

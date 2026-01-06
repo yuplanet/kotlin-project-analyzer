@@ -8,7 +8,7 @@ data class MethodValue (
      var methodName: String = "unknown",// её тип
 
     /**
-     * Тип Метода
+     *  Возвращаемый тип
      */
     var methodReturnType: String = "unknown",// её тип
 
@@ -19,14 +19,54 @@ data class MethodValue (
      * Имя переменной, через которую вызывается метод
      */
     var receiverName: String = "unknown",
+
+    /**
+     * Тип переменной, через которую вызывается метод
+     */
     var receiverClassName: String = "unknown",
 
+
+    /**
+     * Внутренний вызов? через This или без receiver
+     */
     var innerCall: Boolean = false,
 
+): ExpressionValue() {
 
-    var methodSignature: String = "unknown",
-    override var rawValue: String = "",
+    override var rawValue: String = "unknown"
+        get() = "$receiverName.$methodName(${getRawParameters()})"
 
-): ExpressionValue(){
+    override var valueType: String = "unknown"
+        get() = methodReturnType
 
+    var methodSignature: String = "unknown"
+        get() = "$receiverClassName.$methodName(${getParameterSignatures()})"
+
+
+    private fun getRawParameters(): String {
+
+        if (parameters.isEmpty())
+            return ""
+
+        val raw: StringBuilder = StringBuilder()
+
+        for (param in parameters) {
+            raw.append(param.rawValue)
+        }
+
+        return raw.toString()
+    }
+
+    private fun getParameterSignatures(): String {
+        if (parameters.isEmpty())
+            return ""
+
+        val raw: StringBuilder = StringBuilder()
+
+        for (param in parameters) {
+            raw.append(param.valueType)
+        }
+
+        return raw.toString()
+    }
 }
