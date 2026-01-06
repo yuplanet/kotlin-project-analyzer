@@ -9,59 +9,42 @@ class DependencyChainBuilder: IDependencyChainBuilder {
 
     override fun generateChangedMethodChains(
         methods: List<ClassMethod>,
-        allClasses: List<KotlinClass>,
-    ): List<MethodCallNode> {
-
-        val chain =
-            methods.map { method ->
-                generateChain(method, allClasses)
-            }
-
-        return chain
-    }
-
-    override fun generateChain(
-        rootMethod: ClassMethod,
         allClasses: List<KotlinClass>
-    ): MethodCallNode {
-
-        return buildChain(rootMethod, allClasses)
+    ): List<MethodCallNode> {
+        return methods.map { method ->
+            buildChain(method, mutableSetOf())
+        }
     }
+
 
     override fun generateAddedMethodChains(
         methods: List<ClassMethod>,
         allClasses: List<KotlinClass>
     ): List<MethodCallNode> {
-        return methods.map { method ->
-            buildChain(
-                method = method,
-                allClasses = allClasses,
-                visited = mutableSetOf()
-            )
-        }
+        return emptyList()
     }
 
     override fun generateRemovedMethodChains(
         methods: List<ClassMethod>,
         allClasses: List<KotlinClass>
     ): List<MethodCallNode> {
-        return methods.map { method ->
-            buildChain(
-                method = method,
-                allClasses = allClasses,
-                visited = mutableSetOf()
-            )
-        }
+        return emptyList()
     }
 
-    private fun buildChain(
-        method: ClassMethod,
-        allClasses: List<KotlinClass>,
-        visited: MutableSet<String> = mutableSetOf()
+
+        private fun buildChain(
+    method: ClassMethod,
+    visited: MutableSet<String>
     ): MethodCallNode {
-        // Если уже встречали метод в текущей цепи — прекращаем рекурсию
+
+        // защита от циклов
         if (!visited.add(method.fullName)) {
-            return MethodCallNode(method.fullName, method.function, "", mutableListOf())
+            return MethodCallNode(
+                fullName = method.fullName,
+                function = method.function,
+                updates = "",
+                nextCalls = mutableListOf()
+            )
         }
 
         val node = MethodCallNode(
@@ -71,28 +54,32 @@ class DependencyChainBuilder: IDependencyChainBuilder {
             nextCalls = mutableListOf()
         )
 
-        val cls = allClasses.firstOrNull { it.functionCalls.contains(method) } ?: return node
-        val methodShortName = method.fullName.substringAfter("::")
-        val allRelevantMethods = mutableListOf<ClassMethod>()
+        val nextVisited = visited.toMutableSet()
 
-        allRelevantMethods += cls.functionCalls.filter { it.fullName.endsWith("::$methodShortName") }
-        for (parent in cls.superClasses) {
-            allRelevantMethods += parent.functionCalls.filter { it.fullName.endsWith("::$methodShortName") }
+        // 🔹 DIRECT: кого этот метод вызывает
+        for (call in method.callRecords) {
+            val calleeMethod =
+                call.parentClass.functionCalls
+                    .firstOrNull { it.fullName == call.name }
+                    ?: continue
+
+            node.nextCalls.add(
+                buildChain(calleeMethod, nextVisited)
+            )
         }
 
-        for (m in allRelevantMethods) {
-            for (reverseCall in m.reverseCallRecords) {
-                val callerMethod = reverseCall.parentClass.functionCalls
-                    .firstOrNull { it.fullName == reverseCall.name }
+        // 🔹 REVERSE: кто вызывает этот метод
+        for (reverse in method.reverseCallRecords) {
+            val callerMethod =
+                reverse.parentClass.functionCalls
+                    .firstOrNull { it.fullName == reverse.name }
+                    ?: continue
 
-                callerMethod?: continue
-
-                val childNode = buildChain(callerMethod, allClasses, visited.toMutableSet())
-                node.nextCalls.add(childNode)
-            }
+            node.nextCalls.add(
+                buildChain(callerMethod, nextVisited)
+            )
         }
 
         return node
     }
-
 }
