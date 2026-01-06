@@ -171,10 +171,10 @@ class SearcherEngine: IProjectSearchEngine {
 
         val result = candidates.firstOrNull { method ->
             // проверяем класс
-            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName") &&
+            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName")
                     // проверяем имя метода
-                    method.name == methodName
-                // && areParamsEqual(params, method.parameterTypeNames)
+                    // method.name == methodName
+                    && areParamsEqual(params, method.parameterTypeNames)
             // проверяем параметры
         }
 
@@ -186,9 +186,18 @@ class SearcherEngine: IProjectSearchEngine {
      * Проверяет, совпадают ли два списка типов аргументов.
      * Возвращает true, если списки одной длины и все элементы на соответствующих позициях равны.
      */
-    private fun areParamsEqual(targetParams: List<String>, methodParams: List<KtParameter>): Boolean {
+    private fun areParamsEqualKt(targetParams: List<String>, methodParams: List<KtParameter>): Boolean {
         val types = methodParams.map { it.typeReference?.text ?: "Any" }
         if (types.size != targetParams.size) return false
         return types.indices.all { types[it] == targetParams[it] }
     }
+
+    private fun areParamsEqual(
+        targetParams: List<String>,
+        methodParams: List<String>
+    ): Boolean {
+        if (targetParams.size != methodParams.size) return false
+        return targetParams.indices.all { targetParams[it] == methodParams[it] }
+    }
+
 }

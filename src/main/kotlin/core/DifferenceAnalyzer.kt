@@ -25,8 +25,6 @@ class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
             return result
         }
 
-
-
     fun analyzeMethods(){
         // 1. Строим карты методов по fullName
         val developMethodsByFullName: Map<String, ClassMethod> =
@@ -62,9 +60,5 @@ class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
         result.addedMethods = addedMethods
         result.changedMethods = changedMethods
         result.removedMethods = removedMethods
-    }
-
-    fun analyzeParameters(){
-
     }
 }

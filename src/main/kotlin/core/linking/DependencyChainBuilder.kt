@@ -7,7 +7,7 @@ import org.example.data.symbol.KotlinClass
 
 class DependencyChainBuilder: IDependencyChainBuilder {
 
-    override fun generateChangedChains(
+    override fun generateChangedMethodChains(
         methods: List<ClassMethod>,
         allClasses: List<KotlinClass>,
     ): List<MethodCallNode> {
@@ -26,6 +26,32 @@ class DependencyChainBuilder: IDependencyChainBuilder {
     ): MethodCallNode {
 
         return buildChain(rootMethod, allClasses)
+    }
+
+    override fun generateAddedMethodChains(
+        methods: List<ClassMethod>,
+        allClasses: List<KotlinClass>
+    ): List<MethodCallNode> {
+        return methods.map { method ->
+            buildChain(
+                method = method,
+                allClasses = allClasses,
+                visited = mutableSetOf()
+            )
+        }
+    }
+
+    override fun generateRemovedMethodChains(
+        methods: List<ClassMethod>,
+        allClasses: List<KotlinClass>
+    ): List<MethodCallNode> {
+        return methods.map { method ->
+            buildChain(
+                method = method,
+                allClasses = allClasses,
+                visited = mutableSetOf()
+            )
+        }
     }
 
     private fun buildChain(

@@ -1,7 +1,7 @@
 package org.example.core.interfaces
 
-import org.example.data.chain.MethodCallNode
+import org.example.data.analyzer.ProjectDiffResultOutput
 
 interface IDiffResultPresenter {
-    fun writeCallChainToFile(result: List<MethodCallNode>)
+    fun writeCallChainToFile(result: ProjectDiffResultOutput)
 }

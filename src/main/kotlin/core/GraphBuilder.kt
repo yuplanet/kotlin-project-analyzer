@@ -7,7 +7,7 @@ import org.example.core.psi.KtFileExtractor
 import org.example.core.search.SearcherEngine
 import org.example.core.utils.KtFileMapper
 import org.example.data.analyzer.ProjectDiffResult
-import org.example.data.chain.MethodCallNode
+import org.example.data.analyzer.ProjectDiffResultOutput
 import org.example.data.symbol.KotlinClass
 import java.io.File
 
@@ -31,8 +31,7 @@ class GraphBuilder() {
 
     //output
     private var diffResult = ProjectDiffResult()
-    private var callChain: List<MethodCallNode> = listOf()
-
+    private var callChain = ProjectDiffResultOutput()
 
     //logs
     private val logFile ="logs.txt"
@@ -57,7 +56,7 @@ class GraphBuilder() {
         initSearchEngine()
 
         //3
-        //buildClassReferences(developClasses, devSearchEngine)
+        buildClassReferences(developClasses, devSearchEngine)
         buildClassReferences(featureClasses, featSearchEngine)
 
         //4 analizy
@@ -93,7 +92,13 @@ class GraphBuilder() {
     }
 
     private fun generateChains(){
-        callChain = dependencyChainBuilder.generateChangedChains(diffResult.changedMethods,featureClasses)
+        val changed  = dependencyChainBuilder.generateChangedMethodChains(diffResult.changedMethods,featureClasses)
+        val added  = dependencyChainBuilder.generateAddedMethodChains(diffResult.changedMethods,featureClasses)
+        val removed = dependencyChainBuilder.generateRemovedMethodChains(diffResult.changedMethods,featureClasses)
+
+        callChain.changedMethods = changed
+        callChain.addedMethods = added
+        callChain.removedMethods = removed
     }
 
     private fun analyzeDifference() {

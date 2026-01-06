@@ -1,15 +1,16 @@
 package org.example.core
 
 import org.example.core.interfaces.IDiffResultPresenter
+import org.example.data.analyzer.ProjectDiffResultOutput
 import org.example.data.chain.MethodCallNode
 import java.io.File
 
 class DiffResultPresenter : IDiffResultPresenter {
 
-    override fun writeCallChainToFile(result: List<MethodCallNode>) {
+    override fun writeCallChainToFile(result: ProjectDiffResultOutput) {
         val builder = StringBuilder()
 
-        result.forEach { root ->
+        result.changedMethods.forEach { root ->
             buildLinearChains(root, builder)
             builder.appendLine() // пустая строка между цепями
         }

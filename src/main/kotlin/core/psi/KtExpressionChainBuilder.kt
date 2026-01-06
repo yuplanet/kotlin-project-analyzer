@@ -1,6 +1,5 @@
 package org.example.core.psi
 
-import com.intellij.rml.dfa.analyzes.input.Bool
 import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.core.interfaces.ITemporaryVariableStorage
@@ -9,13 +8,12 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.enum.AssigmentExpressionType
 import org.example.data.symbol.expression.*
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.mirror.FieldVariable
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.slf4j.LoggerFactory
+import java.io.File
 
 
 class KtExpressionChainBuilder(
@@ -34,9 +32,14 @@ class KtExpressionChainBuilder(
     fun collectTopLevelExpressions() {
         val block = currentMethod.function.bodyBlockExpression ?: return
 
+        for (param in currentMethod.function.valueParameters) {
+            handleTopLevelExpression(param)
+        }
+
         for (statement in block.statements) {
             handleTopLevelExpression(statement)
         }
+        printExpressions()
     }
 
 
@@ -127,44 +130,6 @@ class KtExpressionChainBuilder(
         logInfo(element.text, recursionDepth)
 
         val target: ExpressionValue? = when (element) {
-
-            is KtNameReferenceExpression -> {
-                // parent не нужонный
-
-                val variableName = element.getReferencedName()
-
-                var type = if(context!=null && context is VariableValue)
-                {
-                    typeResolver.getVariableTypeByNameAndClass(context.variableType, variableName)
-                }
-                else{
-                    typeResolver.getVariableTypeByName(variableName)
-                }
-
-                if (type == null) {
-
-                    val objClass = searchEngine.findByClassName(variableName)
-                    type = objClass?.name ?: unknownType
-                }
-
-                var value = if(context!=null && context is VariableValue)
-                {
-                    FieldValue(
-                        fieldName = variableName,
-                        fieldType =  type,
-                        qualifier = context.variableName,
-                        qualifierType = context.variableType
-                    )
-                }
-                else {
-                    VariableValue(variableName, type)
-                }
-
-                logExpression(value, recursionDepth + 1)
-
-                return value
-            }
-
             is KtProperty -> {
 
                 val initializer = element.initializer
@@ -219,6 +184,43 @@ class KtExpressionChainBuilder(
 
                 addExpression(target, source)
                 return target
+            }
+
+            is KtNameReferenceExpression -> {
+                // parent не нужонный
+
+                val variableName = element.getReferencedName()
+
+                var type = if(context!=null && context is VariableValue)
+                {
+                    typeResolver.getVariableTypeByNameAndClass(context.variableType, variableName)
+                }
+                else{
+                    typeResolver.getVariableTypeByName(variableName)
+                }
+
+                if (type == null) {
+
+                    val objClass = searchEngine.findByClassName(variableName)
+                    type = objClass?.name ?: unknownType
+                }
+
+                var value = if(context!=null && context is VariableValue)
+                {
+                    FieldValue(
+                        fieldName = variableName,
+                        fieldType =  type,
+                        qualifier = context.variableName,
+                        qualifierType = context.variableType
+                    )
+                }
+                else {
+                    VariableValue(variableName, type)
+                }
+
+                logExpression(value, recursionDepth + 1)
+
+                return value
             }
 
             is KtCallExpression -> {
@@ -313,14 +315,13 @@ class KtExpressionChainBuilder(
             }
 
             is KtReturnExpression -> {
-                null
+                val returned = element.returnedExpression
+                returned?.let {
+                    handlePsiElement(it)
+                }
             }
 
             is KtThrowExpression -> {
-                null
-            }
-
-            is KtReturnExpression -> {
                 null
             }
 
@@ -495,21 +496,30 @@ class KtExpressionChainBuilder(
     private fun addExpression(
         target: ExpressionValue?,
         source: ExpressionValue?,
-        operationType: AssigmentExpressionType = AssigmentExpressionType.Undefined
     ) {
 
         var operation =
             AssignmentExpression(
                 target = target,
                 source = source,
-                operationType = operationType,
             )
 
         currentMethod.fullExpressions.add(operation)
     }
 
-    private fun logExpression(expr: ExpressionValue, level: Int = 1) {
+    private fun printExpressions(){
+        val builder = StringBuilder()
 
+        for (expr in currentMethod.fullExpressions) {
+            builder.appendLine("${expr.target?.valueType}  -  ${expr.source?.valueType}")
+            builder.appendLine("${expr.target?.rawValue}  -  ${expr.source?.rawValue}")
+            builder.appendLine()
+        }
+
+        File("expressions.txt").writeText(builder.toString())
+    }
+
+    private fun logExpression(expr: ExpressionValue, level: Int = 1) {
 
         var message = if (expr is VariableValue)
             "VariableValue"

@@ -7,6 +7,9 @@ import org.example.data.symbol.ClassMethod
 interface IDependencyChainBuilder {
     fun generateChain(rootMethod: ClassMethod, allClasses: List<KotlinClass>): MethodCallNode
 
-    fun generateChangedChains(methods: List<ClassMethod>, allClasses: List<KotlinClass>): List<MethodCallNode>
+    fun generateChangedMethodChains(methods: List<ClassMethod>, allClasses: List<KotlinClass>): List<MethodCallNode>
 
+    fun generateAddedMethodChains(methods: List<ClassMethod>, allClasses: List<KotlinClass>): List<MethodCallNode>
+
+    fun generateRemovedMethodChains(methods: List<ClassMethod>, allClasses: List<KotlinClass>): List<MethodCallNode>
 }

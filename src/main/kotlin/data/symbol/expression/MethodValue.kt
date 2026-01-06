@@ -45,28 +45,11 @@ data class MethodValue (
 
     private fun getRawParameters(): String {
 
-        if (parameters.isEmpty())
-            return ""
-
-        val raw: StringBuilder = StringBuilder()
-
-        for (param in parameters) {
-            raw.append(param.rawValue)
-        }
-
-        return raw.toString()
+        return parameters.joinToString(", ") { it.rawValue }
     }
 
     private fun getParameterSignatures(): String {
-        if (parameters.isEmpty())
-            return ""
-
-        val raw: StringBuilder = StringBuilder()
-
-        for (param in parameters) {
-            raw.append(param.valueType)
-        }
-
-        return raw.toString()
+        return parameters.joinToString(", ") { it.valueType }
     }
+
 }
