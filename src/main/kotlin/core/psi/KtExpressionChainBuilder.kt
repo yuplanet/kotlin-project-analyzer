@@ -21,7 +21,7 @@ class KtExpressionChainBuilder(
 
     private val currentMethod: ClassMethod,
     private val mainClass: KotlinClass,
-    private val searchEngine: IProjectSearchEngine){
+    private val searchEngine: IProjectSearchEngine) {
 
     private var typeResolver: IExpressionTypeResolver = ExpressionTypeResolver(searchEngine, mainClass, currentMethod)
     private val variableStorage: ITemporaryVariableStorage = ExpressionValueStorage()
@@ -129,12 +129,14 @@ class KtExpressionChainBuilder(
 
             is KtNameReferenceExpression -> {
 
+                // parent не нужонный
+
                 val variableName = element.getReferencedName()
                 val type = typeResolver.getVariableTypeByName(variableName) ?: unknownType
 
                 var value = VariableValue(variableName, type)
 
-                logInfo("variable ${value.variableName} ${value.variableType}", recursionDepth)
+                logExpression(value, recursionDepth + 1)
 
                 return value
             }
@@ -142,26 +144,29 @@ class KtExpressionChainBuilder(
             is KtProperty -> {
 
                 val initializer = element.initializer
-                val source: ExpressionValue? = initializer?.let {
-                    initializer.text
-                    handlePsiElement(it)
-                }
 
-                logInfo(element.text, recursionDepth + 1)
+                val source = initializer?.let {
+
+                    initializer.text
+                    handlePsiElement(it, hasTarget = true) // target  - ktProperty
+                }
 
                 val name = element.name ?: "unknown"
                 val type = element.typeReference?.text ?: unknownType
 
                 val target = VariableValue(name, type)
 
-                val property = ClassProperty(name, type, element)
-                currentMethod.properties.add(property)
-
                 source?.let {
                     normalizeTypes(target, source)
                 }
 
+                val property = ClassProperty(name, type, element)
+                currentMethod.properties.add(property)
+
                 addExpression(target, source)
+
+                logExpression(target, recursionDepth + 1)
+
                 return target
             }
 
@@ -171,21 +176,22 @@ class KtExpressionChainBuilder(
                 val source: ExpressionValue? = initializer?.let {
 
                     initializer.text
-                    handlePsiElement(it)
+                    handlePsiElement(it, hasTarget = true)
                 }
-                logInfo(element.text, recursionDepth + 1)
 
                 val name = element.name ?: "unknown"
                 val type = element.typeReference?.text ?: unknownType
 
                 val target = VariableValue(name, type)
 
-                val parameter = ClassParameter(target.variableName, target.variableType, element)
-                currentMethod.parameters.add(parameter)
-
                 source?.let {
                     normalizeTypes(target, source)
                 }
+
+                val parameter = ClassParameter(target.variableName, target.variableType, element)
+                currentMethod.parameters.add(parameter)
+
+                logExpression(target, recursionDepth + 1)
 
                 addExpression(target, source)
                 return target
@@ -195,9 +201,12 @@ class KtExpressionChainBuilder(
 
                 element.text
 
-                var receiver = context?.let {  getReceiveVariable(it)}
+                var receiver = context?.let { getReceiveVariable(it) }
 
-                val method =  completeMethod(element, receiver)
+                val method = completeMethod(element, receiver)
+
+                if(hasTarget)
+                    return method
 
                 val tmpName = variableStorage.add(method)
 
@@ -213,6 +222,7 @@ class KtExpressionChainBuilder(
 
                 val dotExpression = element as KtQualifiedExpression
                 element.text
+
                 val leftExpression: KtExpression = dotExpression.receiverExpression
                 leftExpression.text
 
@@ -222,27 +232,30 @@ class KtExpressionChainBuilder(
                 /// left . right
                 var target: ExpressionValue? = handlePsiElement(leftExpression)
 
-                if(target is VariableValue && target.variableType == unknownType && rightExpression?.text!=null) {
+                if (target is VariableValue && target.variableType == unknownType && rightExpression?.text != null) {
                     val type = typeResolver.getVariableTypeByNameAndClass(leftExpression.text, rightExpression.text)
-                    target =  VariableValue(rightExpression.text, type?:unknownType)
+                    target = VariableValue(rightExpression.text, type ?: unknownType)
                 }
 
                 val source: ExpressionValue? = rightExpression?.let {
-                    handlePsiElement(it, target)
+                    handlePsiElement(it, target, hasTarget = hasTarget)
                 }
 
-                if(target == null && source!=null) {
-                    val tmpName = variableStorage.add(source)
-                    target = VariableValue(tmpName, getExpressionValueType(source))
-                }
-                else if(source == null)
-                    return null
+                if (hasTarget)
+                    return source
 
-                normalizeTypes(target!!, source)
+                if (source == null)
+                    return target
 
-                addExpression(target, source)
+                val tmpName = variableStorage.add(source)
 
-                target
+                val tempTarget = VariableValue(tmpName, getExpressionValueType(source))
+
+                normalizeTypes(tempTarget, source)
+
+                addExpression(tempTarget, source)
+
+                tempTarget
             }
 
             is KtBinaryExpression -> {
@@ -258,11 +271,10 @@ class KtExpressionChainBuilder(
                 // 2️⃣ обрабатываем левую часть (цель)
                 var target = handlePsiElement(leftExpression, null)
 
-                if(target == null && source!=null) {
+                if (target == null && source != null) {
                     val tmpName = variableStorage.add(source)
                     target = VariableValue(tmpName, getExpressionValueType(source))
-                }
-                else if(source == null)
+                } else if (source == null)
                     return null
 
                 normalizeTypes(target!!, source)
@@ -320,12 +332,11 @@ class KtExpressionChainBuilder(
         }
 
         var method = MethodValue(
-
             methodName = methodName,
             parameters = params.toMutableList(),
-            rawValue = KtExpressionInspector.getRawCallText(expression),
             methodReturnType = unknownType
         )
+        method.rawValue = KtExpressionInspector.getRawCallText(expression),
 
         if (receiver != null) {
 
@@ -354,8 +365,8 @@ class KtExpressionChainBuilder(
     //принимает xpressionValue И дает receive в виде Variable
     fun getReceiveVariable(expr: ExpressionValue): VariableValue? {
 
-        if (expr is VariableValue) {
-            return VariableValue(expr.variableName, expr.variableType)
+        if (expr is VariableValue) { // дальше этого не зайдет
+            return expr
         } else if (expr is FieldValue) {
             return VariableValue(expr.fieldName, expr.fieldType)
         } else if (expr is MethodValue) {
@@ -404,7 +415,7 @@ class KtExpressionChainBuilder(
 
         val target = FieldValue(
             fieldName = fieldName,
-            fieldType = fieldType?:unknownType,
+            fieldType = fieldType ?: unknownType,
             qualifier = className,
             qualifierType = classType
         )
@@ -432,7 +443,7 @@ class KtExpressionChainBuilder(
         }
     }
 
-    private fun getExpressionValueType(value: ExpressionValue):String {
+    private fun getExpressionValueType(value: ExpressionValue): String {
 
         if (value is VariableValue)
             return value.variableType
@@ -454,7 +465,11 @@ class KtExpressionChainBuilder(
     }
 
     ///////// others
-    private fun addExpression(target: ExpressionValue?, source: ExpressionValue?, operationType: AssigmentExpressionType = AssigmentExpressionType.Undefined) {
+    private fun addExpression(
+        target: ExpressionValue?,
+        source: ExpressionValue?,
+        operationType: AssigmentExpressionType = AssigmentExpressionType.Undefined
+    ) {
 
         var operation =
             AssignmentExpression(
@@ -466,7 +481,24 @@ class KtExpressionChainBuilder(
         currentMethod.fullExpressions.add(operation)
     }
 
-    private fun logInfo( message: String, level: Int = 1) {
+    private fun logExpression(expr: ExpressionValue, level: Int = 1) {
+
+
+        var message = if (expr is VariableValue)
+            "VariableValue"
+        else if (expr is FieldValue)
+            "FieldValue"
+        else if (expr is MethodValue)
+            "MethodValue"
+        else
+            "unknown"
+
+        var message2 = message + "  " + expr.rawValue + "  " + expr.valueType
+
+        logInfo(message2, level)
+    }
+
+    private fun logInfo(message: String, level: Int = 1) {
         val indent = "  ".repeat(level)
         log.info("{}{}", indent, message)
     }
