@@ -34,8 +34,9 @@ class GraphBuilder() {
     private var callChain = ProjectDiffResultOutput()
 
     //logs
-    private val logFile ="logs/build_process.txt"
+    private val logFile =           "logs/build_process.txt"
 
+    private val logLoadedProject =  "logs/loaded_project" //log for claases
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
@@ -57,7 +58,7 @@ class GraphBuilder() {
         initSearchEngine()
 
         //3
-        buildClassReferences(developClasses, devSearchEngine)
+        //buildClassReferences(developClasses, devSearchEngine)
         buildClassReferences(featureClasses, featSearchEngine)
 
         //4 analizy
@@ -180,6 +181,9 @@ class GraphBuilder() {
 
             KtFileMapper.linkSuperClasses(developClasses)
             KtFileMapper.linkSuperClasses(featureClasses)
+
+            LogManager.logLoadedProject(logLoadedProject+"/develop", developClasses)
+            LogManager.logLoadedProject(logLoadedProject+"/feature",featureClasses)
 
             logStatus(logFile, "Project loading success", 1)
         } catch (ex: Exception) {

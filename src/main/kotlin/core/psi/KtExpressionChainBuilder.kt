@@ -28,8 +28,9 @@ class KtExpressionChainBuilder(
     private val variableStorage: ITemporaryVariableStorage = ExpressionValueStorage()
 
     private val logFile = "logs/reference_builder_chains.txt"
+    private val logFolder = "logs/reference_builder_chains.txt"
+
     private val writer = BufferedWriter(FileWriter(logFile, false))
-    private val log = LoggerFactory.getLogger(KtExpressionChainBuilder::class.java)
 
     val unknownType = "unknown"
 
@@ -47,8 +48,8 @@ class KtExpressionChainBuilder(
             handleTopLevelExpression(statement)
         }
 
-        closeLogger()
         printExpressions()
+        closeLogger()
     }
 
 
@@ -368,14 +369,14 @@ class KtExpressionChainBuilder(
             method.receiverClassName = receiver.variableType
             method.innerCall = false
         } else {
-            method.receiverName = "this."
+            method.receiverName = mainClass.name
             method.receiverClassName = mainClass.name
             method.innerCall = true
         }
 
         val methodType = typeResolver.getMethodReturnTypeByNameReceiveAndParamTypes(
             methodName = methodName,
-            receiverClass = receiver?.variableType ?: unknownType,
+            receiverClass = receiver?.variableType ?: mainClass.name,
             params.map { getExpressionValueType(it) }
         ) ?: unknownType
 

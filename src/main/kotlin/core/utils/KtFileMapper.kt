@@ -60,7 +60,6 @@ object KtFileMapper {
                     )
                 }
             )
-
             kotlinClasses.add(ktClass)
         }
 

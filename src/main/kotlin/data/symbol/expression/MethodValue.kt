@@ -45,11 +45,11 @@ data class MethodValue (
 
     private fun getRawParameters(): String {
 
-        return parameters.joinToString(", ") { it.rawValue }
+        return parameters.joinToString(",") { it.rawValue }
     }
 
     private fun getParameterSignatures(): String {
-        return parameters.joinToString(", ") { it.valueType }
+        return parameters.joinToString(",") { it.valueType }
     }
 
 }

@@ -2,8 +2,8 @@ package org.example.core.search
 
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
+import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtParameter
 
@@ -47,10 +47,10 @@ class SearcherEngine: IProjectSearchEngine {
         }
     }
 
-    override fun findObjectRefByClassNameAndFieldName(
+    override fun findFieldRefByClassNameAndFieldName(
         className: String,
         fieldName: String
-    ): ObjectReference? {
+    ): FieldReference? {
 
         val ktClass = findByClassName(className)
         if (ktClass == null)
@@ -61,16 +61,25 @@ class SearcherEngine: IProjectSearchEngine {
         }
 
         if (field != null) {
-            //val reference = FieldReference(fieldName, ktClass!!, VariableValue(variableName = fieldName, variableType = field.type))
-            //return reference
+            val reference = FieldReference(
+                name = fieldName,
+                parentClass = ktClass!!,
+                signature = "",
+                expressionValue = null)
+                    //(variableName = fieldName, variableType = field.type))
+            return reference
         }
 
         val paramd = ktClass?.propertyReferences?.firstOrNull {
             it.name == fieldName
         }
         if (paramd != null) {
-            //val reference = FieldReference(fieldName, ktClass!!, VariableValue(variableName = fieldName, variableType = paramd.type))
-            //return reference
+            val reference = FieldReference(
+                name = fieldName,
+                parentClass = ktClass,
+                signature = "",
+                expressionValue = null)
+            return reference
         }
 
         return null

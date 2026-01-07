@@ -28,10 +28,12 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
     fun collectExpressions(projectClasses: List<KotlinClass>) {
 
         for (cls in projectClasses) {
-
+            if(cls.name!="RcsServiceImpl")
+                continue
             for (method in cls.functionCalls) {
                 val expressionCollector = KtExpressionChainBuilder(method, cls, searchEngine);
                 expressionCollector.collectTopLevelExpressions()
+                print(1)
             }
         }
     }
@@ -91,8 +93,8 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
     }
 
     fun dumpCallGraph(projectClasses: List<KotlinClass>) {
-
-        val logDir = File("logs")
+        resetLogDirectory("logs/class_chains")
+        val logDir = File("logs/class_chains")
         if (!logDir.exists()) {
             logDir.mkdirs()
         }
@@ -131,5 +133,19 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
             file.writeText(builder.toString())
         }
+    }
+
+
+
+    private fun resetLogDirectory(path: String) {
+        val logDir = File(path)
+
+        // Если папка существует, удаляем её вместе со всем содержимым
+        if (logDir.exists()) {
+            logDir.deleteRecursively()
+        }
+
+        // Создаём пустую директорию заново
+        logDir.mkdirs()
     }
 }

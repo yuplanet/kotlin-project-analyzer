@@ -2,6 +2,7 @@ package org.example.core.interfaces
 
 import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
+import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
 
 interface IProjectSearchEngine {
@@ -10,7 +11,7 @@ interface IProjectSearchEngine {
 
 
     //==== fields Properties
-    fun findObjectRefByClassNameAndFieldName(className: String, fieldName: String): ObjectReference?
+    fun findFieldRefByClassNameAndFieldName(className: String, fieldName: String): FieldReference?
 
 
     // ===== Methods =====
@@ -44,4 +45,6 @@ interface IProjectSearchEngine {
         methodName: String,
         params: List<String>,
     ): ClassMethod?
+
+
 }

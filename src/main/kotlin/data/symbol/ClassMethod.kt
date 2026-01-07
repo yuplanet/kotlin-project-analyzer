@@ -28,6 +28,6 @@ data class ClassMethod(
     var ktParameters: List<KtParameter> = listOf(),
 
     //refs
-    val callRecords: MutableList<ObjectReference> = mutableListOf(),
+    val callRecords: MutableList<ObjectReference> = mutableListOf(), // target method
     val reverseCallRecords: MutableList<ObjectReference> = mutableListOf(),
 )

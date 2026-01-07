@@ -117,7 +117,7 @@ class ExpressionTypeResolver(
             .findMethodByClassNameAndMethodNameAndParams(
                 className = methodClassName,
                 methodName = methodName,
-                params = params.map { getExpressionValueTargetType(it) ?: "unknown" }
+                params = params.map { it.valueType }
             )
             ?.returnType
 
@@ -152,8 +152,15 @@ class ExpressionTypeResolver(
                 parentClass = currentClass.name
 
             getEnumOrObjectTypeInsideClass(fieldName, parentClass)
-        } else
+        } else{
+
+            val clType = searchEngine.findByClassName(expression)
+
+            if(clType != null && clType.ktClassObjectType == ObjectType.Object)
+                return expression
+
             getEnumOrObjectTypeInsideClass(expression, currentClass.name)
+        }
     }
 
 
@@ -237,28 +244,6 @@ class ExpressionTypeResolver(
 
             if (target.variableName == variableName)
                 return target.variableType
-        }
-
-        return null
-    }
-
-    private fun getExpressionValueTargetType(expr: ExpressionValue): String? {
-
-        if (expr is MethodValue) {
-
-            if(!expr.methodReturnType.isNullOrEmpty() && expr.methodReturnType!="unknown")
-                return expr.methodReturnType
-
-            for (parameter in expr.parameters) {
-                val type = getExpressionValueTargetType(parameter)
-                type?.let { return it }
-            }
-        }
-        else if (expr is FieldValue) {
-            return expr.fieldType
-        } else if (expr is VariableValue) {
-
-            return expr.variableType
         }
 
         return null

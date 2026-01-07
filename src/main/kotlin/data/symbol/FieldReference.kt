@@ -1,6 +1,6 @@
 package org.example.data.symbol
 
-import org.example.data.symbol.expression.VariableValue
+import org.example.data.symbol.expression.ExpressionValue
 
 data class FieldReference(
     override var name: String,
@@ -8,5 +8,5 @@ data class FieldReference(
 
     override var signature: String,
 
-    var field: VariableValue,
+    var expressionValue: ExpressionValue?,
 ) : ObjectReference()
