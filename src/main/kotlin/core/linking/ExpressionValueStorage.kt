@@ -1,4 +1,4 @@
-package org.example.core.psi
+package org.example.core.linking
 
 import org.example.core.interfaces.ITemporaryVariableStorage
 import org.example.data.symbol.expression.ExpressionValue

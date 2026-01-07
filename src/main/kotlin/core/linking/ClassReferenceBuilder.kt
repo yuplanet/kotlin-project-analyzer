@@ -1,8 +1,8 @@
 package org.example.core.linking
 
+import org.example.core.LogManager
 import org.example.core.interfaces.IClassReferenceBuilder
 import org.example.core.interfaces.IProjectSearchEngine
-import org.example.core.psi.KtExpressionChainBuilder
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.MethodReference
@@ -14,12 +14,17 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
     private lateinit var searchEngine: IProjectSearchEngine
 
-    override fun bindAll(projectClasses: List<KotlinClass>, searchEngine: IProjectSearchEngine) {
+    private val logFolder = "logs/reference/"
+    override fun bindAll(projectClasses: List<KotlinClass>, searchEngine: IProjectSearchEngine, branchName: String) {
 
         this.searchEngine = searchEngine
 
         // 11 collect function expressions
         collectExpressions(projectClasses)
+
+        LogManager.logClassAllMethodExpression(projectClasses, logFolder + branchName)
+
+
         collectCalls(projectClasses)
 
         dumpCallGraph(projectClasses)
@@ -28,12 +33,9 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
     fun collectExpressions(projectClasses: List<KotlinClass>) {
 
         for (cls in projectClasses) {
-            if(cls.name!="RcsServiceImpl")
-                continue
             for (method in cls.functionCalls) {
-                val expressionCollector = KtExpressionChainBuilder(method, cls, searchEngine);
+                val expressionCollector = ExpressionChainBuilder(method, cls, searchEngine);
                 expressionCollector.collectTopLevelExpressions()
-                print(1)
             }
         }
     }
@@ -55,9 +57,6 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         caller: ClassMethod,
         cls: KotlinClass
     ) {
-        if(cls.name.contains("RcsService"))
-            print(1)
-
         val methodValue = expr as? MethodValue ?: return
 
         // resolve real method from project

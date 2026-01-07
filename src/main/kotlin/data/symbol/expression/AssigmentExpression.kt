@@ -12,7 +12,7 @@ data class AssignmentExpression(
 
     private fun generateRawExpression(): String {
         if (target != null)
-            return target!!.rawValue + " " + source?.rawValue
+            return target!!.rawValue + " = " + source?.rawValue
         else
             return source?.rawValue ?: ""
 
@@ -20,7 +20,7 @@ data class AssignmentExpression(
 
     private fun generateExpressionSignature(): String {
         if (target != null)
-            return target!!.valueType + " " + source?.valueType
+            return target!!.valueType + " = " + source?.valueType
         else
             return source?.valueType ?: ""
     }

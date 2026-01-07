@@ -58,8 +58,8 @@ class GraphBuilder() {
         initSearchEngine()
 
         //3
-        //buildClassReferences(developClasses, devSearchEngine)
-        buildClassReferences(featureClasses, featSearchEngine)
+        buildClassReferences(developClasses, devSearchEngine, "develop")
+        buildClassReferences(featureClasses, featSearchEngine, "feature")
 
         //4 analizy
         analyzeDifference()
@@ -136,13 +136,13 @@ class GraphBuilder() {
         }
     }
 
-    private fun buildClassReferences(projectClasses: List<KotlinClass>, searchEngine: IProjectSearchEngine) {
+    private fun buildClassReferences(projectClasses: List<KotlinClass>, searchEngine: IProjectSearchEngine, branchName: String) {
 
         logStatus(logFile, "Step 3: project binding")
 
         try {
 
-            referenceBuilder.bindAll(projectClasses, searchEngine)
+            referenceBuilder.bindAll(projectClasses, searchEngine, branchName)
 
             logStatus(logFile, "Project binding success", 1)
 
