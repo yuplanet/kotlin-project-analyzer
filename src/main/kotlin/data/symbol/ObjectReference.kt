@@ -3,7 +3,7 @@ package org.example.data.symbol
 // только класс
 sealed class ObjectReference {
 
-    abstract var name: String
+    abstract var referenceTargetName: String
     abstract var signature: String
-    abstract var parentClass: KotlinClass
+    abstract var referenceTargetParentClass: KotlinClass
 }

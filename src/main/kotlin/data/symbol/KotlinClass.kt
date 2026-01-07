@@ -28,6 +28,4 @@ class KotlinClass(
 
     var subClasses: MutableList<KotlinClass> = mutableListOf(),
     var superClasses: MutableList<KotlinClass> = mutableListOf(),
-
-
 )

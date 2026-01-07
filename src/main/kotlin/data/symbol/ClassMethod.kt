@@ -17,6 +17,7 @@ data class ClassMethod(
     val function: KtNamedFunction,
     val parameterTypeNames: List<String>,
 
+    val parentClass: KotlinClass,
     //content
     var properties: MutableList<ClassProperty> = mutableListOf(),
     var parameters: MutableList<ClassParameter> = mutableListOf(),

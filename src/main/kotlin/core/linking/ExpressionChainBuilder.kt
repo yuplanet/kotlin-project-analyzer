@@ -24,100 +24,18 @@ class ExpressionChainBuilder(
     private var typeResolver: IExpressionTypeResolver = ExpressionTypeResolver(searchEngine, mainClass, currentMethod)
     private val variableStorage: ITemporaryVariableStorage = ExpressionValueStorage()
 
-    private val logFile = "logs/reference_builder_chains.txt"
-    private val logFolder = "logs/reference"
-
     val unknownType = "unknown"
 
     fun collectTopLevelExpressions() {
 
-        clearFile()
-
         val block = currentMethod.function.bodyBlockExpression ?: return
 
         for (param in currentMethod.function.valueParameters) {
-            handleTopLevelExpression(param)
+            handlePsiElement(param)
         }
 
         for (statement in block.statements) {
-            handleTopLevelExpression(statement)
-        }
-    }
-
-
-    fun handleTopLevelExpression(expr: KtExpression) {
-        when (expr) {
-
-            is KtIfExpression -> {
-                expr.then?.let { handleTopLevelExpression(it) }
-                expr.`else`?.let { handleTopLevelExpression(it) }
-            }
-
-            is KtWhenExpression -> {
-                expr.entries.forEach { entry ->
-                    entry.expression?.let { handleTopLevelExpression(it) }
-                }
-            }
-
-            is KtForExpression -> {
-                expr.body?.let { handleTopLevelExpression(it) }
-            }
-
-            is KtWhileExpression -> {
-                expr.body?.let { handleTopLevelExpression(it) }
-            }
-
-            is KtDoWhileExpression -> {
-                expr.body?.let { handleTopLevelExpression(it) }
-            }
-
-            is KtTryExpression -> {
-                // try
-                handleTopLevelExpression(expr.tryBlock)
-
-                // catch
-                expr.catchClauses.forEach { clause ->
-                    clause.catchBody?.let { body ->
-                        handleTopLevelExpression(body)
-                    }
-                }
-
-                // finally
-                expr.finallyBlock?.finalExpression?.let {
-                    handleTopLevelExpression(it)
-                }
-            }
-
-            is KtIsExpression -> {
-                expr.leftHandSide?.let {
-                    handleTopLevelExpression(it)
-                }
-            }
-
-            is KtLambdaExpression -> {
-                expr.bodyExpression?.let {
-                    handleTopLevelExpression(it)
-                }
-            }
-
-            is KtArrayAccessExpression -> {
-                expr.arrayExpression?.let {
-                    handleTopLevelExpression(it)
-                }
-                expr.indexExpressions.forEach {
-                    handleTopLevelExpression(it)
-                }
-            }
-
-            is KtBlockExpression -> {
-                expr.statements.forEach {
-                    handleTopLevelExpression(it)
-                }
-            }
-
-            else -> {
-                handlePsiElement(expr)
-            }
+            handlePsiElement(statement)
         }
     }
 
@@ -129,8 +47,78 @@ class ExpressionChainBuilder(
     ): ExpressionValue? {
 
         element.text
-
+        ////////////////////////////////////////////////////////////////////////////////empty
         val target: ExpressionValue? = when (element) {
+
+            is KtIfExpression -> {
+                element.then?.let { handlePsiElement(it, context, hasTarget) }
+                element.`else`?.let { handlePsiElement(it, context, hasTarget) }
+                null
+            }
+
+            is KtWhenExpression -> {
+                element.entries.forEach { entry ->
+                    entry.expression?.let { handlePsiElement(it, context, hasTarget) }
+                }
+                null
+            }
+
+            is KtForExpression, is KtWhileExpression, is KtDoWhileExpression -> {
+                element.body?.let { handlePsiElement(it, context, hasTarget) }
+                null
+            }
+
+            is KtTryExpression -> {
+                handlePsiElement(element.tryBlock, context, hasTarget)
+
+                element.catchClauses.forEach { clause ->
+                    clause.catchBody?.let {
+                        handlePsiElement(it, context, hasTarget)
+                    }
+                }
+
+                element.finallyBlock?.finalExpression?.let {
+                    handlePsiElement(it, context, hasTarget)
+                }
+                null
+            }
+
+            is KtLambdaExpression -> {
+                element.bodyExpression?.let {
+                    handlePsiElement(it, context, hasTarget)
+                }
+                null
+            }
+
+            is KtIsExpression -> {
+                element.leftHandSide?.let {
+                    handlePsiElement(it, context, hasTarget)
+                }
+                null
+            }
+
+            is KtArrayAccessExpression -> {
+
+                element.arrayExpression?.let {
+                    handlePsiElement(it, context, hasTarget)
+                }
+
+                element.indexExpressions.forEach {
+                    handlePsiElement(it, context, hasTarget)
+                }
+
+                null
+            }
+
+            is KtBlockExpression -> {
+                element.statements.forEach { st ->
+                    if (st is KtExpression)
+                        handlePsiElement(st, context, hasTarget)
+                }
+                null
+            }
+            ///////////////////////////////////////////////////////////
+
             is KtProperty -> {
 
                 val initializer = element.initializer
@@ -150,9 +138,10 @@ class ExpressionChainBuilder(
                     normalizeTypes(target, source)
                 }
 
-                val property = ClassProperty(name, type, element)
+                val property = ClassProperty(name, type, element, mainClass)
                 currentMethod.properties.add(property)
 
+                addExpression(target, source,)
                 return target
             }
 
@@ -174,7 +163,7 @@ class ExpressionChainBuilder(
                     normalizeTypes(target, source)
                 }
 
-                val parameter = ClassParameter(target.variableName, target.variableType, element)
+                val parameter = ClassParameter(target.variableName, target.variableType, element, mainClass)
                 currentMethod.parameters.add(parameter)
                 addExpression(target, source,)
                 return target
@@ -217,6 +206,11 @@ class ExpressionChainBuilder(
                 var receiver = context?.let { getReceiveVariable(it) }
 
                 val method = completeMethod(element, receiver)
+
+                //element.lambdaArguments.forEach { lambdaArg: KtLambdaArgument ->
+                //    val lambdaExpr: KtLambdaExpression? = lambdaArg.getLambdaExpression()
+                //    lambdaExpr?.bodyExpression?.let { handlePsiElement(it) }
+                //}
 
                 if (hasTarget)
                     return method
@@ -300,23 +294,28 @@ class ExpressionChainBuilder(
             }
 
             is KtUnaryExpression -> {
+                // например: !a, -b, ++i, --i
+                element.baseExpression?.let {
+                    handlePsiElement(it, context, hasTarget)
+                }
                 null
             }
 
             is KtReturnExpression -> {
-                val returned = element.returnedExpression
-                returned?.let {
-                    handlePsiElement(it)
+                element.returnedExpression?.let {
+                    handlePsiElement(it, context, hasTarget)
                 }
+                null
             }
 
             is KtThrowExpression -> {
+                element.thrownExpression?.let {
+                    handlePsiElement(it, context, hasTarget)
+                }
                 null
             }
 
-            else -> {
-                null
-            }
+            else -> null//handlePsiElement(element, context, hasTarget)
         }
 
         return target
@@ -494,11 +493,5 @@ class ExpressionChainBuilder(
             )
 
         currentMethod.fullExpressions.add(operation)
-    }
-
-    private fun clearFile() {
-        val file = File(logFile)
-        // Перезаписываем пустым содержимым
-        file.writeText("")
     }
 }

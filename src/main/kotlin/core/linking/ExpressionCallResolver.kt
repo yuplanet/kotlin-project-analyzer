@@ -37,18 +37,22 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
         caller: ClassMethod,
         callerClass: KotlinClass
     ) {
+
+
         val callee = searchEngine.findMethodByClassNameAndMethodNameAndParams(
             className = value.receiverClassName,
             methodName = value.methodName,
             params = value.parameters.map { it.valueType }
-        ) ?: return
+        )
+
+            ?: return
 
         val parentClass =
             searchEngine.findByClassName(value.receiverClassName) ?: return
 
         val reference = MethodReference(
-            name = callee.fullName,
-            parentClass = parentClass,
+            referenceTargetName = callee.fullName,
+            referenceTargetParentClass = parentClass,
             method = value,
             signature = value.methodSignature
         )
@@ -56,8 +60,8 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
         caller.callRecords.add(reference)
 
         val reverseReference = MethodReference(
-            name = caller.fullName,
-            parentClass = callerClass,
+            referenceTargetName = caller.fullName,
+            referenceTargetParentClass = callerClass,
             method = value,
             signature = ""
         )

@@ -1,5 +1,6 @@
 package org.example.core
 
+import org.example.data.analyzer.ProjectDiffResult
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.expression.AssignmentExpression
 import java.io.BufferedWriter
@@ -7,6 +8,71 @@ import java.io.File
 import java.io.FileWriter
 
 object LogManager {
+
+    fun writeProjectDiffToFile(result: ProjectDiffResult, path: String) {
+        val file = File(path)
+
+        // удалить старый лог, если существует
+        if (file.exists()) {
+            file.delete()
+        }
+
+        // создать родительские директории при необходимости
+        file.parentFile?.mkdirs()
+
+        val logContent = toLogString(result)
+        file.writeText(logContent)
+    }
+
+    fun toLogString(result: ProjectDiffResult): String {
+        return buildString {
+            appendLine("=== ProjectDiffResult ===")
+
+            appendLine("Added methods: ${result.addedMethods.size}")
+            result.addedMethods.forEach { appendLine("  + ${it.fullName}") }
+
+            appendLine("Removed methods: ${result.removedMethods.size}")
+            result.removedMethods.forEach { appendLine("  - ${it.fullName}") }
+
+            appendLine("Changed methods: ${result.changedMethods.size}")
+            result.changedMethods.forEach { appendLine("  * ${it.fullName}") }
+
+            appendLine()
+
+            appendLine("Added parameters: ${result.addedParameters.size}")
+            result.addedParameters.forEach { appendLine("  + ${it.name}: ${it.type}") }
+
+            appendLine("Removed parameters: ${result.removedParameters.size}")
+            result.removedParameters.forEach { appendLine("  - ${it.name}: ${it.type}") }
+
+            appendLine("Changed parameters: ${result.changedParameters.size}")
+            result.changedParameters.forEach { appendLine("  * ${it.name}: ${it.type}") }
+
+            appendLine()
+
+            appendLine("Added properties: ${result.addedProperties.size}")
+            result.addedProperties.forEach { appendLine("  + ${it.name}: ${it.type}") }
+
+            appendLine("Removed properties: ${result.removedProperties.size}")
+            result.removedProperties.forEach { appendLine("  - ${it.name}: ${it.type}") }
+
+            appendLine("Changed properties: ${result.changedProperties.size}")
+            result.changedProperties.forEach { appendLine("  * ${it.name}: ${it.type}") }
+        }
+    }
+
+
+
+
+    /////////////////////////////////log diferences
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////
 
     private fun resetLogDirectory(path: String) {
         val logDir = File(path)
@@ -43,14 +109,14 @@ object LogManager {
                     if (method.callRecords.isNotEmpty()) {
                         log("calls:", 2)
                         for (call in method.callRecords) {
-                            log("-> ${call.name}", 3)
+                            log("-> ${call.referenceTargetName}", 3)
                         }
                     }
 
                     if (method.reverseCallRecords.isNotEmpty()) {
                         log("called by:", 2)
                         for (call in method.reverseCallRecords) {
-                            log("<- ${call.name}", 3)
+                            log("<- ${call.referenceTargetName}", 3)
                         }
                     }
 
@@ -66,7 +132,7 @@ object LogManager {
                         if (field.callRecords.isNotEmpty()) {
                             log("used in:", 2)
                             for (call in field.callRecords) {
-                                log("<- ${call.name}", 3)
+                                log("<- ${call.referenceTargetName}", 3)
                             }
                         }
 
@@ -83,7 +149,7 @@ object LogManager {
                         if (param.callRecords.isNotEmpty()) {
                             log("used in:", 2)
                             for (call in param.callRecords) {
-                                log("<- ${call.name}", 3)
+                                log("<- ${call.referenceTargetName}", 3)
                             }
                         }
 
@@ -151,7 +217,7 @@ object LogManager {
                 }
             }
 
-            log("\n===== End of ${kotlinClass.fullName} =====", 0)
+            log("\n\n===== End of ${kotlinClass.fullName} =====", 0)
         }
     }
 

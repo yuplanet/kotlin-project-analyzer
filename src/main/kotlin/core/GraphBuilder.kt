@@ -35,7 +35,7 @@ class GraphBuilder() {
 
     //logs
     private val logFile =           "logs/build_process.txt"
-
+    private val logDifferences =    "logs/project_differences.txt"
     private val logLoadedProject =  "logs/loaded_project" //log for claases
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
@@ -126,7 +126,10 @@ class GraphBuilder() {
         logStatus(logFile, "Step 4: analyzing difference")
 
         try {
+
             diffResult = differenceAnalyzer.analyzeProjectDifferences(developClasses, featureClasses)
+
+            LogManager.writeProjectDiffToFile(diffResult, logDifferences)
 
             logStatus(logFile, "Analyzing difference success", 1)
 

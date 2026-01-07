@@ -9,6 +9,8 @@ data class ClassProperty (
     var type: String,
     var property: KtProperty,
 
+    val parentClass: KotlinClass,
+
     var expression: MutableList<AssignmentExpression> = mutableListOf(),
 
     var callRecords: MutableList<ObjectReference> = mutableListOf(),

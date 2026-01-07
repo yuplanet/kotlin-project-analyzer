@@ -35,7 +35,9 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
     }
 
     fun collectCalls(projectClasses: List<KotlinClass>) {
-        val callResolver = ExpressionCallResolver(searchEngine)
+
+
+        val callResolver = ExpressionCallResolver(searchEngine) //CallResolverWithLogs(searchEngine)//
         callResolver.collect(projectClasses)
     }
 }

@@ -42,10 +42,10 @@ object KtFileMapper {
 
             // Создаем property и parameter references
             ktClass.propertyReferences.addAll(ktClass.ktProperties.map {
-                ClassProperty(it.name ?: "__no_name__", it.typeReference?.text ?: "_", it)
+                ClassProperty(it.name ?: "__no_name__", it.typeReference?.text ?: "_", it, ktClass)
             })
             ktClass.parameterReferences.addAll(ktClass.ktParameters.map {
-                ClassParameter(it.name ?: "__no_name__", it.typeReference?.text ?: "_", it)
+                ClassParameter(it.name ?: "__no_name__", it.typeReference?.text ?: "_", it, ktClass)
             })
 
             // Создаем функции с параметрами
@@ -56,7 +56,9 @@ object KtFileMapper {
                         fullName = KtFunctionHelper.getFullFunctionName(it),
                         returnType = it.typeReference?.text ?: "Unit",
                         function = it,
-                        parameterTypeNames = it.valueParameters.map { p -> p.typeReference?.text ?: "_" }
+                        parameterTypeNames = it.valueParameters.map { p -> p.typeReference?.text ?: "_" },
+                        parentClass = ktClass,
+
                     )
                 }
             )

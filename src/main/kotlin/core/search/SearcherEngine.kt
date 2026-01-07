@@ -62,8 +62,8 @@ class SearcherEngine: IProjectSearchEngine {
 
         if (field != null) {
             val reference = FieldReference(
-                name = fieldName,
-                parentClass = ktClass!!,
+                referenceTargetName = fieldName,
+                referenceTargetParentClass = ktClass!!,
                 signature = "",
                 expressionValue = null)
                     //(variableName = fieldName, variableType = field.type))
@@ -75,8 +75,8 @@ class SearcherEngine: IProjectSearchEngine {
         }
         if (paramd != null) {
             val reference = FieldReference(
-                name = fieldName,
-                parentClass = ktClass,
+                referenceTargetName = fieldName,
+                referenceTargetParentClass = ktClass,
                 signature = "",
                 expressionValue = null)
             return reference
