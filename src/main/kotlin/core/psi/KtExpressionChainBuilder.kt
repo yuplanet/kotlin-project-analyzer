@@ -136,7 +136,7 @@ class KtExpressionChainBuilder(
         hasTarget: Boolean = false
     ): ExpressionValue? {
 
-        logInfo(element.text, recursionDepth)
+        element.text
 
         val target: ExpressionValue? = when (element) {
             is KtProperty -> {
@@ -161,10 +161,7 @@ class KtExpressionChainBuilder(
                 val property = ClassProperty(name, type, element)
                 currentMethod.properties.add(property)
 
-                addExpression(target, source)
-
-                logExpression(target, recursionDepth + 1)
-
+                addExpression(target, source, recursionDepth + 1)
                 return target
             }
 
@@ -188,11 +185,7 @@ class KtExpressionChainBuilder(
 
                 val parameter = ClassParameter(target.variableName, target.variableType, element)
                 currentMethod.parameters.add(parameter)
-
-                addExpression(target, source)
-
-                logExpression(target, recursionDepth + 1)
-
+                addExpression(target, source, )
                 return target
             }
 
@@ -201,35 +194,29 @@ class KtExpressionChainBuilder(
 
                 val variableName = element.getReferencedName()
 
+                element.text
+
                 var type = if(context!=null && context is VariableValue)
-                {
                     typeResolver.getVariableTypeByNameAndClass(context.variableType, variableName)
-                }
-                else{
+                else
                     typeResolver.getVariableTypeByName(variableName)
-                }
 
                 if (type == null) {
-
                     val objClass = searchEngine.findByClassName(variableName)
                     type = objClass?.name ?: unknownType
                 }
 
-                var value = if(context!=null && context is VariableValue)
-                {
+                var value = if(context!=null && context is VariableValue){
                     FieldValue(
                         fieldName = variableName,
                         fieldType =  type,
                         qualifier = context.variableName,
-                        qualifierType = context.variableType
-                    )
+                        qualifierType = context.variableType)
                 }
                 else {
                     VariableValue(variableName, type)
                 }
-
                 logExpression(value, recursionDepth + 1)
-
                 return value
             }
 
@@ -257,12 +244,11 @@ class KtExpressionChainBuilder(
             is KtSafeQualifiedExpression, -> {
 
                 val dotExpression = element as KtQualifiedExpression
-                element.text
-
                 val leftExpression: KtExpression = dotExpression.receiverExpression
-                leftExpression.text
-
                 val rightExpression = dotExpression.selectorExpression
+
+                element.text
+                leftExpression.text
                 rightExpression?.text
 
                 /// left . right
@@ -288,18 +274,22 @@ class KtExpressionChainBuilder(
                 val tempTarget = VariableValue(tmpName, getExpressionValueType(source))
 
                 normalizeTypes(tempTarget, source)
-
                 addExpression(tempTarget, source)
 
                 tempTarget
             }
 
             is KtBinaryExpression -> {
+
                 if (element.operationToken != KtTokens.EQ)
                     return null
 
                 val leftExpression = element.left ?: error("Left-hand side missing ${element.left?.text}")
                 val rightExpression = element.right ?: error("Right-hand side missing ${element.right?.text}")
+
+                element.text
+                element.left?.text
+                element.right?.text
 
                 // 1️⃣ обрабатываем правую часть (источник)
                 val source = handlePsiElement(rightExpression, null, hasTarget = true)
@@ -314,9 +304,7 @@ class KtExpressionChainBuilder(
                     return null
 
                 normalizeTypes(target!!, source)
-
                 addExpression(target, source)
-
                 target
             }
 
@@ -506,6 +494,7 @@ class KtExpressionChainBuilder(
     private fun addExpression(
         target: ExpressionValue?,
         source: ExpressionValue?,
+        recursionDepth: Int = 1
     ) {
 
         var operation =
@@ -515,6 +504,8 @@ class KtExpressionChainBuilder(
             )
 
         currentMethod.fullExpressions.add(operation)
+        if (target != null)
+            logExpression(target, recursionDepth)
     }
 
     private fun logExpression(expr: ExpressionValue, level: Int = 1) {
