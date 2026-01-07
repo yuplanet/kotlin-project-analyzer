@@ -88,30 +88,49 @@ class GraphBuilder() {
         }
     }
 
-    private fun output(){
-        resultPresenter.writeCallChainToFile(callChain)
+    private fun output() {
+        logStatus(logFile, "Step 6: output")
+        try {
+            resultPresenter.writeCallChainToFile(callChain)
+
+            logStatus(logFile, "Output success")
+
+        } catch (ex: Exception) {
+            logStatus(logFile, "Output error ${ex.message}", 1)
+            throw ex
+        }
     }
 
-    private fun generateChains(){
-        val changed  = dependencyChainBuilder.generateChangedMethodChains(diffResult.changedMethods,featureClasses)
-        val added  = dependencyChainBuilder.generateAddedMethodChains(diffResult.changedMethods,featureClasses)
-        val removed = dependencyChainBuilder.generateRemovedMethodChains(diffResult.changedMethods,featureClasses)
+    private fun generateChains() {
 
-        callChain.changedMethods = changed
-        callChain.addedMethods = added
-        callChain.removedMethods = removed
+        logStatus(logFile, "Step 5: generating chains")
+        try {
+
+            val changed = dependencyChainBuilder.generateChangedMethodChains(diffResult.changedMethods, featureClasses)
+            val added = dependencyChainBuilder.generateAddedMethodChains(diffResult.changedMethods, featureClasses)
+            val removed = dependencyChainBuilder.generateRemovedMethodChains(diffResult.changedMethods, featureClasses)
+
+            callChain.changedMethods = changed
+            callChain.addedMethods = added
+            callChain.removedMethods = removed
+
+            logStatus(logFile, "Generating chains error success", 1)
+        } catch (ex: Exception) {
+            logStatus(logFile, "Generating chains error ${ex.message}", 1)
+            throw ex
+        }
     }
 
     private fun analyzeDifference() {
-        logStatus(logFile, "Analyzing difference")
+        logStatus(logFile, "Step 4: analyzing difference")
 
         try {
             diffResult = differenceAnalyzer.analyzeProjectDifferences(developClasses, featureClasses)
 
-            logStatus(logFile, "Analyzing difference success")
+            logStatus(logFile, "Analyzing difference success", 1)
 
         } catch (ex: Exception) {
-            logStatus(logFile, "Analyzing difference error ${ex.message}")
+            logStatus(logFile, "Analyzing difference error ${ex.message}", 1)
             throw ex
         }
     }
