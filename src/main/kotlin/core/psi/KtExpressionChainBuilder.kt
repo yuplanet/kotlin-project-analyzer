@@ -13,7 +13,9 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.slf4j.LoggerFactory
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileWriter
 
 
 class KtExpressionChainBuilder(
@@ -25,11 +27,16 @@ class KtExpressionChainBuilder(
     private var typeResolver: IExpressionTypeResolver = ExpressionTypeResolver(searchEngine, mainClass, currentMethod)
     private val variableStorage: ITemporaryVariableStorage = ExpressionValueStorage()
 
+    private val logFile = "logs/reference_builder_chains.txt"
+    private val writer = BufferedWriter(FileWriter(logFile, false))
     private val log = LoggerFactory.getLogger(KtExpressionChainBuilder::class.java)
 
     val unknownType = "unknown"
 
     fun collectTopLevelExpressions() {
+
+        clearFile()
+
         val block = currentMethod.function.bodyBlockExpression ?: return
 
         for (param in currentMethod.function.valueParameters) {
@@ -39,6 +46,8 @@ class KtExpressionChainBuilder(
         for (statement in block.statements) {
             handleTopLevelExpression(statement)
         }
+
+        closeLogger()
         printExpressions()
     }
 
@@ -180,9 +189,10 @@ class KtExpressionChainBuilder(
                 val parameter = ClassParameter(target.variableName, target.variableType, element)
                 currentMethod.parameters.add(parameter)
 
+                addExpression(target, source)
+
                 logExpression(target, recursionDepth + 1)
 
-                addExpression(target, source)
                 return target
             }
 
@@ -507,18 +517,6 @@ class KtExpressionChainBuilder(
         currentMethod.fullExpressions.add(operation)
     }
 
-    private fun printExpressions(){
-        val builder = StringBuilder()
-
-        for (expr in currentMethod.fullExpressions) {
-            builder.appendLine("${expr.target?.valueType}  -  ${expr.source?.valueType}")
-            builder.appendLine("${expr.target?.rawValue}  -  ${expr.source?.rawValue}")
-            builder.appendLine()
-        }
-
-        File("expressions.txt").writeText(builder.toString())
-    }
-
     private fun logExpression(expr: ExpressionValue, level: Int = 1) {
 
         var message = if (expr is VariableValue)
@@ -535,8 +533,42 @@ class KtExpressionChainBuilder(
         logInfo(message2, level)
     }
 
+    private fun clearFile() {
+        val file = File(logFile)
+        // Перезаписываем пустым содержимым
+        file.writeText("")
+    }
+
+    private fun printExpressions() {
+        val methodName = currentMethod.function.name ?: "unknownMethod"
+        logInfo("===== Method: $methodName =====", level = 0)
+
+        for (expr in currentMethod.fullExpressions) {
+            val targetType = expr.target?.valueType ?: "unknown"
+            val sourceType = expr.source?.valueType ?: "unknown"
+            val targetValue = expr.target?.rawValue ?: "null"
+            val sourceValue = expr.source?.rawValue ?: "null"
+
+            logInfo("$targetType  -  $sourceType", level = 1)
+            logInfo("$targetValue  -  $sourceValue", level = 1)
+            logInfo("", level = 0) // пустая строка между выражениями
+        }
+
+        logInfo("===== End of $methodName =====\n", level = 0)
+    }
+
+
     private fun logInfo(message: String, level: Int = 1) {
         val indent = "  ".repeat(level)
-        log.info("{}{}", indent, message)
+        val line = "  $indent$message\n"
+
+        writer.write(line)
+        // Не обязательно вызывать flush каждый раз — достаточно периодически
+    }
+
+    // В конце приложения обязательно закрываем writer
+    fun closeLogger() {
+        writer.flush()
+        writer.close()
     }
 }

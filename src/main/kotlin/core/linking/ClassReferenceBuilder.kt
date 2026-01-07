@@ -53,6 +53,9 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         caller: ClassMethod,
         cls: KotlinClass
     ) {
+        if(cls.name.contains("RcsService"))
+            print(1)
+
         val methodValue = expr as? MethodValue ?: return
 
         // resolve real method from project
@@ -68,7 +71,8 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         val reference = MethodReference(
             name = callee.fullName,
             parentClass = parentClass!!,
-            method = methodValue
+            method = methodValue,
+            signature = ""
         )
 
         // direct call
@@ -77,6 +81,7 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         val reverseReference = MethodReference(
             name = caller.fullName,
             parentClass = cls,
+            signature = "",
             method = MethodValue(
             )
         )

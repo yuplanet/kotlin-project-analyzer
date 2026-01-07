@@ -34,18 +34,19 @@ class GraphBuilder() {
     private var callChain = ProjectDiffResultOutput()
 
     //logs
-    private val logFile ="logs.txt"
+    private val logFile ="logs/build_process.txt"
 
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
+        //clear logs
+        clearFile()
         // 1 load project
         // 2 init engine
         // 3 build references
         // 4 analyze difference
         // 5 generate chains
         // 6 output
-
 
 
         //1 load
@@ -70,7 +71,7 @@ class GraphBuilder() {
     }
 
     private fun initSearchEngine() {
-        logStatus(logFile, "Initialize engines")
+        logStatus(logFile, "Step 2: initialize engines")
 
         try {
             devSearchEngine = SearcherEngine()
@@ -80,9 +81,9 @@ class GraphBuilder() {
             featSearchEngine.init(featureClasses)
 
 
-            logStatus(logFile, "Initialize engines success")
+            logStatus(logFile, "Initialize engines success", 1)
         } catch (ex: Exception) {
-            logStatus(logFile, "Initialize engines error ${ex.message}")
+            logStatus(logFile, "Initialize engines error ${ex.message}", 1)
             throw ex
         }
     }
@@ -117,23 +118,23 @@ class GraphBuilder() {
 
     private fun buildClassReferences(projectClasses: List<KotlinClass>, searchEngine: IProjectSearchEngine) {
 
-        logStatus(logFile, "Project binding")
+        logStatus(logFile, "Step 3: project binding")
 
         try {
 
             referenceBuilder.bindAll(projectClasses, searchEngine)
 
-            logStatus(logFile, "Project binding success")
+            logStatus(logFile, "Project binding success", 1)
 
         } catch (ex: Exception) {
-            logStatus(logFile, "Project binding error ${ex.message}")
+            logStatus(logFile, "Project binding error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun loadProject(repoPath: String, mainCommit: String, branchCommit: String) {
 
-        logStatus(logFile, "Project loading")
+        logStatus(logFile, "Step 1: project loading")
 
         try {
             developClasses = listOf()
@@ -161,14 +162,24 @@ class GraphBuilder() {
             KtFileMapper.linkSuperClasses(developClasses)
             KtFileMapper.linkSuperClasses(featureClasses)
 
-            logStatus(logFile, "Project loading success")
+            logStatus(logFile, "Project loading success", 1)
         } catch (ex: Exception) {
-            logStatus(logFile, "Project loading error ${ex.message}")
+            logStatus(logFile, "Project loading error ${ex.message}", 1)
             throw ex
         }
     }
 
-    private fun logStatus(filename: String, content: String) {
-        File(filename).appendText(content + System.lineSeparator())
+    private fun logStatus(filename: String, content: String, indentLevel: Int = 0) {
+        // Создаём отступ: 4 пробела на каждый уровень
+        val indent = "    ".repeat(indentLevel)
+
+        // Пишем в файл с отступом
+        File(filename).appendText(indent + content + System.lineSeparator())
+    }
+
+    private fun clearFile() {
+        val file = File(logFile)
+        // Перезаписываем пустым содержимым
+        file.writeText("")
     }
 }

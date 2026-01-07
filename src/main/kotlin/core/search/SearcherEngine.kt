@@ -1,11 +1,9 @@
 package org.example.core.search
 
 import org.example.core.interfaces.IProjectSearchEngine
-import org.example.data.symbol.FieldReference
-import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.expression.VariableValue
+import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.KtParameter
 
@@ -39,9 +37,11 @@ class SearcherEngine: IProjectSearchEngine {
 
         // Инициализация methodDictionary
         for (method in allMethods) {
+            //ApiKeyManagementController::getApiKeyClients():ResponseEntity<List<ApiKeyClientResponseDto>>
             val key = method.fullName.hashCode() // метод, который возвращает hashCode fullName
             methodFullNameDictionary.computeIfAbsent(key) { mutableListOf() }.add(method)
 
+            //getApiKeyClients
             val nkey = method.name.hashCode() // метод, который возвращает hashCode fullName
             methodSimpleNameDictionary.computeIfAbsent(nkey) { mutableListOf() }.add(method)
         }
@@ -61,16 +61,16 @@ class SearcherEngine: IProjectSearchEngine {
         }
 
         if (field != null) {
-            val reference = FieldReference(fieldName, ktClass!!, VariableValue(variableName = fieldName, variableType = field.type))
-            return reference
+            //val reference = FieldReference(fieldName, ktClass!!, VariableValue(variableName = fieldName, variableType = field.type))
+            //return reference
         }
 
         val paramd = ktClass?.propertyReferences?.firstOrNull {
             it.name == fieldName
         }
         if (paramd != null) {
-            val reference = FieldReference(fieldName, ktClass!!, VariableValue(variableName = fieldName, variableType = paramd.type))
-            return reference
+            //val reference = FieldReference(fieldName, ktClass!!, VariableValue(variableName = fieldName, variableType = paramd.type))
+            //return reference
         }
 
         return null

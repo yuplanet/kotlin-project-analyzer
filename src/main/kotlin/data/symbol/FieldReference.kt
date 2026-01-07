@@ -6,5 +6,7 @@ data class FieldReference(
     override var name: String,
     override var parentClass: KotlinClass,
 
+    override var signature: String,
+
     var field: VariableValue,
 ) : ObjectReference()
