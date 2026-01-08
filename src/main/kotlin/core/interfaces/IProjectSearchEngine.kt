@@ -47,4 +47,9 @@ interface IProjectSearchEngine {
     ): ClassMethod?
 
 
+    fun findMethodByClassNameAndMethodNameAndParamsCount(
+        className: String,
+        methodName: String,
+        paramsCount: Int,
+    ): ClassMethod?
 }

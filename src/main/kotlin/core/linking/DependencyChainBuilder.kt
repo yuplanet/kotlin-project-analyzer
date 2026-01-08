@@ -35,7 +35,6 @@ class DependencyChainBuilder(): IDependencyChainBuilder {
         method: ClassMethod,
         visited: MutableSet<String> = mutableSetOf()
     ): MethodCallNode {
-
         if (!visited.add(method.fullName)) {
             return MethodCallNode(
                 fullName = method.fullName,
@@ -65,8 +64,6 @@ class DependencyChainBuilder(): IDependencyChainBuilder {
         methodFullName: String,
         visited: MutableSet<String> = mutableSetOf()
     ): ClassMethod? {
-
-        if (!visited.add(kotlinClass.fullName)) return null
 
         kotlinClass.functionCalls.firstOrNull { extractSignature(it.fullName) == extractSignature(methodFullName) }
             ?.let { return it }

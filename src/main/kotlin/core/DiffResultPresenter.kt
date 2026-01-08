@@ -42,37 +42,46 @@ class DiffResultPresenter : IDiffResultPresenter {
         File("changed_methods.txt").writeText(builder.toString())
     }
 
-    /**
-     * Рекурсивный обход дерева вызовов.
-     *
-     * UPSTREAM: A -> B -> C  (C вызван B, B вызван A)
-     * DOWNSTREAM: C -> B -> A (A вызывает B, B вызывает C)
-     */
     private fun buildLinearChains(
         node: MethodCallNode,
         builder: StringBuilder,
         direction: CallDirection,
-        path: List<String> = emptyList()
+        depth: Int = 0,
+        visited: MutableSet<String> = mutableSetOf()
     ) {
-        // простая защита от зацикливания
-        if (node.fullName in path) return
+        // защита от циклов
+        if (!visited.add("${direction}_${node.fullName}_$depth")) return
 
-        val currentPath = path + node.fullName
+        val indent = " ".repeat(depth * 4)
 
-        val nextNodes = when (direction) {
-            CallDirection.UPSTREAM -> node.reverseCalls   // 🔼 кто вызывает метод
-            CallDirection.DOWNSTREAM -> node.calls        // 🔽 кого вызывает метод
-        }.filter { it.fullName.isNotBlank() }
+        // === комментарии по уровням ===
+        val comment = when {
+            depth == 0 ->
+                "// ИЗМЕНЕННЫЙ МЕТОД — источник изменений"
 
-        // тупик — печатаем путь
-        if (nextNodes.isEmpty()) {
-            builder.appendLine(currentPath.joinToString(" -> "))
-            return
+            direction == CallDirection.UPSTREAM ->
+                "// МОЖЕТ ИЗМЕНИТЬСЯ ПОВЕДЕНИЕ ВЫШЕ ПО ЦЕПОЧКЕ (этот метод вызывает измененный)"
+
+            direction == CallDirection.DOWNSTREAM ->
+                "// МОЖЕТ ПОТРЕБОВАТЬ КОРРЕКТИРОВКУ ИЗ-ЗА ИЗМЕНЕНИЙ (вызывается измененным методом)"
+
+            else -> ""
         }
 
-        // иначе рекурсивно продолжаем
+        // === вывод строки ===
+        if (depth == 0) {
+            builder.appendLine("${node.fullName}    $comment")
+        } else {
+            builder.appendLine("$indent└─ ${node.fullName}    $comment")
+        }
+
+        val nextNodes = when (direction) {
+            CallDirection.UPSTREAM -> node.reverseCalls
+            CallDirection.DOWNSTREAM -> node.calls
+        }.filter { it.fullName.isNotBlank() }
+
         nextNodes.forEach { child ->
-            buildLinearChains(child, builder, direction, currentPath)
+            buildLinearChains(child, builder, direction, depth + 1, visited)
         }
     }
 

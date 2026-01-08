@@ -12,6 +12,7 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
     fun collect(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
             for (method in cls.functionCalls) {
+
                 for (expression in method.fullExpressions) {
                     resolveExpression(expression.target, method, cls)
                     resolveExpression(expression.source, method, cls)
@@ -27,7 +28,7 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
     ) {
         when (expr) {
             is MethodValue -> resolveMethod(expr, caller, callerClass)
-                //is FieldValue -> resolveProperty(expr, caller, callerClass)
+            //is FieldValue -> resolveProperty(expr, caller, callerClass)
             //is VariableValue -> resolveParameter(expr, caller, callerClass)
         }
     }
@@ -37,15 +38,22 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
         caller: ClassMethod,
         callerClass: KotlinClass
     ) {
-
-
-        val callee = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+        var callee = searchEngine.findMethodByClassNameAndMethodNameAndParams(
             className = value.receiverClassName,
             methodName = value.methodName,
             params = value.parameters.map { it.valueType }
         )
 
-            ?: return
+        //if (callee == null && value.parameters.any { it.valueType == "unknown" }) {
+        //    callee = searchEngine.findMethodByClassNameAndMethodNameAndParamsCount(
+        //        className = value.receiverClassName,
+        //        methodName = value.methodName,
+        //        paramsCount = value.parameters.count()
+        //    )
+        //    if(callee != null)
+        //        print(1)
+        //}
+        callee ?: return
 
         val parentClass =
             searchEngine.findByClassName(value.receiverClassName) ?: return

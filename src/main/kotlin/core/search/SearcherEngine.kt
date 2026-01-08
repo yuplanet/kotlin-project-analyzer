@@ -180,7 +180,7 @@ class SearcherEngine: IProjectSearchEngine {
 
         val result = candidates.firstOrNull { method ->
             // проверяем класс
-            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName")
+            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName(")
                     // проверяем имя метода
                     // method.name == methodName
                     && areParamsEqual(params, method.parameterTypeNames)
@@ -188,6 +188,32 @@ class SearcherEngine: IProjectSearchEngine {
         }
 
         return result
+    }
+
+    override fun findMethodByClassNameAndMethodNameAndParamsCount(
+        className: String,
+        methodName: String,
+        paramsCount: Int
+    ): ClassMethod? {
+        val parentClass = findByClassName(className) ?: return null
+
+        val key = methodName.hashCode()
+        val candidates = methodSimpleNameDictionary[key] ?: emptyList()
+
+        val results = candidates.filter { method ->
+            // проверяем класс
+            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName(")
+
+                    && method.parameterTypeNames.count() == paramsCount
+            // проверяем имя метода
+            // method.name == methodName
+        }
+
+        if (results.count() == 1)
+            return results.first()
+        // проверяем параметры
+
+        return null
     }
 
     // utils
