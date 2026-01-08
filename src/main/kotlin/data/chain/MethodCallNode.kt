@@ -8,7 +8,7 @@ data class MethodCallNode (
      */
     val fullName: String,
     val function: KtNamedFunction,
-    val updates: String,
+    var updates: String,
 
     val calls: MutableList<MethodCallNode>  = mutableListOf(),
     val reverseCalls: MutableList<MethodCallNode>  = mutableListOf()

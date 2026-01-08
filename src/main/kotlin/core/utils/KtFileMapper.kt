@@ -59,7 +59,7 @@ object KtFileMapper {
                         parameterTypeNames = it.valueParameters.map { p -> p.typeReference?.text ?: "_" },
                         parentClass = ktClass,
 
-                    )
+                        )
                 }
             )
             kotlinClasses.add(ktClass)
@@ -69,37 +69,44 @@ object KtFileMapper {
     }
 
 
-    fun linkSuperClasses(
-        allClasses: List<KotlinClass>
-    ) {
+    fun linkSuperClasses(allClasses: List<KotlinClass>) {
         val classesByName: Map<String, KotlinClass> =
             allClasses.associateBy { it.ktClassObject.name ?: "__anonymous__" }
 
+        allClasses.forEach { it.superClasses.clear() }
+
         for (ktClass in allClasses) {
+            for (entry in ktClass.ktClassObject.superTypeListEntries) {
+                val typeName = when (entry) {
+                    is KtSuperTypeEntry -> entry.typeReference?.text
+                    is KtSuperTypeCallEntry -> entry.typeReference?.text
+                    else -> null
+                } ?: continue
 
-            val visitedParents = mutableSetOf<KotlinClass>()
-
-            fun collectParents(clsObj: KtClassOrObject) {
-                clsObj.superTypeListEntries.forEach { entry ->
-                    val typeName = when (entry) {
-                        is KtSuperTypeEntry -> entry.typeReference?.text
-                        is KtSuperTypeCallEntry -> entry.typeReference?.text
-                        else -> null
-                    } ?: return@forEach
-
-                    val parentClass = classesByName[typeName] ?: return@forEach
-
-                    if (visitedParents.add(parentClass)) {
-                        ktClass.superClasses.add(parentClass)
-                        collectParents(parentClass.ktClassObject)
-                    }
-                }
+                val parentClass = classesByName[typeName] ?: continue
+                ktClass.superClasses.add(parentClass)
             }
-
-            collectParents(ktClass.ktClassObject)
         }
     }
 
+    /**
+     * Строит обратные связи: для каждого класса заполняет список его наследников (subClasses)
+     */
+    fun linkSubClasses(allClasses: List<KotlinClass>) {
+
+        // очищаем старые данные на всякий случай
+        allClasses.forEach { it.subClasses.clear() }
+
+        // для каждого класса пройдемся по его предкам
+        for (ktClass in allClasses) {
+            for (superClass in ktClass.superClasses) {
+
+                if (superClass.subClasses.none { it.fullName == ktClass.fullName }) {
+                    superClass.subClasses.add(ktClass)
+                }
+            }
+        }
+    }
 
     /**
      * Преобразует список KtFile в список KotlinClass
@@ -111,21 +118,7 @@ object KtFileMapper {
         }
 
         linkSuperClasses(allClasses)
-
+        linkSubClasses(allClasses)
         return allClasses
-    }
-
-
-    fun collectClassesByFile(ktFiles: List<KtFile>): Map<KtFile, List<KotlinClass>> {
-
-       val mapKtFilesAndClasses = ktFiles.associateWith { ktFile ->
-            mapKtFileToClassList(ktFile)
-        }
-
-        val allClasses = mapKtFilesAndClasses.values.flatten()
-
-        linkSuperClasses(allClasses)
-
-        return mapKtFilesAndClasses
     }
 }

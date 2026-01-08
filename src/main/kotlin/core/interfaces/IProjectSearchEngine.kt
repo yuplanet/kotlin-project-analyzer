@@ -1,6 +1,5 @@
 package org.example.core.interfaces
 
-import org.example.data.symbol.ObjectReference
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
@@ -52,4 +51,7 @@ interface IProjectSearchEngine {
         methodName: String,
         paramsCount: Int,
     ): ClassMethod?
+
+    fun findMethodByClassNameAndFullMethodName(className: String,
+                                               methodFullName: String,): ClassMethod?
 }

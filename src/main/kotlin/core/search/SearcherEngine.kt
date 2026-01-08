@@ -216,6 +216,16 @@ class SearcherEngine: IProjectSearchEngine {
         return null
     }
 
+    override fun findMethodByClassNameAndFullMethodName(
+        className: String,
+        methodFullName: String
+    ): ClassMethod? {
+
+        val parentClass = findByClassName(className) ?: return null
+        val method = parentClass.functionCalls.firstOrNull{ it.name == methodFullName }
+        return method
+    }
+
     // utils
     /**
      * Проверяет, совпадают ли два списка типов аргументов.

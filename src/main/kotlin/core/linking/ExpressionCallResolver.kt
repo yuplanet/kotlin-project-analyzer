@@ -18,9 +18,6 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
                     resolveExpression(expression.target, method, cls)
                     resolveExpression(expression.source, method, cls)
                 }
-
-                if(method.name == "sendToNextRecipient")
-                    print(1)
             }
         }
     }

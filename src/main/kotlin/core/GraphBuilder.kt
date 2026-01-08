@@ -17,7 +17,6 @@ class GraphBuilder() {
     private val differenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
 
     private val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
-    private val dependencyChainBuilder: IDependencyChainBuilder = DependencyChainBuilder()
     private val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
     private val projectLoader: IProjectLoader = GitLoader()
 
@@ -29,6 +28,7 @@ class GraphBuilder() {
     //separate search engine
     private lateinit var devSearchEngine: IProjectSearchEngine
     private lateinit var featSearchEngine: IProjectSearchEngine
+    private lateinit var dependencyChainBuilder: IDependencyChainBuilder
 
     //output
     private var diffResult = ProjectDiffResult()
@@ -57,7 +57,7 @@ class GraphBuilder() {
 
         //2 init search engine
         initSearchEngine()
-
+        dependencyChainBuilder = DependencyChainBuilder(featSearchEngine)
         //3
         buildClassReferences(developClasses, devSearchEngine, "develop")
         buildClassReferences(featureClasses, featSearchEngine, "feature")
@@ -108,12 +108,7 @@ class GraphBuilder() {
         try {
 
             val changed = dependencyChainBuilder.generateChangedMethodChains(diffResult.changedMethods, featureClasses)
-            val added = dependencyChainBuilder.generateAddedMethodChains(diffResult.changedMethods, featureClasses)
-            val removed = dependencyChainBuilder.generateRemovedMethodChains(diffResult.changedMethods, featureClasses)
-
             callChain.changedMethods = changed
-            callChain.addedMethods = added
-            callChain.removedMethods = removed
 
             logStatus(logFile, "Generating chains error success", 1)
         } catch (ex: Exception) {

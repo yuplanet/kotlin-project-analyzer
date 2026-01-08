@@ -125,8 +125,32 @@ class ExpressionTypeResolver(
         return type
     }
 
-    // Функция для резолва полного имени класса через импорты
     private fun resolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
+        // Ищем последнее точное совпадение
+        ktFile.importDirectives
+            .lastOrNull { it.importedFqName?.shortName()?.asString() == typeName }
+            ?.importedFqName
+            ?.asString()
+            ?.let { fq ->
+                return fq.substringAfterLast('.') // <<< вот это ключ
+            }
+
+        // Ищем wildcard-импорт package.*
+        ktFile.importDirectives
+            .lastOrNull { it.importedFqName?.asString()?.endsWith(".*") == true }
+            ?.importedFqName
+            ?.asString()
+            ?.removeSuffix(".*")
+            ?.let { pkg ->
+                return typeName // берём короткое имя
+            }
+
+        return null
+    }
+
+
+    // Функция для резолва полного имени класса через импорты
+    private fun reserveResolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
         // Сначала ищем точное совпадение
         ktFile.importDirectives.firstOrNull { it.importedFqName?.shortName()?.asString() == typeName }
             ?.importedFqName?.asString()?.let { return it }
