@@ -12,11 +12,15 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
     fun collect(projectClasses: List<KotlinClass>) {
         for (cls in projectClasses) {
             for (method in cls.functionCalls) {
-
                 for (expression in method.fullExpressions) {
                     resolveExpression(expression.target, method, cls)
                     resolveExpression(expression.source, method, cls)
+
+
                 }
+
+                if(method.name == "checkNextRecipient")
+                    print(1)
             }
         }
     }
