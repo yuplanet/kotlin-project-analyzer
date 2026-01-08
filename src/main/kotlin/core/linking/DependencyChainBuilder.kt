@@ -5,6 +5,7 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.chain.MethodCallNode
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.ObjectReference
 
 class DependencyChainBuilder(private val searchEngine: IProjectSearchEngine): IDependencyChainBuilder {
 
@@ -12,6 +13,7 @@ class DependencyChainBuilder(private val searchEngine: IProjectSearchEngine): ID
         methods: List<ClassMethod>,
         allClasses: List<KotlinClass>
     ): List<MethodCallNode> {
+
         val nodes = methods.map { method ->
             collectCalls(method)
         }
@@ -19,63 +21,67 @@ class DependencyChainBuilder(private val searchEngine: IProjectSearchEngine): ID
         return nodes
     }
 
+    fun getEmptyNode(method: ClassMethod): MethodCallNode {
 
-    fun collectCalls(method: ClassMethod, visited: MutableSet<String> = mutableSetOf()): MethodCallNode {
-        val node = MethodCallNode(
+        return MethodCallNode(
             fullName = method.fullName,
             function = method.function,
             updates = "",
         )
+    }
 
-        if (!visited.add(method.fullName)) {
-            node.updates = "cycle"
-            return node
+    fun collectCalls(method: ClassMethod, node: MethodCallNode? = null): MethodCallNode {
+
+        val currentNode = node ?: getEmptyNode(method)
+
+        val count = currentNode.visitedFunctionHistory.count { it == method.fullName }
+        if (count >= 10) {
+            currentNode.updates = "max repetitions reached"
+            return currentNode
         }
+
+        currentNode.visitedFunctionHistory.add(method.fullName)
 
         for (call in method.callRecords) {
 
-            val callClassMethods = getMethodFromSuperClass(call.referenceTargetName)
+            val callClassMethods = searchEngine.findAllMethodByClassNameAndFullMethodName(call.referenceTargetName)
 
             for (callClassMethod in callClassMethods) {
 
-                val childNode = collectCalls(callClassMethod, visited)
-                node.calls.add(childNode)
+                val childNode = collectCalls(callClassMethod, currentNode)
+                currentNode.calls.add(childNode)
+
             }
         }
 
-        return node
+        var reverseCalls = method.reverseCallRecords
+        reverseCalls += getSuperClassReverseCalls(method)
+
+        for (call in method.reverseCallRecords) {
+
+            val callClassMethods = searchEngine.findAllMethodByClassNameAndFullMethodName(call.referenceTargetName)
+
+            for (callClassMethod in callClassMethods) {
+
+                val childNode = collectCalls(callClassMethod, currentNode)
+
+                currentNode.reverseCalls.add(childNode)
+
+            }
+        }
+        return currentNode
     }
 
-    fun getMethodFromSuperClass(methodFullName: String): MutableList<ClassMethod> {
+    fun getSuperClassReverseCalls(method: ClassMethod): MutableList<ObjectReference> {
 
-        val calls = mutableListOf<ClassMethod>()
+        var reverseCalls = mutableListOf<ObjectReference>()
 
-        //call inside method
-        val methodCLassName = methodFullName.substringBefore("::")
+        val methods = searchEngine.findAllMethodByClassNameAndFullMethodName(method.fullName)
 
-        val fullMethod = methodFullName.substringAfter("::")
-
-        val method = searchEngine.findMethodByClassNameAndFullMethodName(methodCLassName, fullMethod)
-        method?.let { calls.add(it) }
-
-
-        //call in super classes
-        val mClass = searchEngine.findByClassName(methodCLassName)
-        if (mClass != null) {
-
-            for (superClass in mClass.superClasses) {
-
-                val parentMethod = searchEngine.findMethodByClassNameAndFullMethodName(superClass.name, fullMethod)
-                parentMethod?.let { calls.add(it) }
-            }
-
-            for (subClass in mClass.subClasses) {
-
-                val subClassMethod = searchEngine.findMethodByClassNameAndFullMethodName(subClass.name, fullMethod)
-                subClassMethod?.let { calls.add(it) }
-            }
+        for (method in methods) {
+            reverseCalls += method.reverseCallRecords
         }
 
-        return calls
+        return reverseCalls
     }
 }

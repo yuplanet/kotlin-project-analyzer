@@ -216,14 +216,71 @@ class SearcherEngine: IProjectSearchEngine {
         return null
     }
 
+    /**
+     * class + method()type
+     * */
     override fun findMethodByClassNameAndFullMethodName(
         className: String,
         methodFullName: String
     ): ClassMethod? {
 
         val parentClass = findByClassName(className) ?: return null
-        val method = parentClass.functionCalls.firstOrNull{ it.name == methodFullName }
+        val method = parentClass.functionCalls.firstOrNull{ it.fullName.contains("::${methodFullName}") }
         return method
+    }
+
+    /**
+     * class.method()type
+     * */
+    override fun findMethodByFullMethodExpression(expression: String): ClassMethod? {
+
+        val methodClassName = expression.substringBefore("::")
+
+        val fullMethodExpression = expression.substringAfter("::")
+        return findMethodByClassNameAndFullMethodName(methodClassName, fullMethodExpression)
+    }
+
+    override fun findAllMethodByClassNameAndFullMethodName(
+        className: String,
+        methodFullName: String
+    ): List<ClassMethod> {
+
+        val calls = mutableListOf<ClassMethod>()
+
+        val method = findMethodByClassNameAndFullMethodName(className, methodFullName)
+        method?.let { calls.add(it) }
+
+        //call in super classes
+        val methodClass = method?.parentClass
+
+        if (methodClass != null) {
+
+            for (superClass in methodClass.superClasses) {
+                val parentMethod = findMethodByClassNameAndFullMethodName(superClass.name, methodFullName)
+                parentMethod?.let { calls.add(it) }
+            }
+
+            for (subClass in methodClass.subClasses) {
+                val subClassMethod = findMethodByClassNameAndFullMethodName(subClass.name, methodFullName)
+                subClassMethod?.let { calls.add(it) }
+            }
+        }
+
+        return calls
+    }
+
+    override fun findAllMethodByClassNameAndFullMethodName(expression: String): List<ClassMethod> {
+        val methodClassName = expression.substringBefore("::")
+
+        val fullMethodExpression = expression.substringAfter("::")
+        return findAllMethodByClassNameAndFullMethodName(methodClassName, fullMethodExpression)
+    }
+
+    override fun findAllMethodByClassNameAndFullMethodNameRecursive(expression: String): List<ClassMethod> {
+        val methodClassName = expression.substringBefore("::")
+
+        val fullMethodExpression = expression.substringAfter("::")
+        return findAllMethodByClassNameAndFullMethodName(methodClassName, fullMethodExpression)
     }
 
     // utils
