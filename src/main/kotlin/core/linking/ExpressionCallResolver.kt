@@ -5,7 +5,9 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.MethodReference
 import org.example.data.symbol.expression.ExpressionValue
+import org.example.data.symbol.expression.FieldValue
 import org.example.data.symbol.expression.MethodValue
+import org.example.data.symbol.expression.VariableValue
 
 class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
 
@@ -15,11 +17,9 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
                 for (expression in method.fullExpressions) {
                     resolveExpression(expression.target, method, cls)
                     resolveExpression(expression.source, method, cls)
-
-
                 }
 
-                if(method.name == "checkNextRecipient")
+                if(method.name == "sendToNextRecipient")
                     print(1)
             }
         }
@@ -48,17 +48,46 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
             params = value.parameters.map { it.valueType }
         )
 
-        //if (callee == null && value.parameters.any { it.valueType == "unknown" }) {
-        //    callee = searchEngine.findMethodByClassNameAndMethodNameAndParamsCount(
-        //        className = value.receiverClassName,
-        //        methodName = value.methodName,
-        //        paramsCount = value.parameters.count()
-        //    )
-        //    if(callee != null)
-        //        print(1)
-        //}
-        callee ?: return
+        if (callee == null && value.parameters.any { it.valueType == "unknown" }) {
+            var candidate = searchEngine.findMethodByClassNameAndMethodNameAndParamsCount(
+                className = value.receiverClassName,
+                methodName = value.methodName,
+                paramsCount = value.parameters.count()
+            )
+            if (candidate != null) {
 
+                // сверяем и обновляем параметры по индексу
+                var compatible = true
+
+                value.parameters.forEachIndexed { index, param ->
+
+                    val realParamType = candidate.parameters.getOrNull(index)?.type ?: return@forEachIndexed
+
+                    when {
+                        // unknown -> просто обновляем тип
+                        param.valueType == "unknown" -> {
+
+                            if(param is VariableValue)
+                                param.variableType = realParamType
+                            else if(param is FieldValue)
+                                param.fieldType = realParamType
+                            else if(param is MethodValue)
+                                param.methodReturnType = realParamType
+                        }
+
+                        // тип известен, но отличается -> не та перегрузка
+                        param.valueType != realParamType -> {
+                            compatible = false
+                        }
+                    }
+                }
+
+                if (compatible) {
+                    callee = candidate
+                }
+            }
+        }
+        callee ?: return
         val parentClass =
             searchEngine.findByClassName(value.receiverClassName) ?: return
 

@@ -306,7 +306,19 @@ class ExpressionChainBuilder(
 
             is KtBinaryExpression -> {
 
-                if (element.operationToken != KtTokens.EQ)
+                val op = element.operationToken
+
+                // 1) Elvis operator ?:
+                if (op == KtTokens.ELVIS) {
+
+                    element.left?.let { handlePsiElement(it, context, hasTarget) }
+
+                    element.right?.let { handlePsiElement(it, context, hasTarget) }
+
+                    return null
+                }
+
+                else if (op!= KtTokens.EQ)
                     return null
 
                 val leftExpression = element.left ?: error("Left-hand side missing ${element.left?.text}")
