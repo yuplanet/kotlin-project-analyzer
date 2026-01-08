@@ -15,6 +15,7 @@ class GraphBuilder() {
 
     //modules
     private val differenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
+
     private val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
     private val dependencyChainBuilder: IDependencyChainBuilder = DependencyChainBuilder()
     private val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
@@ -93,7 +94,6 @@ class GraphBuilder() {
         logStatus(logFile, "Step 6: output")
         try {
             resultPresenter.writeCallChainToFile(callChain)
-
             logStatus(logFile, "Output success")
 
         } catch (ex: Exception) {

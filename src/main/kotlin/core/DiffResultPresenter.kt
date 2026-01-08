@@ -8,39 +8,50 @@ import java.io.File
 class DiffResultPresenter : IDiffResultPresenter {
 
     override fun writeCallChainToFile(result: ProjectDiffResultOutput) {
-        val builder = StringBuilder()
 
+        val treeLike = StringBuilder()
+        val pathLike = StringBuilder()
+
+        // ======= ВИД №1 (дерево с отступами) =======
         result.changedMethods.forEach { root ->
 
-            builder.appendLine("=== METHOD ===")
-            builder.appendLine(root.fullName)
-            builder.appendLine()
+            treeLike.appendLine("=== METHOD ===")
+            treeLike.appendLine(root.fullName)
+            treeLike.appendLine()
 
-            // ================= UPSTREAM =======================
-            builder.appendLine("=== UPSTREAM (WHO CALLS THIS METHOD) ===")
+            treeLike.appendLine("=== UPSTREAM (WHO CALLS THIS METHOD) ===")
+            buildLinearChains(root, treeLike, CallDirection.UPSTREAM)
 
-            buildLinearChains(
-                node = root,
-                builder = builder,
-                direction = CallDirection.UPSTREAM
-            )
+            treeLike.appendLine()
 
-            builder.appendLine()
+            treeLike.appendLine("=== DOWNSTREAM (WHAT THIS METHOD CALLS) ===")
+            buildLinearChains(root, treeLike, CallDirection.DOWNSTREAM)
 
-            // ================= DOWNSTREAM =======================
-            builder.appendLine("=== DOWNSTREAM (WHAT THIS METHOD CALLS) ===")
-
-            buildLinearChains(
-                node = root,
-                builder = builder,
-                direction = CallDirection.DOWNSTREAM
-            )
-
-            builder.appendLine("\n----------------------------------------\n")
+            treeLike.appendLine("\n----------------------------------------\n")
         }
 
-        File("changed_methods.txt").writeText(builder.toString())
+        // ======= ВИД №2 (полные пути) =======
+        result.changedMethods.forEach { root ->
+
+            pathLike.appendLine("=== METHOD ===")
+            pathLike.appendLine(root.fullName)
+            pathLike.appendLine()
+
+            pathLike.appendLine("=== UPSTREAM PATHS ===")
+            buildLinearChains2(root, pathLike, CallDirection.UPSTREAM)
+
+            pathLike.appendLine()
+
+            pathLike.appendLine("=== DOWNSTREAM PATHS ===")
+            buildLinearChains2(root, pathLike, CallDirection.DOWNSTREAM)
+
+            pathLike.appendLine("\n----------------------------------------\n")
+        }
+
+        File("changed_methods_tree.txt").writeText(treeLike.toString())
+        File("changed_methods_paths.txt").writeText(pathLike.toString())
     }
+
 
     private fun buildLinearChains(
         node: MethodCallNode,
@@ -82,6 +93,39 @@ class DiffResultPresenter : IDiffResultPresenter {
 
         nextNodes.forEach { child ->
             buildLinearChains(child, builder, direction, depth + 1, visited)
+        }
+    }
+
+    private fun buildLinearChains2(
+        node: MethodCallNode,
+        builder: StringBuilder,
+        direction: CallDirection,
+        path: List<String> = emptyList(),
+        printed: MutableSet<String> = mutableSetOf()
+    ) {
+        if (node.fullName in path) return
+
+        val currentPath = path + node.fullName
+
+        val nextNodes = when (direction) {
+            CallDirection.UPSTREAM -> node.reverseCalls
+            CallDirection.DOWNSTREAM -> node.calls
+        }.filter { it.fullName.isNotBlank() }
+
+        // тупик — печатаем путь
+        if (nextNodes.isEmpty()) {
+            val line = currentPath.joinToString(" -> ")
+
+            // <<< УДАЛЕНИЕ ДУБЛИКАТОВ >>>
+            if (printed.add(line)) {
+                builder.appendLine(line)
+            }
+
+            return
+        }
+
+        nextNodes.forEach { child ->
+            buildLinearChains2(child, builder, direction, currentPath, printed)
         }
     }
 
