@@ -18,14 +18,7 @@ class DependencyChainBuilder(
             collectChains(method)
         }
 
-    /**
-     * Создает корневой узел и запускает рекурсивный сбор цепочек
-     */
-    fun collectChains(
-        method: ClassMethod,
-        depth: Int = 0,
-        visited: MutableSet<String> = mutableSetOf()
-    ): MethodCallNode {
+    fun collectChains(method: ClassMethod): MethodCallNode {
 
         val node = MethodCallNode(
             fullName = method.fullName,
@@ -33,47 +26,77 @@ class DependencyChainBuilder(
             updates = ""
         )
 
-        // защита от рекурсии и циклов
-        if (depth > 50) {
-            node.updates = "max depth reached"
-            return node
+        // запускаем отдельно
+        collectDirectCalls(method, node)
+        collectReverseCalls(method, node)
+
+        return node
+    }
+
+    /**
+     * ====== прямые вызовы ======
+     */
+    private fun collectDirectCalls(method: ClassMethod, node: MethodCallNode) {
+
+        // защита от циклов
+        if (node.visitedFunctionHistory.count { it == method.fullName } >= 100) {
+            node.updates = "max direct repetitions reached"
+            return
         }
 
-        if (!visited.add(method.fullName)) {
-            node.updates = "cycle detected"
-            return node
-        }
+        node.visitedFunctionHistory.add(method.fullName)
 
-        // ==== прямые вызовы ====
         for (call in method.callRecords) {
-            val target = searchEngine
-                .findMethodByFullMethodExpression(call.referenceTargetName)
-                ?: continue
 
-            val child = collectChains(
-                method = target,
-                depth = depth + 1,
-                visited = visited.toMutableSet() // копия!
+            val target = searchEngine.findMethodByFullMethodExpression(call.referenceTargetName)
+                    ?: continue
+
+            val child = MethodCallNode(
+                fullName = target.fullName,
+                function = target.function,
+                updates = ""
             )
+
+            // передаем историю дальше
+            child.visitedFunctionHistory = node.visitedFunctionHistory.toMutableList()
+
+            collectDirectCalls(target, child)
 
             node.calls.add(child)
         }
 
-        // ==== обратные вызовы ====
-        for (call in method.reverseCallRecords) {
-            val target = searchEngine
-                .findMethodByFullMethodExpression(call.referenceTargetName)
-                ?: continue
+    }
 
-            val child = collectChains(
-                method = target,
-                depth = depth + 1,
-                visited = visited.toMutableSet()
+    /**
+     * ====== обратные вызовы ======
+     */
+    private fun collectReverseCalls(method: ClassMethod, node: MethodCallNode) {
+
+        if (node.visitedReverseFunctionHistory.count { it == method.fullName } >= 100) {
+            node.updates = "max reverse repetitions reached"
+            return
+        }
+
+        node.visitedReverseFunctionHistory.add(method.fullName)
+
+        for (call in method.reverseCallRecords) {
+
+            val target =
+                searchEngine.findMethodByFullMethodExpression(call.referenceTargetName)
+                    ?: continue
+
+            val child = MethodCallNode(
+                fullName = target.fullName,
+                function = target.function,
+                updates = ""
             )
+
+            child.visitedReverseFunctionHistory =
+                node.visitedReverseFunctionHistory.toMutableList()
+
+            collectReverseCalls(target, child)
 
             node.reverseCalls.add(child)
         }
-
-        return node
     }
 }

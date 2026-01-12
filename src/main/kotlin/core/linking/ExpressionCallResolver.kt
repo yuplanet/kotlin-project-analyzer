@@ -4,7 +4,6 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.MethodReference
-import org.example.data.symbol.enum.ObjectType
 import org.example.data.symbol.expression.ExpressionValue
 import org.example.data.symbol.expression.FieldValue
 import org.example.data.symbol.expression.MethodValue
@@ -12,8 +11,10 @@ import org.example.data.symbol.expression.VariableValue
 
 class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
 
-    fun collect(projectClasses: List<KotlinClass>) {
+    var _projectClasses = listOf<KotlinClass>()
 
+    fun collect(projectClasses: List<KotlinClass>) {
+        _projectClasses = projectClasses
         try {
 
             for (cls in projectClasses) {
@@ -55,39 +56,18 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
         callingMethod = findCalleeMethodByCount(callingMethod, value)
         callingMethod ?: return
 
-        //if(callingMethod.parentClass.ktClassObjectType == ObjectType.Interface) {
-        //    val method = searchEngine.findMethodByClassNameAndMethodNameAndParams(
-        //        callingMethod.parentClass.name,
-        //        value.methodName,
-        //        value.parameters.map { it.valueType })
-        //    method ?: return
-        //    val reference = MethodReference(
-        //        referenceTargetName = method.fullName,
-        //        referenceTargetParentClass = method.parentClass,
-        //        method = value,
-        //        signature = value.methodSignature
-        //    )
-        //    callerMethod.callRecords.add(reference)
-        //    val reverseReference = MethodReference(
-        //        referenceTargetName = callerMethod.fullName,
-        //        referenceTargetParentClass = callerClass,
-        //        method = value,
-        //        signature = ""
-        //    )
-        //    callingMethod.reverseCallRecords.add(reverseReference)
-        //    return
-        //}
+        if(value.receiverName.contains( "RcsServiceImpl")  )
+            print(1)
+
         val allMethods = searchEngine.findAllMethodByClassNameAndMethodValue(callingMethod.parentClass.name, value)
 
         for (method in allMethods) {
-
-            if(method.fullName.contains("checkPhoneNumber"))
-                print(1)
 
             val referenceTargetName = method.fullName.replace(  "${value.receiverClassName}::", "${method.parentClass.name}::")
             val signature = value.methodSignature.replace( "${value.receiverClassName}.", "${method.parentClass.name}.")
 
             value.receiverClassName = method.parentClass.name
+
             val reference = MethodReference(
                 referenceTargetName = referenceTargetName,
                 referenceTargetParentClass = method.parentClass,
@@ -97,14 +77,18 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
 
             callerMethod.callRecords.add(reference)
 
-            val reverseReference = MethodReference(
-                referenceTargetName = callerMethod.fullName,
-                referenceTargetParentClass = callerClass,
-                method = value,
-                signature = signature
-            )
+            val callers = findMethodsCalling(callingMethod)
 
-            callingMethod.reverseCallRecords.add(reverseReference)
+            for (caller in callers) {
+                val reverseReference = MethodReference(
+                    referenceTargetName = caller.fullName,
+                    referenceTargetParentClass = caller.parentClass,
+                    method = value,
+                    signature = signature
+                )
+
+                callingMethod.reverseCallRecords.add(reverseReference)
+            }
         }
     }
 
@@ -139,7 +123,7 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
                         }
 
                         // тип известен, но отличается -> не та перегрузка
-                        param.valueType != realParamType -> {
+                        param.valueType.replace("?","") != realParamType.replace("?","") -> {
                             compatible = false
                         }
                     }
@@ -152,4 +136,46 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
         }
         return  callee
     }
+
+    fun findMethodsCalling(
+        target: ClassMethod
+    ): List<ClassMethod> {
+
+        val result = mutableListOf<ClassMethod>()
+
+        for (cls in _projectClasses) {
+            for (method in cls.functionCalls) {
+
+                for (expr in method.fullExpressions) {
+
+                    if (isCallOf(expr.target, target) || isCallOf(expr.source, target)) {
+                        result.add(method)
+                        break
+                    }
+                }
+            }
+        }
+
+        return result
+    }
+
+
+    private fun isCallOf(
+        expr: ExpressionValue?,
+        target: ClassMethod
+    ): Boolean {
+        val mv = expr as? MethodValue ?: return false
+
+        // проверка имени метода
+        if (mv.methodName != target.name) return false
+
+        // проверка класса-получателя (receiver)
+        if (mv.receiverClassName != target.parentClass.name) return false
+
+        // количество параметров
+        if (mv.parameters.size != target.parameters.size) return false
+
+        return true
+    }
+
 }

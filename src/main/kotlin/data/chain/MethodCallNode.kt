@@ -9,6 +9,8 @@ class MethodCallNode(
 ) {
     var visitedFunctionHistory: MutableList<String> = mutableListOf()
     val calls: MutableList<MethodCallNode> = mutableListOf()
+
+    var visitedReverseFunctionHistory: MutableList<String> = mutableListOf()
     val reverseCalls: MutableList<MethodCallNode> = mutableListOf()
 
     override fun toString(): String {
