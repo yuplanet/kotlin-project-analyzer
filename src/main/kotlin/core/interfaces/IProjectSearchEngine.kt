@@ -72,6 +72,7 @@ interface IProjectSearchEngine {
     fun findMethodByFullMethodExpression(expression: String): ClassMethod?
 
 
+    fun findAllMethodByClassNameAndMethodValue(className: String, value: MethodValue): List<ClassMethod>
 
     /**
      * Возвращает все ClassMethod из текущего класса, родителя и наследника.
@@ -79,22 +80,4 @@ interface IProjectSearchEngine {
      */
     fun findAllMethodByClassNameAndFullMethodName(className: String,
                                                methodFullName: String,): List<ClassMethod>
-
-
-    /**
-     * Возвращает все ClassMethod из текущего класса, родителя и наследника.
-     * поиск по Class.Method(params):type
-     */
-    fun findAllMethodByClassNameAndMethodValue(className: String, value: MethodValue,): List<ClassMethod>
-    /**
-     * Возвращает все ClassMethod из текущего класса, родителя и наследника.
-     * поиск по Class.Method(params):type
-     */
-    fun findAllMethodByClassNameAndFullMethodName(expression: String): List<ClassMethod>
-
-    /**
-     * Возвращает все ClassMethod из текущего класса, родителя и наследника.
-     * поиск по Class.Method(params):type
-     */
-    fun findAllMethodByClassNameAndFullMethodNameRecursive(expression: String): List<ClassMethod>
 }

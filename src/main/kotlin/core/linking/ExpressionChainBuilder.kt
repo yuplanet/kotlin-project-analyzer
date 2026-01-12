@@ -12,7 +12,6 @@ import org.example.data.symbol.expression.*
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
-import java.io.File
 
 class ExpressionChainBuilder(
 

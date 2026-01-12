@@ -6,8 +6,11 @@ import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.enum.ObjectType
 import org.example.data.symbol.expression.MethodValue
+import org.jetbrains.kotlin.builtins.DefaultBuiltIns
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtParameter
-
+import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
 
 class SearcherEngine: IProjectSearchEngine {
 
@@ -46,6 +49,31 @@ class SearcherEngine: IProjectSearchEngine {
             val nkey = method.name.hashCode() // метод, который возвращает hashCode fullName
             methodSimpleNameDictionary.computeIfAbsent(nkey) { mutableListOf() }.add(method)
         }
+    }
+
+    fun isSubType(parent: String, heir: String): Boolean {
+
+        // 1) берём стандартные kotlin builtins (Any, Int, String, Number и т.п.)
+        val builtIns = DefaultBuiltIns.Instance
+
+        // 2) функция получения типа по имени строки
+        fun getTypeByName(name: String): KotlinType? {
+            val fq = when (name) {
+                "Int" -> "kotlin.Int"
+                "String" -> "kotlin.String"
+                "Any" -> "kotlin.Any"
+                "Number" -> "kotlin.Number"
+                else -> "kotlin.$name"   // попытка угадать
+            }
+
+            val descriptor = builtIns.getBuiltInClassByFqName(FqName(fq))
+            return descriptor.defaultType
+        }
+
+        val parentType = getTypeByName(parent) ?: return false
+        val heirType = getTypeByName(heir) ?: return false
+
+        return KotlinTypeChecker.DEFAULT.isSubtypeOf(heirType, parentType)
     }
 
     override fun findFieldRefByClassNameAndFieldName(
@@ -302,20 +330,6 @@ class SearcherEngine: IProjectSearchEngine {
         return calls
     }
 
-    override fun findAllMethodByClassNameAndFullMethodName(expression: String): List<ClassMethod> {
-        val methodClassName = expression.substringBefore("::")
-
-        val fullMethodExpression = expression.substringAfter("::")
-        return findAllMethodByClassNameAndFullMethodName(methodClassName, fullMethodExpression)
-    }
-
-    override fun findAllMethodByClassNameAndFullMethodNameRecursive(expression: String): List<ClassMethod> {
-        val methodClassName = expression.substringBefore("::")
-
-        val fullMethodExpression = expression.substringAfter("::")
-        return findAllMethodByClassNameAndFullMethodName(methodClassName, fullMethodExpression)
-    }
-
     // utils
     /**
      * Проверяет, совпадают ли два списка типов аргументов.
@@ -332,7 +346,6 @@ class SearcherEngine: IProjectSearchEngine {
         methodParams: List<String>
     ): Boolean {
         if (targetParams.size != methodParams.size) return false
-        return targetParams.indices.all { targetParams[it] == methodParams[it] }
+        return targetParams.indices.all { targetParams[it].replace("?","") == methodParams[it].replace("?","") }
     }
-
 }
