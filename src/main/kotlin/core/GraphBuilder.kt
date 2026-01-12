@@ -12,15 +12,6 @@ import org.example.data.symbol.KotlinClass
 import java.io.File
 
 class GraphBuilder() {
-
-    //modules
-    private val differenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
-
-    private val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
-    private val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
-    private val projectLoader: IProjectLoader = GitLoader()
-
-
     //state
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
@@ -57,8 +48,7 @@ class GraphBuilder() {
         //2 init search engine
         initSearchEngine()
         //3
-        buildClassReferences(developClasses, devSearchEngine, "develop")
-        buildClassReferences(featureClasses, featSearchEngine, "feature")
+        buildClassReferences()
 
         //4 analizy
         analyzeDifference()
@@ -91,7 +81,11 @@ class GraphBuilder() {
     private fun output() {
         logStatus(logFile, "Step 6: output")
         try {
+
+            val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
+
             resultPresenter.writeCallChainToFile(callChain)
+
             logStatus(logFile, "Output success")
 
         } catch (ex: Exception) {
@@ -109,6 +103,7 @@ class GraphBuilder() {
             callChain.changedMethods = changed
 
             logStatus(logFile, "Generating chains error success", 1)
+
         } catch (ex: Exception) {
             logStatus(logFile, "Generating chains error ${ex.message}", 1)
             throw ex
@@ -119,6 +114,7 @@ class GraphBuilder() {
         logStatus(logFile, "Step 4: analyzing difference")
 
         try {
+            val differenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
 
             diffResult = differenceAnalyzer.analyzeProjectDifferences(developClasses, featureClasses)
 
@@ -132,13 +128,26 @@ class GraphBuilder() {
         }
     }
 
-    private fun buildClassReferences(projectClasses: List<KotlinClass>, searchEngine: IProjectSearchEngine, branchName: String) {
+    private fun buildClassReferences() {
 
         logStatus(logFile, "Step 3: project binding")
 
         try {
+            val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
+            val logFolder = "logs/reference/"
 
-            referenceBuilder.bindAll(projectClasses, searchEngine, branchName)
+            //develop + logs
+            referenceBuilder.bindAll(developClasses, devSearchEngine)
+
+            LogManager.logClassAllMethodExpression(developClasses, logFolder + "/expressions/develop")
+            LogManager.logClassAllCalls(developClasses, logFolder + "/calls/develop")
+
+
+            //feature + logs
+            referenceBuilder.bindAll(featureClasses, featSearchEngine)
+
+            LogManager.logClassAllMethodExpression(developClasses, logFolder + "/expressions/feature")
+            LogManager.logClassAllCalls(developClasses, logFolder + "/calls/feature")
 
             logStatus(logFile, "Project binding success", 1)
 
@@ -153,8 +162,7 @@ class GraphBuilder() {
         logStatus(logFile, "Step 1: project loading")
 
         try {
-            developClasses = listOf()
-            featureClasses = listOf()
+            val projectLoader: IProjectLoader = GitLoader()
 
             val developFiles = projectLoader.loadProjectFilesFromCommit(repoPath, mainCommit)
                 .filterKeys { !it.startsWith("src/test") }

@@ -131,7 +131,7 @@ class SearcherEngine: IProjectSearchEngine {
         val key = _className.hashCode()
         val candidates = classSimpleNameDictionary[key] ?: emptyList()
 
-        val result = candidates.firstOrNull { it.ktClassObject.name == _className }
+        val result = candidates.firstOrNull { it.ktClassObject.name == className }
 
         return result
     }

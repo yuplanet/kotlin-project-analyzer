@@ -13,9 +13,8 @@ object LogManager {
         val file = File(path)
 
         // удалить старый лог, если существует
-        if (file.exists()) {
+        if (file.exists())
             file.delete()
-        }
 
         // создать родительские директории при необходимости
         file.parentFile?.mkdirs()
