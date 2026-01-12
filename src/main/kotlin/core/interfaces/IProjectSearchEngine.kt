@@ -3,6 +3,7 @@ package org.example.core.interfaces
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.expression.MethodValue
 
 interface IProjectSearchEngine {
 
@@ -53,6 +54,7 @@ interface IProjectSearchEngine {
     ): ClassMethod?
 
 
+
     fun findMethodByClassNameAndMethodNameAndParamsCount(
         className: String,
         methodName: String,
@@ -77,6 +79,13 @@ interface IProjectSearchEngine {
      */
     fun findAllMethodByClassNameAndFullMethodName(className: String,
                                                methodFullName: String,): List<ClassMethod>
+
+
+    /**
+     * Возвращает все ClassMethod из текущего класса, родителя и наследника.
+     * поиск по Class.Method(params):type
+     */
+    fun findAllMethodByClassNameAndMethodValue(className: String, value: MethodValue,): List<ClassMethod>
     /**
      * Возвращает все ClassMethod из текущего класса, родителя и наследника.
      * поиск по Class.Method(params):type

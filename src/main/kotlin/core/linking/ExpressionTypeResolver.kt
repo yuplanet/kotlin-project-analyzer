@@ -150,7 +150,7 @@ class ExpressionTypeResolver(
 
 
     // Функция для резолва полного имени класса через импорты
-    private fun reserveResolveTypeFromImports(typeName: String, ktFile: KtFile): String? {
+    private fun resolveFullTypeFromImports(typeName: String, ktFile: KtFile): String? {
         // Сначала ищем точное совпадение
         ktFile.importDirectives.firstOrNull { it.importedFqName?.shortName()?.asString() == typeName }
             ?.importedFqName?.asString()?.let { return it }

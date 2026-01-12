@@ -2,16 +2,17 @@ package org.example.data.chain
 
 import org.jetbrains.kotlin.psi.KtNamedFunction
 
-data class MethodCallNode (
-    /**
-     * <путь_к_файлу>.<имя_класса>::<имя_метода> ( параметры )
-     */
+class MethodCallNode(
     val fullName: String,
     val function: KtNamedFunction,
-    var updates: String,
+    var updates: String
+) {
+    var visitedFunctionHistory: MutableList<String> = mutableListOf()
+    val calls: MutableList<MethodCallNode> = mutableListOf()
+    val reverseCalls: MutableList<MethodCallNode> = mutableListOf()
 
-    var visitedFunctionHistory: MutableList<String> = mutableListOf(),
-
-    val calls: MutableList<MethodCallNode>  = mutableListOf(),
-    val reverseCalls: MutableList<MethodCallNode>  = mutableListOf()
-)
+    override fun toString(): String {
+        // безопасный вывод, без рекурсии
+        return fullName + if (updates.isNotBlank()) " ($updates)" else ""
+    }
+}

@@ -58,28 +58,31 @@ class DiffResultPresenter : IDiffResultPresenter {
         builder: StringBuilder,
         direction: CallDirection,
         depth: Int = 0,
-        visited: MutableSet<String> = mutableSetOf()
+        pathVisited: MutableSet<String> = mutableSetOf()
     ) {
-        // защита от циклов
-        if (!visited.add("${direction}_${node.fullName}_$depth")) return
+        val key = "${direction}_${node.fullName}"
+        if (key in pathVisited) {
+            builder.appendLine(
+                "${" ".repeat(depth * 4)}└─ ${node.fullName}    // ⟳ цикл"
+            )
+            return
+        }
+
+        pathVisited.add(key)
 
         val indent = " ".repeat(depth * 4)
 
-        // === комментарии по уровням ===
         val comment = when {
             depth == 0 ->
                 "// ИЗМЕНЕННЫЙ МЕТОД — источник изменений"
 
             direction == CallDirection.UPSTREAM ->
-                "// МОЖЕТ ИЗМЕНИТЬСЯ ПОВЕДЕНИЕ ВЫШЕ ПО ЦЕПОЧКЕ (этот метод вызывает измененный)"
+                "// МОЖЕТ ИЗМЕНИТЬСЯ ПОВЕДЕНИЕ ВЫШЕ ПО ЦЕПОЧКЕ"
 
-            direction == CallDirection.DOWNSTREAM ->
-                "// МОЖЕТ ПОТРЕБОВАТЬ КОРРЕКТИРОВКУ ИЗ-ЗА ИЗМЕНЕНИЙ (вызывается измененным методом)"
-
-            else -> ""
+            else ->
+                "// МОЖЕТ ПОТРЕБОВАТЬ КОРРЕКТИРОВКУ"
         }
 
-        // === вывод строки ===
         if (depth == 0) {
             builder.appendLine("${node.fullName}    $comment")
         } else {
@@ -89,12 +92,19 @@ class DiffResultPresenter : IDiffResultPresenter {
         val nextNodes = when (direction) {
             CallDirection.UPSTREAM -> node.reverseCalls
             CallDirection.DOWNSTREAM -> node.calls
-        }.filter { it.fullName.isNotBlank() }
+        }
 
         nextNodes.forEach { child ->
-            buildLinearChains(child, builder, direction, depth + 1, visited)
+            buildLinearChains(
+                child,
+                builder,
+                direction,
+                depth + 1,
+                pathVisited.toMutableSet() // 🔥 ВАЖНО
+            )
         }
     }
+
 
     private fun buildLinearChains2(
         node: MethodCallNode,

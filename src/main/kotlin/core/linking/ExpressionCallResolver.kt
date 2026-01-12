@@ -4,6 +4,7 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.MethodReference
+import org.example.data.symbol.enum.ObjectType
 import org.example.data.symbol.expression.ExpressionValue
 import org.example.data.symbol.expression.FieldValue
 import org.example.data.symbol.expression.MethodValue
@@ -12,13 +13,19 @@ import org.example.data.symbol.expression.VariableValue
 class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
 
     fun collect(projectClasses: List<KotlinClass>) {
-        for (cls in projectClasses) {
-            for (method in cls.functionCalls) {
-                for (expression in method.fullExpressions) {
-                    resolveExpression(expression.target, method, cls)
-                    resolveExpression(expression.source, method, cls)
+
+        try {
+
+            for (cls in projectClasses) {
+                for (method in cls.functionCalls) {
+                    for (expression in method.fullExpressions) {
+                        resolveExpression(expression.target, method, cls)
+                        resolveExpression(expression.source, method, cls)
+                    }
                 }
             }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
         }
     }
 
@@ -36,14 +43,73 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
 
     private fun resolveMethod(
         value: MethodValue,
-        caller: ClassMethod,
+        callerMethod: ClassMethod,
         callerClass: KotlinClass
     ) {
-        var callee = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+        var callingMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
             className = value.receiverClassName,
             methodName = value.methodName,
             params = value.parameters.map { it.valueType }
         )
+
+        callingMethod = findCalleeMethodByCount(callingMethod, value)
+        callingMethod ?: return
+
+        //if(callingMethod.parentClass.ktClassObjectType == ObjectType.Interface) {
+        //    val method = searchEngine.findMethodByClassNameAndMethodNameAndParams(
+        //        callingMethod.parentClass.name,
+        //        value.methodName,
+        //        value.parameters.map { it.valueType })
+        //    method ?: return
+        //    val reference = MethodReference(
+        //        referenceTargetName = method.fullName,
+        //        referenceTargetParentClass = method.parentClass,
+        //        method = value,
+        //        signature = value.methodSignature
+        //    )
+        //    callerMethod.callRecords.add(reference)
+        //    val reverseReference = MethodReference(
+        //        referenceTargetName = callerMethod.fullName,
+        //        referenceTargetParentClass = callerClass,
+        //        method = value,
+        //        signature = ""
+        //    )
+        //    callingMethod.reverseCallRecords.add(reverseReference)
+        //    return
+        //}
+        val allMethods = searchEngine.findAllMethodByClassNameAndMethodValue(callingMethod.parentClass.name, value)
+
+        for (method in allMethods) {
+
+            if(method.fullName.contains("checkPhoneNumber"))
+                print(1)
+
+            val referenceTargetName = method.fullName.replace(  "${value.receiverClassName}::", "${method.parentClass.name}::")
+            val signature = value.methodSignature.replace( "${value.receiverClassName}.", "${method.parentClass.name}.")
+
+            value.receiverClassName = method.parentClass.name
+            val reference = MethodReference(
+                referenceTargetName = referenceTargetName,
+                referenceTargetParentClass = method.parentClass,
+                method = value,
+                signature = signature
+            )
+
+            callerMethod.callRecords.add(reference)
+
+            val reverseReference = MethodReference(
+                referenceTargetName = callerMethod.fullName,
+                referenceTargetParentClass = callerClass,
+                method = value,
+                signature = signature
+            )
+
+            callingMethod.reverseCallRecords.add(reverseReference)
+        }
+    }
+
+
+    fun findCalleeMethodByCount(callee: ClassMethod?, value: MethodValue):  ClassMethod? {
 
         if (callee == null && value.parameters.any { it.valueType == "unknown" }) {
             var candidate = searchEngine.findMethodByClassNameAndMethodNameAndParamsCount(
@@ -64,11 +130,11 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
                         // unknown -> просто обновляем тип
                         param.valueType == "unknown" -> {
 
-                            if(param is VariableValue)
+                            if (param is VariableValue)
                                 param.variableType = realParamType
-                            else if(param is FieldValue)
+                            else if (param is FieldValue)
                                 param.fieldType = realParamType
-                            else if(param is MethodValue)
+                            else if (param is MethodValue)
                                 param.methodReturnType = realParamType
                         }
 
@@ -80,30 +146,10 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
                 }
 
                 if (compatible) {
-                    callee = candidate
+                    return candidate
                 }
             }
         }
-        callee ?: return
-        val parentClass =
-            searchEngine.findByClassName(value.receiverClassName) ?: return
-
-        val reference = MethodReference(
-            referenceTargetName = callee.fullName,
-            referenceTargetParentClass = parentClass,
-            method = value,
-            signature = value.methodSignature
-        )
-
-        caller.callRecords.add(reference)
-
-        val reverseReference = MethodReference(
-            referenceTargetName = caller.fullName,
-            referenceTargetParentClass = callerClass,
-            method = value,
-            signature = ""
-        )
-
-        callee.reverseCallRecords.add(reverseReference)
+        return  callee
     }
 }

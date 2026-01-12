@@ -50,14 +50,12 @@ class GraphBuilder() {
         // 5 generate chains
         // 6 output
 
-
         //1 load
         loadProject(repoPath, mainCommit, branchCommit)
 
 
         //2 init search engine
         initSearchEngine()
-        dependencyChainBuilder = DependencyChainBuilder(featSearchEngine)
         //3
         buildClassReferences(developClasses, devSearchEngine, "develop")
         buildClassReferences(featureClasses, featSearchEngine, "feature")
@@ -106,7 +104,7 @@ class GraphBuilder() {
 
         logStatus(logFile, "Step 5: generating chains")
         try {
-
+            dependencyChainBuilder = DependencyChainBuilder(featSearchEngine)
             val changed = dependencyChainBuilder.generateChangedMethodChains(diffResult.changedMethods, featureClasses)
             callChain.changedMethods = changed
 

@@ -5,6 +5,7 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.enum.ObjectType
+import org.example.data.symbol.expression.MethodValue
 import org.jetbrains.kotlin.psi.KtParameter
 
 
@@ -122,10 +123,16 @@ class SearcherEngine: IProjectSearchEngine {
     //Classes
     override fun findByClassName(className: String): KotlinClass? {
 
-        val key = className.hashCode()
+        val _className = if(className.contains('?'))
+            className.replace("?","")
+        else
+            className
+
+        val key = _className.hashCode()
         val candidates = classSimpleNameDictionary[key] ?: emptyList()
 
-        val result = candidates.firstOrNull { it.ktClassObject.name == className }
+        val result = candidates.firstOrNull { it.ktClassObject.name == _className }
+
         return result
     }
 
@@ -262,6 +269,32 @@ class SearcherEngine: IProjectSearchEngine {
 
             for (subClass in methodClass.subClasses) {
                 val subClassMethod = findMethodByClassNameAndFullMethodName(subClass.name, methodFullName)
+                subClassMethod?.let { calls.add(it) }
+            }
+        }
+
+        return calls
+    }
+
+    override fun findAllMethodByClassNameAndMethodValue(className: String, value: MethodValue): List<ClassMethod> {
+        val calls = mutableListOf<ClassMethod>()
+
+        val method = findMethodByClassNameAndMethodNameAndParams(className, value.methodName, value.parameters.map { it.valueType } )
+
+        method?.let { calls.add(it) }
+
+        //call in super classes
+        val methodClass = method?.parentClass
+
+        if (methodClass != null) {
+
+            for (superClass in methodClass.superClasses) {
+                val parentMethod = findMethodByClassNameAndMethodNameAndParams(superClass.name, value.methodName,  value.parameters.map { it.valueType } )
+                parentMethod?.let { calls.add(it) }
+            }
+
+            for (subClass in methodClass.subClasses) {
+                val subClassMethod = findMethodByClassNameAndMethodNameAndParams(subClass.name, value.methodName,  value.parameters.map { it.valueType } )
                 subClassMethod?.let { calls.add(it) }
             }
         }

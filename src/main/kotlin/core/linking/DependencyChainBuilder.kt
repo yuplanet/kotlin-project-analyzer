@@ -5,83 +5,75 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.chain.MethodCallNode
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.ObjectReference
 
-class DependencyChainBuilder(private val searchEngine: IProjectSearchEngine): IDependencyChainBuilder {
+class DependencyChainBuilder(
+    private val searchEngine: IProjectSearchEngine
+) : IDependencyChainBuilder {
 
     override fun generateChangedMethodChains(
         methods: List<ClassMethod>,
         allClasses: List<KotlinClass>
-    ): List<MethodCallNode> {
-
-        val nodes = methods.map { method ->
-            collectCalls(method)
+    ): List<MethodCallNode> =
+        methods.map { method ->
+            collectChains(method)
         }
 
-        return nodes
-    }
+    /**
+     * Создает корневой узел и запускает рекурсивный сбор цепочек
+     */
+    fun collectChains(
+        method: ClassMethod,
+        depth: Int = 0,
+        visited: MutableSet<String> = mutableSetOf()
+    ): MethodCallNode {
 
-    fun getEmptyNode(method: ClassMethod): MethodCallNode {
-
-        return MethodCallNode(
+        val node = MethodCallNode(
             fullName = method.fullName,
             function = method.function,
-            updates = "",
+            updates = ""
         )
-    }
 
-    fun collectCalls(method: ClassMethod, node: MethodCallNode? = null): MethodCallNode {
-
-        val currentNode = node ?: getEmptyNode(method)
-
-        val count = currentNode.visitedFunctionHistory.count { it == method.fullName }
-        if (count >= 10) {
-            currentNode.updates = "max repetitions reached"
-            return currentNode
+        // защита от рекурсии и циклов
+        if (depth > 50) {
+            node.updates = "max depth reached"
+            return node
         }
 
-        currentNode.visitedFunctionHistory.add(method.fullName)
+        if (!visited.add(method.fullName)) {
+            node.updates = "cycle detected"
+            return node
+        }
 
+        // ==== прямые вызовы ====
         for (call in method.callRecords) {
+            val target = searchEngine
+                .findMethodByFullMethodExpression(call.referenceTargetName)
+                ?: continue
 
-            val callClassMethods = searchEngine.findAllMethodByClassNameAndFullMethodName(call.referenceTargetName)
+            val child = collectChains(
+                method = target,
+                depth = depth + 1,
+                visited = visited.toMutableSet() // копия!
+            )
 
-            for (callClassMethod in callClassMethods) {
-
-                val childNode = collectCalls(callClassMethod, currentNode)
-                currentNode.calls.add(childNode)
-
-            }
+            node.calls.add(child)
         }
 
-        var reverseCalls = method.reverseCallRecords
-        reverseCalls += getSuperClassReverseCalls(method)
-
+        // ==== обратные вызовы ====
         for (call in method.reverseCallRecords) {
+            val target = searchEngine
+                .findMethodByFullMethodExpression(call.referenceTargetName)
+                ?: continue
 
-            val callClassMethods = searchEngine.findAllMethodByClassNameAndFullMethodName(call.referenceTargetName)
+            val child = collectChains(
+                method = target,
+                depth = depth + 1,
+                visited = visited.toMutableSet()
+            )
 
-            for (callClassMethod in callClassMethods) {
-
-                val childNode = collectCalls(callClassMethod, currentNode)
-
-                currentNode.reverseCalls.add(childNode)
-
-            }
-        }
-        return currentNode
-    }
-
-    fun getSuperClassReverseCalls(method: ClassMethod): MutableList<ObjectReference> {
-
-        var reverseCalls = mutableListOf<ObjectReference>()
-
-        val methods = searchEngine.findAllMethodByClassNameAndFullMethodName(method.fullName)
-
-        for (method in methods) {
-            reverseCalls += method.reverseCallRecords
+            node.reverseCalls.add(child)
         }
 
-        return reverseCalls
+        return node
     }
 }
