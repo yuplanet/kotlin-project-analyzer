@@ -51,22 +51,39 @@ class SearcherEngine: IProjectSearchEngine {
         }
     }
 
-    fun isSubType(parent: String, heir: String): Boolean {
+    fun isSubTypeOfCustomType(parent: String, heir: String): Boolean {
 
-        // 1) берём стандартные kotlin builtins (Any, Int, String, Number и т.п.)
+        fun isParents(heirName: String, parentName: String): Boolean {
+            val heirClass = findByClassName(parentName)
+            val superClasses = heirClass?.superClasses ?: return false
+
+            if (superClasses.any { it.name == heirName }) return true
+
+            // рекурсивно проверяем супер-классы
+            return superClasses.any { isParents(heirName, it.name) }
+        }
+
+        val isSubType = isParents(parent, heir)
+
+        return isSubType
+    }
+
+    /***
+     *
+     */
+    fun isSubTypeOfSysType(parent: String, heir: String): Boolean {
         val builtIns = DefaultBuiltIns.Instance
 
-        // 2) функция получения типа по имени строки
         fun getTypeByName(name: String): KotlinType? {
-            val fq = when (name) {
-                "Int" -> "kotlin.Int"
-                "String" -> "kotlin.String"
-                "Any" -> "kotlin.Any"
-                "Number" -> "kotlin.Number"
-                else -> "kotlin.$name"   // попытка угадать
+            val fq = when (name.lowercase()) {
+                "int" -> "kotlin.Int"
+                "string" -> "kotlin.String"
+                "any" -> "kotlin.Any"
+                "number" -> "kotlin.Number"
+                else -> return null // кастомные классы возвращаем null
             }
 
-            val descriptor = builtIns.getBuiltInClassByFqName(FqName(fq))
+            val descriptor = builtIns.getBuiltInClassByFqName(FqName(fq)) ?: return null
             return descriptor.defaultType
         }
 
@@ -75,6 +92,7 @@ class SearcherEngine: IProjectSearchEngine {
 
         return KotlinTypeChecker.DEFAULT.isSubtypeOf(heirType, parentType)
     }
+
 
     override fun findFieldRefByClassNameAndFieldName(
         className: String,
@@ -94,8 +112,9 @@ class SearcherEngine: IProjectSearchEngine {
                 referenceTargetName = fieldName,
                 referenceTargetParentClass = ktClass!!,
                 signature = "",
-                expressionValue = null)
-                    //(variableName = fieldName, variableType = field.type))
+                expressionValue = null
+            )
+            //(variableName = fieldName, variableType = field.type))
             return reference
         }
 
@@ -107,7 +126,8 @@ class SearcherEngine: IProjectSearchEngine {
                 referenceTargetName = fieldName,
                 referenceTargetParentClass = ktClass,
                 signature = "",
-                expressionValue = null)
+                expressionValue = null
+            )
             return reference
         }
 
@@ -151,8 +171,8 @@ class SearcherEngine: IProjectSearchEngine {
     //Classes
     override fun findByClassName(className: String): KotlinClass? {
 
-        val _className = if(className.contains('?'))
-            className.replace("?","")
+        val _className = if (className.contains('?'))
+            className.replace("?", "")
         else
             className
 
@@ -197,7 +217,7 @@ class SearcherEngine: IProjectSearchEngine {
             method.fullName.contains("${parentClass.ktClassObject.name}::$methodName") &&
                     // проверяем имя метода
                     method.name == methodName
-                    // проверяем параметры
+            // проверяем параметры
         }
 
         return result
@@ -260,7 +280,7 @@ class SearcherEngine: IProjectSearchEngine {
     ): ClassMethod? {
 
         val parentClass = findByClassName(className) ?: return null
-        val method = parentClass.functionCalls.firstOrNull{ it.fullName.contains("::${methodFullName}") }
+        val method = parentClass.functionCalls.firstOrNull { it.fullName.contains("::${methodFullName}") }
         return method
     }
 
@@ -307,7 +327,10 @@ class SearcherEngine: IProjectSearchEngine {
     override fun findAllMethodByClassNameAndMethodValue(className: String, value: MethodValue): List<ClassMethod> {
         val calls = mutableListOf<ClassMethod>()
 
-        val method = findMethodByClassNameAndMethodNameAndParams(className, value.methodName, value.parameters.map { it.valueType } )
+        val method = findMethodByClassNameAndMethodNameAndParams(
+            className,
+            value.methodName,
+            value.parameters.map { it.valueType })
 
         method?.let { calls.add(it) }
 
@@ -317,12 +340,18 @@ class SearcherEngine: IProjectSearchEngine {
         if (methodClass != null) {
 
             for (superClass in methodClass.superClasses) {
-                val parentMethod = findMethodByClassNameAndMethodNameAndParams(superClass.name, value.methodName,  value.parameters.map { it.valueType } )
+                val parentMethod = findMethodByClassNameAndMethodNameAndParams(
+                    superClass.name,
+                    value.methodName,
+                    value.parameters.map { it.valueType })
                 parentMethod?.let { calls.add(it) }
             }
 
             for (subClass in methodClass.subClasses) {
-                val subClassMethod = findMethodByClassNameAndMethodNameAndParams(subClass.name, value.methodName,  value.parameters.map { it.valueType } )
+                val subClassMethod = findMethodByClassNameAndMethodNameAndParams(
+                    subClass.name,
+                    value.methodName,
+                    value.parameters.map { it.valueType })
                 subClassMethod?.let { calls.add(it) }
             }
         }
@@ -346,6 +375,27 @@ class SearcherEngine: IProjectSearchEngine {
         methodParams: List<String>
     ): Boolean {
         if (targetParams.size != methodParams.size) return false
-        return targetParams.indices.all { targetParams[it].replace("?","") == methodParams[it].replace("?","") }
+
+        for (i in targetParams.indices) {
+            val parent = targetParams[i].replace("?", "")
+            val heir = methodParams[i].replace("?", "")
+
+
+            if (parent == heir)
+                continue
+            else {
+                val isSysSubType = isSubTypeOfSysType(parent, heir)
+
+                if (isSysSubType == false) {
+                    val isCustomSubType = isSubTypeOfCustomType(parent, heir)
+
+                    if (isCustomSubType)
+                        continue
+                    else
+                        return false
+                }
+            }
+        }
+        return true
     }
 }

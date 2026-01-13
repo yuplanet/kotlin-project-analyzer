@@ -56,9 +56,6 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
         callingMethod = findCalleeMethodByCount(callingMethod, value)
         callingMethod ?: return
 
-        if(value.receiverName.contains( "RcsServiceImpl")  )
-            print(1)
-
         val allMethods = searchEngine.findAllMethodByClassNameAndMethodValue(callingMethod.parentClass.name, value)
 
         for (method in allMethods) {

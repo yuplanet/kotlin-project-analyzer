@@ -19,7 +19,6 @@ class ExpressionChainBuilder(
     private val mainClass: KotlinClass,
     private val searchEngine: IProjectSearchEngine
 ) {
-
     private var typeResolver: IExpressionTypeResolver = ExpressionTypeResolver(searchEngine, mainClass, currentMethod)
     private val variableStorage: ITemporaryVariableStorage = ExpressionValueStorage()
 
@@ -46,6 +45,7 @@ class ExpressionChainBuilder(
     ): ExpressionValue? {
 
         element.text
+
         ////////////////////////////////////////////////////////////////////////////////empty
         val target: ExpressionValue? = when (element) {
 
@@ -66,17 +66,20 @@ class ExpressionChainBuilder(
             }
 
             is KtWhenExpression -> {
-                // просто первый найденный тип из веток
-                element.entries.forEach { entry ->
-                    entry.expression?.let {
-                        val t = handlePsiElement(it, context, hasTarget)
-                        if (t != null) return t
-                    }
+                element.subjectExpression?.let {
+                    handlePsiElement(it, context, hasTarget)
                 }
 
-                return null
+                element.entries.forEach { entry ->
+                    entry.conditions.forEach { cond ->
+                        handlePsiElement(cond, context, hasTarget)
+                    }
+                    entry.expression?.let {
+                        handlePsiElement(it, context, hasTarget)
+                    }
+                }
+                null
             }
-
 
             is KtForExpression, is KtWhileExpression, is KtDoWhileExpression -> {
                 element.body?.let { handlePsiElement(it, context, hasTarget) }
@@ -86,11 +89,6 @@ class ExpressionChainBuilder(
             is KtTryExpression -> {
                 // результат из try
                 val tryResult = handlePsiElement(element.tryBlock, context, hasTarget)
-
-                // если try дал что-то — возвращаем его
-                if (tryResult != null) {
-                    return tryResult
-                }
 
                 // иначе обходим catch
                 element.catchClauses.forEach { clause ->
@@ -109,7 +107,7 @@ class ExpressionChainBuilder(
                 }
 
                 // если вообще ничего не извлекли — считаем Unit
-                null
+                tryResult
             }
 
             is KtLambdaExpression -> {
