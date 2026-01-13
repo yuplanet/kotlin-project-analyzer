@@ -12,25 +12,28 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
 
         this.searchEngine = searchEngine
 
-        // 11 collect function expressions
+        // process of expressions inside class
         collectExpressions(projectClasses)
 
-        collectCalls(projectClasses)
+        // process of collect calls from history
+        collectCallsFromExpressions(projectClasses)
     }
 
     fun collectExpressions(projectClasses: List<KotlinClass>) {
 
         for (cls in projectClasses) {
             for (method in cls.functionCalls) {
-                val expressionCollector = ExpressionChainBuilder(method, cls, searchEngine);
-                expressionCollector.collectTopLevelExpressions()
+                val expressionCollector = ExpressionChainBuilder(method, searchEngine);
+                expressionCollector.collectAllExpressions()
             }
         }
     }
 
-    fun collectCalls(projectClasses: List<KotlinClass>) {
+    fun collectCallsFromExpressions(projectClasses: List<KotlinClass>) {
 
         val callResolver = ExpressionCallResolver(searchEngine) //CallResolverWithLogs(searchEngine)//
         callResolver.collect(projectClasses)
     }
+
+
 }

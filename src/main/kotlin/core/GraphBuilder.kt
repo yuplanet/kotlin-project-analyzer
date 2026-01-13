@@ -25,10 +25,13 @@ class GraphBuilder() {
     private var diffResult = ProjectDiffResult()
     private var callChain = ProjectDiffResultOutput()
 
-    //logs
-    private val logFile =           "logs/build_process.txt"
-    private val logDifferences =    "logs/project_differences.txt"
-    private val logLoadedProject =  "logs/loaded_project" //log for claases
+    //logs files
+    private val buildStepLogFile =              "logs/build_process.txt"
+    private val projectDifferenceLogFile =      "logs/project_differences.txt"
+
+    //log directories
+    //имена идут от шагов
+    private val loadedProjectFolder =           "logs/loaded_project" //log for claases
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
@@ -60,106 +63,109 @@ class GraphBuilder() {
         output()
     }
 
+    private fun clearFile() {
+        LogManager.clearLogFile(buildStepLogFile)
+    }
+
     private fun initSearchEngine() {
-        logStatus(logFile, "Step 2: initialize engines")
+        logStatus(buildStepLogFile, "Step 2: initialize engines")
 
         try {
             devSearchEngine = SearcherEngine()
-            featSearchEngine = SearcherEngine()
-
             devSearchEngine.init(developClasses)
+
+            featSearchEngine = SearcherEngine()
             featSearchEngine.init(featureClasses)
 
-
-            logStatus(logFile, "Initialize engines success", 1)
+            logStatus(buildStepLogFile, "Initialize engines success", 1)
         } catch (ex: Exception) {
-            logStatus(logFile, "Initialize engines error ${ex.message}", 1)
+            logStatus(buildStepLogFile, "Initialize engines error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun output() {
-        logStatus(logFile, "Step 6: output")
+        logStatus(buildStepLogFile, "Step 6: output")
         try {
 
             val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
 
             resultPresenter.writeCallChainToFile(callChain)
 
-            logStatus(logFile, "Output success")
+            logStatus(buildStepLogFile, "Output success")
 
         } catch (ex: Exception) {
-            logStatus(logFile, "Output error ${ex.message}", 1)
+            logStatus(buildStepLogFile, "Output error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun generateChains() {
 
-        logStatus(logFile, "Step 5: generating chains")
+        logStatus(buildStepLogFile, "Step 5: generating chains")
         try {
             dependencyChainBuilder = DependencyChainBuilder(featSearchEngine)
             val changed = dependencyChainBuilder.generateChangedMethodChains(diffResult.changedMethods, featureClasses)
             callChain.changedMethods = changed
 
-            logStatus(logFile, "Generating chains error success", 1)
+            logStatus(buildStepLogFile, "Generating chains error success", 1)
 
         } catch (ex: Exception) {
-            logStatus(logFile, "Generating chains error ${ex.message}", 1)
+            logStatus(buildStepLogFile, "Generating chains error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun analyzeDifference() {
-        logStatus(logFile, "Step 4: analyzing difference")
+        logStatus(buildStepLogFile, "Step 4: analyzing difference")
 
         try {
             val differenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
 
             diffResult = differenceAnalyzer.analyzeProjectDifferences(developClasses, featureClasses)
 
-            LogManager.writeProjectDiffToFile(diffResult, logDifferences)
+            LogManager.writeProjectDiffToFile(diffResult, projectDifferenceLogFile)
 
-            logStatus(logFile, "Analyzing difference success", 1)
+            logStatus(buildStepLogFile, "Analyzing difference success", 1)
 
         } catch (ex: Exception) {
-            logStatus(logFile, "Analyzing difference error ${ex.message}", 1)
+            logStatus(buildStepLogFile, "Analyzing difference error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun buildClassReferences() {
 
-        logStatus(logFile, "Step 3: project binding")
+        logStatus(buildStepLogFile, "Step 3: project binding")
 
         try {
             val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
-            val logFolder = "logs/reference/"
+            val logFolder = "logs/class_reference/"
 
             //develop + logs
             referenceBuilder.bindAll(developClasses, devSearchEngine)
 
-            LogManager.logClassAllMethodExpression(developClasses, logFolder + "/expressions/develop")
-            LogManager.logClassAllCalls(developClasses, logFolder + "/calls/develop")
+            LogManager.logClassAllMethodExpression(developClasses, "$logFolder/expressions/develop")
+            LogManager.logClassAllCalls(developClasses, "$logFolder/calls/develop")
 
 
             //feature + logs
             referenceBuilder.bindAll(featureClasses, featSearchEngine)
 
-            LogManager.logClassAllMethodExpression(developClasses, logFolder + "/expressions/feature")
-            LogManager.logClassAllCalls(developClasses, logFolder + "/calls/feature")
+            LogManager.logClassAllMethodExpression(developClasses, "$logFolder/expressions/feature")
+            LogManager.logClassAllCalls(developClasses, "$logFolder/calls/feature")
 
-            logStatus(logFile, "Project binding success", 1)
+            logStatus(buildStepLogFile, "Project binding success", 1)
 
         } catch (ex: Exception) {
-            logStatus(logFile, "Project binding error ${ex.message}", 1)
+            logStatus(buildStepLogFile, "Project binding error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun loadProject(repoPath: String, mainCommit: String, branchCommit: String) {
 
-        logStatus(logFile, "Step 1: project loading")
+        logStatus(buildStepLogFile, "Step 1: project loading")
 
         try {
             val projectLoader: IProjectLoader = GitLoader()
@@ -186,12 +192,12 @@ class GraphBuilder() {
             KtFileMapper.linkSuperClasses(developClasses)
             KtFileMapper.linkSuperClasses(featureClasses)
 
-            LogManager.logLoadedProject(logLoadedProject+"/develop", developClasses)
-            LogManager.logLoadedProject(logLoadedProject+"/feature",featureClasses)
+            LogManager.logLoadedProject(loadedProjectFolder+"/develop", developClasses)
+            LogManager.logLoadedProject(loadedProjectFolder+"/feature",featureClasses)
 
-            logStatus(logFile, "Project loading success", 1)
+            logStatus(buildStepLogFile, "Project loading success", 1)
         } catch (ex: Exception) {
-            logStatus(logFile, "Project loading error ${ex.message}", 1)
+            logStatus(buildStepLogFile, "Project loading error ${ex.message}", 1)
             throw ex
         }
     }
@@ -204,9 +210,5 @@ class GraphBuilder() {
         File(filename).appendText(indent + content + System.lineSeparator())
     }
 
-    private fun clearFile() {
-        val file = File(logFile)
-        // Перезаписываем пустым содержимым
-        file.writeText("")
-    }
+
 }

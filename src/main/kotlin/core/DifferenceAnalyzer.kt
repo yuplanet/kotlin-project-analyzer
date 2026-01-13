@@ -56,7 +56,6 @@ class DifferenceAnalyzer : IProjectDifferenceAnalyzer {
                 if (devBody != featBody) featMethod else null
             }
 
-
         result.addedMethods = addedMethods
         result.changedMethods = changedMethods
         result.removedMethods = removedMethods

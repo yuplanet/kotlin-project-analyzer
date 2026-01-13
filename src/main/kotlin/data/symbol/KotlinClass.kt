@@ -8,8 +8,23 @@ import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 
 class KotlinClass(
+
+    /**
+     * path / name /.kt
+     * src/main/kotlin/de/axxessio/a2sre/A2sreApplication.kt
+     */
     var path: String,
+
+    /**
+     * path / name
+     * src/main/kotlin/de/axxessio/a2sre/A2sreApplication
+     */
     val fullName: String,
+
+    /**
+     *  name
+     * /A2sreApplication
+     */
     var name: String,
     var ktFile: KtFile,
 

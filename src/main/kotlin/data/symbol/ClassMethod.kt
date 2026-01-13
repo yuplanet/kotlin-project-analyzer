@@ -8,13 +8,28 @@ import org.jetbrains.kotlin.psi.KtProperty
 data class ClassMethod(
 
     /**
-     * <путь_к_файлу>.<имя_класса>::<имя_метода> ( параметры )
-     *ApiKeyManagementController::getApiKeyClients():Boolean
+     * name
+     * getApiKeyClients
      */
     val name: String,
+
+    /**
+     * type
+     * Int or Unit
+     */
     val returnType: String,
+
+    /**
+     * Class::Method( Params ): ReturnType
+     * ApiKeyManagementController::getApiKeyClients():Boolean
+     */
     val fullName: String,
     val function: KtNamedFunction,
+
+    /**
+     * List<param Typ>
+     * List<Int,Int,Int>
+     */
     val parameterTypeNames: List<String>,
 
     val parentClass: KotlinClass,

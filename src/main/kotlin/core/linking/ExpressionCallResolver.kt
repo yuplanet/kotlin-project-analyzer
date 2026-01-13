@@ -174,5 +174,4 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
 
         return true
     }
-
 }

@@ -9,6 +9,18 @@ import java.io.FileWriter
 
 object LogManager {
 
+    fun deleteFile(filePath: String) {
+        val file = File(filePath)
+        // Перезаписываем пустым содержимым
+        if (file.exists())
+            file.delete()
+    }
+    fun clearLogFile(logFile: String) {
+        val file = File(logFile)
+        // Перезаписываем пустым содержимым
+        file.writeText("")
+    }
+
     fun writeProjectDiffToFile(result: ProjectDiffResult, path: String) {
         val file = File(path)
 
