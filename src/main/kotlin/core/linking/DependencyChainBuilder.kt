@@ -5,6 +5,7 @@ import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.chain.MethodCallNode
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.enum.ObjectType
 
 class DependencyChainBuilder(
     private val searchEngine: IProjectSearchEngine
@@ -44,6 +45,10 @@ class DependencyChainBuilder(
             return
         }
 
+        //интерфейсы нас не интересуют
+        if(method.parentClass.ktClassObjectType == ObjectType.Interface)
+            return
+
         node.visitedFunctionHistory.add(method.fullName)
 
         for (call in method.callRecords) {
@@ -64,7 +69,6 @@ class DependencyChainBuilder(
 
             node.calls.add(child)
         }
-
     }
 
     /**
@@ -77,12 +81,14 @@ class DependencyChainBuilder(
             return
         }
 
+        if(method.parentClass.ktClassObjectType == ObjectType.Interface)
+            return
+
         node.visitedReverseFunctionHistory.add(method.fullName)
 
         for (call in method.reverseCallRecords) {
 
-            val target =
-                searchEngine.findMethodByFullMethodExpression(call.referenceTargetName)
+            val target =searchEngine.findMethodByFullMethodExpression(call.referenceTargetName)
                     ?: continue
 
             val child = MethodCallNode(
