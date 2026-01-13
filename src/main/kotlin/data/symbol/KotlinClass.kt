@@ -43,4 +43,40 @@ class KotlinClass(
 
     var subClasses: MutableList<KotlinClass> = mutableListOf(),
     var superClasses: MutableList<KotlinClass> = mutableListOf(),
-)
+){
+
+    var isApi: Boolean = false
+    var apiUrl: String = ""
+
+    companion object {
+        private val API_ANNOTATIONS = listOf(
+            "@RestController",
+            "@Controller",
+            "@RequestMapping",
+            "@Path"       // JAX-RS
+        )
+    }
+
+    private fun initApiMetadata() {
+        // сразу работаем с PSI
+        val apiAnno = ktClassObject.annotationEntries.filter { entry ->
+            val name = entry.shortName?.asString() ?: return@filter false
+            name in listOf("RestController", "Controller", "RequestMapping", "Path")
+        }
+
+        if (apiAnno.isEmpty()) return
+
+        isApi = true
+
+        // путь — из первой найденной аннотации с аргументом
+        apiUrl = apiAnno.mapNotNull { entry ->
+            entry.valueArguments.firstOrNull()?.getArgumentExpression()?.text?.trim('"')
+        }.firstOrNull() ?: ""
+
+        print(apiUrl)
+    }
+
+    init {
+        initApiMetadata()
+    }
+}

@@ -1,12 +1,17 @@
 package org.example.data.chain
 
+import org.example.data.symbol.ClassMethod
 import org.jetbrains.kotlin.psi.KtNamedFunction
 
 class MethodCallNode(
     val fullName: String,
     val function: KtNamedFunction,
-    var updates: String
+    var updates: String,
+    var method: ClassMethod
+
 ) {
+
+
     var visitedFunctionHistory: MutableList<String> = mutableListOf()
     val calls: MutableList<MethodCallNode> = mutableListOf()
 

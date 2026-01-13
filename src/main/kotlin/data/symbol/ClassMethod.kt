@@ -32,6 +32,8 @@ data class ClassMethod(
      */
     val parameterTypeNames: List<String>,
 
+    var annotations: List<String> = emptyList(),
+
     val parentClass: KotlinClass,
     //content
     var properties: MutableList<ClassProperty> = mutableListOf(),
@@ -47,3 +49,50 @@ data class ClassMethod(
     val callRecords: MutableList<ObjectReference> = mutableListOf(), // target method
     val reverseCallRecords: MutableList<ObjectReference> = mutableListOf(),
 )
+{
+    var isApi: Boolean = false
+    var apiUrl: String = ""
+    var apiUri: String = ""
+
+    private fun initMethodApiData() {
+        // сразу из KtNamedFunction
+        val apiAnno = function.annotationEntries.filter { entry ->
+            val name = entry.shortName?.asString() ?: return@filter false
+            name in API_ANNOTATIONS_SHORT
+        }
+
+        if (apiAnno.isEmpty()) return
+
+        isApi = true
+
+        // путь метода — из первой аннотации с аргументом
+        apiUrl = apiAnno.mapNotNull { entry ->
+            entry.valueArguments.firstOrNull()?.getArgumentExpression()?.text?.trim('"')
+        }.firstOrNull() ?: ""
+
+        apiUri = parentClass.apiUrl + apiUrl
+
+        print(apiUrl)
+    }
+
+
+
+    private fun extractPath(annotation: String): String? {
+        // "..." аргумент без имени
+        Regex("\"([^\"]+)\"").find(annotation)?.let { return it.groupValues[1] }
+
+        // value = "..."
+        Regex("value\\s*=\\s*\"([^\"]+)\"").find(annotation)?.let { return it.groupValues[1] }
+
+        return null
+    }
+    companion object {
+        private val API_ANNOTATIONS_SHORT = listOf(
+            "GetMapping", "PostMapping", "PutMapping", "DeleteMapping", "PatchMapping", "RequestMapping",
+            "GET", "POST", "PUT", "DELETE", "PATCH", "Path"
+        )
+    }
+    init {
+        initMethodApiData()
+    }
+}

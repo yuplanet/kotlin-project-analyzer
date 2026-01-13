@@ -58,8 +58,8 @@ object KtFileMapper {
                         function = it,
                         parameterTypeNames = it.valueParameters.map { p -> p.typeReference?.text ?: "_" },
                         parentClass = ktClass,
-
-                        )
+                        annotations = getFunctionAnnotations(it)
+                    )
                 }
             )
             kotlinClasses.add(ktClass)
@@ -88,6 +88,24 @@ object KtFileMapper {
             }
         }
     }
+
+    /**
+     * аннотации методов
+    * */
+    fun getFunctionAnnotations(ktFunction: KtNamedFunction): List<String> {
+        val result = mutableListOf<String>()
+
+        // 1️⃣ Аннотации самой функции
+        result += ktFunction.annotationEntries.map { it.text }
+
+        // 2️⃣ Аннотации return-типа
+        ktFunction.typeReference
+            ?.annotationEntries
+            ?.mapTo(result) { it.text }
+
+        return result
+    }
+
 
     /**
      * Строит обратные связи: для каждого класса заполняет список его наследников (subClasses)

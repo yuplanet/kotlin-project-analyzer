@@ -24,7 +24,8 @@ class DependencyChainBuilder(
         val node = MethodCallNode(
             fullName = method.fullName,
             function = method.function,
-            updates = ""
+            updates = "",
+            method = method
         )
 
         // запускаем отдельно
@@ -59,7 +60,8 @@ class DependencyChainBuilder(
             val child = MethodCallNode(
                 fullName = target.fullName,
                 function = target.function,
-                updates = ""
+                updates = "",
+                method = target
             )
 
             // передаем историю дальше
@@ -94,7 +96,8 @@ class DependencyChainBuilder(
             val child = MethodCallNode(
                 fullName = target.fullName,
                 function = target.function,
-                updates = ""
+                updates = "",
+                method = target
             )
 
             child.visitedReverseFunctionHistory =
