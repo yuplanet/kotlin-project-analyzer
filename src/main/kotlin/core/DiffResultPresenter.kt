@@ -12,6 +12,9 @@ class DiffResultPresenter : IDiffResultPresenter {
         val treeLike = StringBuilder()
         val pathLike = StringBuilder()
 
+        // ======= ВИД №3 (только API методы) =======
+        writeApiMethodsToFile(result)
+
         // ======= ВИД №1 (дерево с отступами) =======
         result.changedMethods.forEach { root ->
 
@@ -50,6 +53,29 @@ class DiffResultPresenter : IDiffResultPresenter {
 
         File("changed_methods_tree.txt").writeText(treeLike.toString())
         File("changed_methods_paths.txt").writeText(pathLike.toString())
+    }
+
+
+    // Рекурсивно собираем API методы
+    private fun collectApiMethods(node: MethodCallNode, builder: StringBuilder, visited: MutableSet<String> = mutableSetOf()) {
+        if (node.fullName in visited) return
+        visited.add(node.fullName)
+
+        if(node.method.name.contains("checkPhoneNumber"))
+            print(1)
+
+        if (node.method.isApi) {
+            builder.appendLine("${node.fullName} -> ${node.method.apiUri}")
+        }
+
+        // рекурсивно вниз
+        node.calls.forEach { child ->
+            collectApiMethods(child, builder, visited)
+        }
+
+        node.reverseCalls.forEach { parent ->
+            collectApiMethods(parent, builder, visited)
+        }
     }
 
 
@@ -105,6 +131,15 @@ class DiffResultPresenter : IDiffResultPresenter {
         }
     }
 
+    private fun writeApiMethodsToFile(result: ProjectDiffResultOutput) {
+        val apiBuilder = StringBuilder()
+
+        result.changedMethods.forEach { root ->
+            collectApiMethods(root, apiBuilder)
+        }
+
+        File("changed_methods_api.txt").writeText(apiBuilder.toString())
+    }
 
     private fun buildLinearChains2(
         node: MethodCallNode,
