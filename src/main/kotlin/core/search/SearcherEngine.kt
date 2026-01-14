@@ -5,10 +5,8 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.enum.ObjectType
-import org.example.data.symbol.expression.MethodValue
 import org.jetbrains.kotlin.builtins.DefaultBuiltIns
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
 
@@ -100,17 +98,16 @@ class SearcherEngine: IProjectSearchEngine {
     ): FieldReference? {
 
         val ktClass = findByClassName(className)
-        if (ktClass == null)
-            null
+            ?:return null
 
-        var field = ktClass?.parameterReferences?.firstOrNull {
+        val field = ktClass.parameterReferences.firstOrNull {
             it.name == fieldName
         }
 
         if (field != null) {
             val reference = FieldReference(
                 referenceTargetName = fieldName,
-                referenceTargetParentClass = ktClass!!,
+                referenceTargetParentClass = ktClass,
                 signature = "",
                 expressionValue = null
             )
@@ -118,7 +115,7 @@ class SearcherEngine: IProjectSearchEngine {
             return reference
         }
 
-        val paramd = ktClass?.propertyReferences?.firstOrNull {
+        val paramd = ktClass.propertyReferences.firstOrNull {
             it.name == fieldName
         }
         if (paramd != null) {
@@ -151,30 +148,23 @@ class SearcherEngine: IProjectSearchEngine {
 
     override fun isEnumClass(className: String): Boolean {
 
-        val ktClass = findByClassName(className)
-        if (ktClass == null)
-            false
+        val ktClass = findByClassName(className) ?: return false
 
-        return ktClass?.ktClassObjectType == ObjectType.EnumClass
+        return ktClass.ktClassObjectType == ObjectType.EnumClass
     }
 
     override fun isStaticClass(className: String): Boolean {
 
-        val ktClass = findByClassName(className)
-        if (ktClass == null)
-            false
+        val ktClass = findByClassName(className) ?: return false
 
-        return ktClass?.ktClassObjectType == ObjectType.Object
+        return ktClass.ktClassObjectType == ObjectType.Object
     }
 
 
     //Classes
     override fun findByClassName(className: String): KotlinClass? {
 
-        val _className = if (className.contains('?'))
-            className.replace("?", "")
-        else
-            className
+        val _className =  className.replace("?", "")
 
         val key = _className.hashCode()
         val candidates = classSimpleNameDictionary[key] ?: emptyList()
@@ -186,14 +176,8 @@ class SearcherEngine: IProjectSearchEngine {
 
 
     //class and method
-    override fun findByClassNameAndMethodName(
-        className: String,
-        methodName: String
-    ): List<ClassMethod> {
-        val key = className.hashCode()
-        val candidates = classSimpleNameDictionary[key] ?: emptyList()
-
-        val targetClass = candidates.firstOrNull { it.ktClassObject.name == className } ?: return emptyList()
+    override fun findByClassNameAndMethodName(className: String, methodName: String): List<ClassMethod> {
+        val targetClass = findByClassName(className) ?: return emptyList()
 
         val matchedMethod = targetClass.functionCalls.filter { method ->
             method.function.name == methodName
@@ -202,67 +186,29 @@ class SearcherEngine: IProjectSearchEngine {
         return matchedMethod
     }
 
-    override fun findFirstMethodByClassNameAndMethodName(
-        className: String,
-        methodName: String
-    ): ClassMethod? {
+    override fun findFirstMethodByClassNameAndMethodName(className: String, methodName: String): ClassMethod? {
 
         val parentClass = findByClassName(className) ?: return null
 
-        val key = methodName.hashCode()
-        val candidates = methodSimpleNameDictionary[key] ?: emptyList()
+        val result = parentClass.functionCalls.firstOrNull { method -> method.name == methodName }
+        return result
+    }
 
-        val result = candidates.firstOrNull { method ->
-            // проверяем класс
-            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName") &&
-                    // проверяем имя метода
-                    method.name == methodName
-            // проверяем параметры
-        }
+    override fun findMethodByClassNameAndMethodNameAndParams(className: String, methodName: String, params: List<String>): ClassMethod? {
+
+        val candidates = findByClassNameAndMethodName(className, methodName)
+
+        val result = candidates.firstOrNull { method -> areParamsEqual(params, method.parameterTypeNames) }
 
         return result
     }
 
-    override fun findMethodByClassNameAndMethodNameAndParams(
-        className: String,
-        methodName: String,
-        params: List<String>
-    ): ClassMethod? {
+    override fun findMethodByClassNameAndMethodNameAndParamsCount(className: String, methodName: String, paramsCount: Int): ClassMethod? {
         val parentClass = findByClassName(className) ?: return null
 
-        val key = methodName.hashCode()
-        val candidates = methodSimpleNameDictionary[key] ?: emptyList()
+        val candidates = parentClass.functionCalls.filter { it.name == methodName }
 
-        val result = candidates.firstOrNull { method ->
-            // проверяем класс
-            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName(")
-                    // проверяем имя метода
-                    // method.name == methodName
-                    && areParamsEqual(params, method.parameterTypeNames)
-            // проверяем параметры
-        }
-
-        return result
-    }
-
-    override fun findMethodByClassNameAndMethodNameAndParamsCount(
-        className: String,
-        methodName: String,
-        paramsCount: Int
-    ): ClassMethod? {
-        val parentClass = findByClassName(className) ?: return null
-
-        val key = methodName.hashCode()
-        val candidates = methodSimpleNameDictionary[key] ?: emptyList()
-
-        val results = candidates.filter { method ->
-            // проверяем класс
-            method.fullName.contains("${parentClass.ktClassObject.name}::$methodName(")
-
-                    && method.parameterTypeNames.count() == paramsCount
-            // проверяем имя метода
-            // method.name == methodName
-        }
+        val results = candidates.filter { method -> method.parameterTypeNames.count() == paramsCount }
 
         if (results.count() == 1)
             return results.first()
@@ -274,10 +220,7 @@ class SearcherEngine: IProjectSearchEngine {
     /**
      * class + method()type
      * */
-    override fun findMethodByClassNameAndFullMethodName(
-        className: String,
-        methodFullName: String
-    ): ClassMethod? {
+    override fun findMethodByClassNameAndFullMethodName(className: String, methodFullName: String): ClassMethod? {
 
         val parentClass = findByClassName(className) ?: return null
         val method = parentClass.functionCalls.firstOrNull { it.fullName.contains("::${methodFullName}") }
@@ -287,12 +230,23 @@ class SearcherEngine: IProjectSearchEngine {
     /**
      * class.method()type
      * */
-    override fun findMethodByFullMethodExpression(expression: String): ClassMethod? {
+    override fun findMethodByFullName(expression: String): ClassMethod? {
 
         val methodClassName = expression.substringBefore("::")
 
         val fullMethodExpression = expression.substringAfter("::")
-        return findMethodByClassNameAndFullMethodName(methodClassName, fullMethodExpression)
+        val method =  findMethodByClassNameAndFullMethodName(methodClassName, fullMethodExpression)
+
+        return method
+    }
+
+    override fun findMethodBySignature(signature: String): ClassMethod? {
+        val methodClassName = signature.substringBefore(".")
+
+        val fullMethodExpression = signature.substringAfter(".")
+        val method =  findMethodByClassNameAndFullMethodName(methodClassName, fullMethodExpression)
+
+        return method
     }
 
     override fun findAllMethodByClassNameAndFullMethodName(
@@ -324,51 +278,11 @@ class SearcherEngine: IProjectSearchEngine {
         return calls
     }
 
-    override fun findAllMethodByClassNameAndMethodValue(className: String, value: MethodValue): List<ClassMethod> {
-        val calls = mutableListOf<ClassMethod>()
-
-        val method = findMethodByClassNameAndMethodNameAndParams(
-            className,
-            value.methodName,
-            value.parameters.map { it.valueType })
-
-        method?.let { calls.add(it) }
-
-        //call in super classes
-        val methodClass = method?.parentClass
-
-        if (methodClass != null) {
-
-            for (superClass in methodClass.superClasses) {
-                val parentMethod = findMethodByClassNameAndMethodNameAndParams(
-                    superClass.name,
-                    value.methodName,
-                    value.parameters.map { it.valueType })
-                parentMethod?.let { calls.add(it) }
-            }
-
-            for (subClass in methodClass.subClasses) {
-                val subClassMethod = findMethodByClassNameAndMethodNameAndParams(
-                    subClass.name,
-                    value.methodName,
-                    value.parameters.map { it.valueType })
-                subClassMethod?.let { calls.add(it) }
-            }
-        }
-
-        return calls
-    }
-
     // utils
     /**
      * Проверяет, совпадают ли два списка типов аргументов.
      * Возвращает true, если списки одной длины и все элементы на соответствующих позициях равны.
      */
-    private fun areParamsEqualKt(targetParams: List<String>, methodParams: List<KtParameter>): Boolean {
-        val types = methodParams.map { it.typeReference?.text ?: "Any" }
-        if (types.size != targetParams.size) return false
-        return types.indices.all { types[it] == targetParams[it] }
-    }
 
     private fun areParamsEqual(
         targetParams: List<String>,

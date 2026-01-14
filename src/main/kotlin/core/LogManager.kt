@@ -204,9 +204,9 @@ object LogManager {
             log("Properties:", 0)
             kotlinClass.propertyReferences.forEach { prop ->
                 log("- ${prop.name}: ${prop.type}", 1)
-                if (prop.expression.isNotEmpty()) {
+                if (prop.fullExpressions.isNotEmpty()) {
                     log("Expressions:", 2)
-                    prop.expression.forEach { expr ->
+                    prop.fullExpressions.forEach { expr ->
                         logAssignmentExpression(expr, writer, 3)
                     }
                 }
@@ -268,9 +268,9 @@ object LogManager {
             writer.appendLine("Properties:")
             kotlinClass.propertyReferences.forEach { prop ->
                 writer.appendLine("  - ${prop.name}: ${prop.type}")
-                if (prop.expression.isNotEmpty()) {
+                if (prop.fullExpressions.isNotEmpty()) {
                     writer.appendLine("    Expressions:")
-                    prop.expression.forEach { expr ->
+                    prop.fullExpressions.forEach { expr ->
                         writer.appendLine("      ${expr.target?.rawValue} = ${expr.source?.rawValue}")
                     }
                 }
@@ -280,9 +280,9 @@ object LogManager {
             writer.appendLine("Parameters:")
             kotlinClass.parameterReferences.forEach { param ->
                 writer.appendLine("  - ${param.name}: ${param.type}")
-                if (param.expression.isNotEmpty()) {
+                if (param.fullExpressions.isNotEmpty()) {
                     writer.appendLine("    Expressions:")
-                    param.expression.forEach { expr ->
+                    param.fullExpressions.forEach { expr ->
                         writer.appendLine("      ${expr.target?.rawValue} = ${expr.source?.rawValue}")
                     }
                 }

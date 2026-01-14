@@ -41,17 +41,10 @@ interface IProjectSearchEngine {
      *
      * поиск по Class.Method
     */
-    fun findFirstMethodByClassNameAndMethodName(
-        className: String,
-        methodName: String,
-    ): ClassMethod?
+    fun findFirstMethodByClassNameAndMethodName(className: String, methodName: String): ClassMethod?
 
     // ===== Classes and Meth=====
-    fun findMethodByClassNameAndMethodNameAndParams(
-        className: String,
-        methodName: String,
-        params: List<String>,
-    ): ClassMethod?
+    fun findMethodByClassNameAndMethodNameAndParams(className: String, methodName: String, params: List<String>): ClassMethod?
 
 
 
@@ -66,18 +59,14 @@ interface IProjectSearchEngine {
      *
      * поиск по Class.Method(params):type
      */
-    fun findMethodByClassNameAndFullMethodName(className: String,
-                                               methodFullName: String,): ClassMethod?
+    fun findMethodByClassNameAndFullMethodName(className: String, methodFullName: String): ClassMethod?
 
-    fun findMethodByFullMethodExpression(expression: String): ClassMethod?
+    fun findMethodByFullName(fullName: String): ClassMethod?
 
-
-    fun findAllMethodByClassNameAndMethodValue(className: String, value: MethodValue): List<ClassMethod>
-
+    fun findMethodBySignature(signature: String): ClassMethod?
     /**
      * Возвращает все ClassMethod из текущего класса, родителя и наследника.
      * поиск по Class.Method(params):type
      */
-    fun findAllMethodByClassNameAndFullMethodName(className: String,
-                                               methodFullName: String,): List<ClassMethod>
+    fun findAllMethodByClassNameAndFullMethodName(className: String, methodFullName: String): List<ClassMethod>
 }

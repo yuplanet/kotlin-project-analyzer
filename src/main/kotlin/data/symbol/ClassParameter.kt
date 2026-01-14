@@ -9,8 +9,14 @@ data class ClassParameter (
     var type: String,
     var property: KtParameter,
     val parentClass: KotlinClass,
-    var expression: MutableList<AssignmentExpression> = mutableListOf(),
+    var fullExpressions: MutableList<AssignmentExpression> = mutableListOf(),
 
     var callRecords: MutableList<ObjectReference> = mutableListOf(),
     var reverseCallRecords: MutableList<ObjectReference> = mutableListOf(),
-)
+){
+    var originalType: String
+
+    init {
+        originalType = type.replace("?","")
+    }
+}

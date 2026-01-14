@@ -54,6 +54,10 @@ data class ClassMethod(
     var apiUrl: String = ""
     var apiUri: String = ""
 
+    var originalReturnType: String = returnType.replace("?","")
+    val originalParameterTypeNames: List<String> = parameterTypeNames.map { it.replace("?","") }
+
+
     private fun initMethodApiData() {
         // сразу из KtNamedFunction
         val apiAnno = function.annotationEntries.filter { entry ->
@@ -74,8 +78,6 @@ data class ClassMethod(
 
         print(apiUrl)
     }
-
-
 
     private fun extractPath(annotation: String): String? {
         // "..." аргумент без имени

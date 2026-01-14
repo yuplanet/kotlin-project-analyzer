@@ -54,7 +54,7 @@ class DependencyChainBuilder(
 
         for (call in method.callRecords) {
 
-            val target = searchEngine.findMethodByFullMethodExpression(call.referenceTargetName)
+            val target = searchEngine.findMethodByFullName(call.referenceTargetName)
                     ?: continue
 
             val child = MethodCallNode(
@@ -90,7 +90,7 @@ class DependencyChainBuilder(
 
         for (call in method.reverseCallRecords) {
 
-            val target =searchEngine.findMethodByFullMethodExpression(call.referenceTargetName)
+            val target =searchEngine.findMethodByFullName(call.referenceTargetName)
                     ?: continue
 
             val child = MethodCallNode(

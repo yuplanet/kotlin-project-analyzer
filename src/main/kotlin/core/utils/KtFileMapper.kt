@@ -5,10 +5,67 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.ClassParameter
 import org.example.data.symbol.ClassProperty
 import org.example.data.symbol.KotlinClass
+import org.example.data.symbol.enum.ObjectType
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
 object KtFileMapper {
+
+    fun getFullFunctionName(fn: KtNamedFunction): String {
+        // 1. Имя метода
+        val name = fn.name ?: "__no_name__"
+
+        // 2. Тип расширения (если extension-функция)
+        val receiverType = fn.receiverTypeReference?.text?.let { "$it." } ?: ""
+
+        // 3. Параметры метода
+        val params = fn.valueParameters.joinToString(",") { it.typeReference?.text ?: "Any" }
+
+        // 4. Имя класса, если есть
+        val className = getFunctionParentClassName(fn)
+
+        // 5. Тип возвращаемого значения
+        val returnType = fn.typeReference?.text ?: "Unit"
+
+        return "$className::$receiverType$name($params):$returnType"
+    }
+
+    // Вспомогательная функция для получения имени класса или top-level
+    fun getFunctionParentClassName(fn: KtNamedFunction): String {
+        var parent = fn.parent
+        while (parent != null) {
+            if (parent is KtClassOrObject) {
+                return parent.name ?: "__anonymous__"
+            }
+            parent = parent.parent
+        }
+        return "__top_level__"
+    }
+
+    fun getEntityType(cl : KtClassOrObject): ObjectType {
+        return when (cl) {
+            is KtClass -> when {
+                cl.isInterface() -> ObjectType.Interface
+                cl.isEnum() -> ObjectType.EnumClass
+                cl.isAnnotation() -> ObjectType.Undefined // или добавить Annotation в enum
+                cl.isData() -> ObjectType.DataClass
+                cl.isSealed() -> ObjectType.SealedClass
+                else -> ObjectType.Class
+            }
+
+            is KtObjectDeclaration -> if (cl.isCompanion()) ObjectType.Undefined // можно добавить CompanionObject в enum
+            else ObjectType.Object
+
+            else -> ObjectType.Undefined
+        }
+    }
+
+    fun getAnnotations(cl : KtClassOrObject): List<String> {
+        return cl.annotationEntries.map { entry ->
+            // Получаем текст аннотации, например "@Serializable"
+            entry.shortName?.asString() ?: entry.text
+        }
+    }
 
     /**
      * Преобразует KtFile в список KotlinClass
@@ -23,8 +80,8 @@ object KtFileMapper {
             val classFullName = filePath.substringBeforeLast(".kt")
             val className = cls.name ?: filePath.substringAfterLast("/").substringBeforeLast(".kt")
 
-            val type = KtClassHelper.getEntityType(cls)
-            val annotation = KtClassHelper.getAnnotations(cls)
+            val type = getEntityType(cls)
+            val annotation = getAnnotations(cls)
 
             val ktClass = KotlinClass(
                 ktClassObject = cls,
@@ -53,7 +110,7 @@ object KtFileMapper {
                 ktClass.ktFunctions.map {
                     ClassMethod(
                         name = it.name ?: "__no_name__",
-                        fullName = KtFunctionHelper.getFullFunctionName(it),
+                        fullName = getFullFunctionName(it),
                         returnType = it.typeReference?.text ?: "Unit",
                         function = it,
                         parameterTypeNames = it.valueParameters.map { p -> p.typeReference?.text ?: "_" },
