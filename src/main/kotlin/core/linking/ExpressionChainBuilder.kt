@@ -243,7 +243,7 @@ class ExpressionChainBuilder(
                     null
                 } else {
 
-                    var receiver = context?.let { getReceiveVariable(it) }
+                    val receiver = context?.let { getReceiveVariable(it) }
 
                     val method = completeMethod(element, receiver)
 
@@ -312,9 +312,7 @@ class ExpressionChainBuilder(
                     element.right?.let { handlePsiElement(it, context, hasTarget) }
 
                     return null
-                }
-
-                else if (op!= KtTokens.EQ)
+                } else if (op != KtTokens.EQ)
                     return null
 
                 val leftExpression = element.left ?: error("Left-hand side missing ${element.left?.text}")
@@ -373,9 +371,9 @@ class ExpressionChainBuilder(
     fun completeMethod(expression: KtCallExpression, receiver: VariableValue?): MethodValue {
 
         //Metho
-        var methodName = expression.calleeExpression?.text ?: "" // мя метода
+        val methodName = expression.calleeExpression?.text ?: "" // мя метода
 
-        var params: MutableList<ExpressionValue> = mutableListOf()
+        val params: MutableList<ExpressionValue> = mutableListOf()
 
         for (arg in expression.valueArguments) {
 
@@ -391,7 +389,7 @@ class ExpressionChainBuilder(
             }
         }
 
-        var method = MethodValue(
+        val method = MethodValue(
             methodName = methodName,
             parameters = params.toMutableList(),
             methodReturnType = unknownType
@@ -438,54 +436,6 @@ class ExpressionChainBuilder(
         return null
     }
 
-    fun getVariableOrFieldValueFromExpression(expr: KtExpression): ExpressionValue? {
-
-        var variable: ExpressionValue? = null
-
-        if (expr is KtNameReferenceExpression)
-            variable = getVariableValueFromNamedExpression(expr)
-        else if (expr is KtDotQualifiedExpression || expr is KtSafeQualifiedExpression)
-            variable = getFieldValueFromExpression(expr)
-
-        return variable
-    }
-
-    private fun getVariableValueFromNamedExpression(variableExpr: KtNameReferenceExpression): VariableValue {
-        val name = variableExpr.getReferencedName()
-        return getVariableValueFromName(name)
-    }
-
-    private fun getVariableValueFromName(variableName: String): VariableValue {
-        val type = typeResolver.getVariableTypeByName(variableName) ?: unknownType
-        return VariableValue(variableName, type)
-    }
-
-
-    private fun getFieldValueFromExpression(expression: KtExpression): ExpressionValue? {
-        val fieldExpression = when (expression) {
-            is KtDotQualifiedExpression -> expression
-            is KtSafeQualifiedExpression -> expression
-            else -> return null
-        }
-
-        val className = fieldExpression.receiverExpression.text
-        val fieldName = fieldExpression.selectorExpression?.text ?: unknownType
-
-        //receiver
-        val classType = typeResolver.getVariableTypeByName(className) ?: unknownType
-
-        var fieldType = typeResolver.getVariableTypeByNameAndClass(classType, fieldName)
-
-        val target = FieldValue(
-            fieldName = fieldName,
-            fieldType = fieldType ?: unknownType,
-            qualifier = className,
-            qualifierType = classType
-        )
-
-        return target
-    }
-
     private fun normalizeTypes(target: ExpressionValue, source: ExpressionValue) {
 
         fun fixTypes(target: ExpressionValue, sourceType: String) {
@@ -517,12 +467,6 @@ class ExpressionChainBuilder(
         return unknownType
     }
 
-    private fun hasValidType(value: ExpressionValue): Boolean {
-
-        val type = getExpressionValueType(value)
-        return hasValidType(type)
-    }
-
     private fun hasValidType(type: String): Boolean {
         return type != unknownType && type.isNotEmpty()
     }
@@ -533,11 +477,10 @@ class ExpressionChainBuilder(
         source: ExpressionValue?
     ) {
 
-        var operation =
-            AssignmentExpression(
-                target = target,
-                source = source,
-            )
+        var operation = AssignmentExpression(
+            target = target,
+            source = source
+        )
 
         currentMethod.fullExpressions.add(operation)
     }

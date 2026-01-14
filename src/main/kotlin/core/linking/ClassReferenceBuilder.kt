@@ -34,6 +34,4 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         val callResolver = ExpressionCallResolver(searchEngine) //CallResolverWithLogs(searchEngine)//
         callResolver.collect(projectClasses)
     }
-
-
 }

@@ -203,6 +203,30 @@ class SearcherEngine: IProjectSearchEngine {
         return result
     }
 
+    override fun findAllMethodByClassNameAndMethodNameAndParams(
+        className: String,
+        methodName: String,
+        params: List<String>
+    ): List<ClassMethod> {
+
+        val methods = mutableListOf<ClassMethod>()
+
+        // Собираем все классы: исходный + родители + дети
+        val allClasses = (
+                getParentClasses(className) +
+                getChildClasses(className) +
+                className).toSet() // Set — избегаем дубликатов
+
+        // Ищем метод в каждом классе
+        for (cls in allClasses) {
+            val method = findMethodByClassNameAndMethodNameAndParams(cls, methodName, params)
+            method?.let { methods.add(it) }
+        }
+
+        return methods
+    }
+
+
     override fun findMethodByClassNameAndMethodNameAndParamsCount(className: String, methodName: String, paramsCount: Int): ClassMethod? {
         val parentClass = findByClassName(className) ?: return null
 
@@ -311,5 +335,38 @@ class SearcherEngine: IProjectSearchEngine {
             }
         }
         return true
+    }
+
+    private fun getParentClasses(
+        className: String,
+        parents: MutableSet<String> = mutableSetOf()
+    ): Set<String> {
+        val currentClass = findByClassName(className) ?: return parents
+
+        if (!parents.add(currentClass.name)) {
+            return parents // уже были — защита от циклов
+        }
+
+        for (parent in currentClass.superClasses) {
+            getParentClasses(parent.name, parents)
+        }
+
+        return parents
+    }
+    private fun getChildClasses(
+        className: String,
+        children: MutableSet<String> = mutableSetOf()
+    ): Set<String> {
+        val currentClass = findByClassName(className) ?: return children
+
+        if (!children.add(currentClass.name)) {
+            return children // уже были — защита от циклов
+        }
+
+        for (child in currentClass.subClasses) {
+            getChildClasses(child.name, children)
+        }
+
+        return children
     }
 }

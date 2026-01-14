@@ -46,6 +46,8 @@ interface IProjectSearchEngine {
     // ===== Classes and Meth=====
     fun findMethodByClassNameAndMethodNameAndParams(className: String, methodName: String, params: List<String>): ClassMethod?
 
+    // ===== Classes and Meth=====
+    fun findAllMethodByClassNameAndMethodNameAndParams(className: String, methodName: String, params: List<String>): List<ClassMethod>
 
 
     fun findMethodByClassNameAndMethodNameAndParamsCount(

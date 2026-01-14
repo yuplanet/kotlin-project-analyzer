@@ -20,8 +20,8 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
             for (cls in projectClasses) {
                 for (method in cls.functionCalls) {
                     for (expression in method.fullExpressions) {
-                        resolveExpression(expression.target, method, cls)
-                        resolveExpression(expression.source, method, cls)
+                        resolveExpression(expression.target, method)
+                        resolveExpression(expression.source, method)
                     }
                 }
             }
@@ -32,11 +32,10 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
 
     private fun resolveExpression(
         expr: ExpressionValue?,
-        caller: ClassMethod,
-        callerClass: KotlinClass
+        caller: ClassMethod
     ) {
         when (expr) {
-            is MethodValue -> resolveMethod(expr, caller, callerClass)
+            is MethodValue -> resolveMethod(expr, caller)
             //is FieldValue -> resolveProperty(expr, caller, callerClass)
             //is VariableValue -> resolveParameter(expr, caller, callerClass)
         }
@@ -45,7 +44,6 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
     private fun resolveMethod(
         value: MethodValue,
         callerMethod: ClassMethod,
-        callerClass: KotlinClass
     ) {
         var callingMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
             className = value.receiverClassName,
@@ -56,12 +54,17 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
         callingMethod = findCalleeMethodByCount(callingMethod, value)
         callingMethod ?: return
 
-        val allMethods = searchEngine.findAllMethodByClassNameAndMethodValue(callingMethod.parentClass.name, value)
+        val allMethods = searchEngine.findAllMethodByClassNameAndMethodNameAndParams(
+            callingMethod.parentClass.name,
+            callingMethod.name,
+            callingMethod.parameterTypeNames
+        )
 
         for (method in allMethods) {
 
-            val referenceTargetName = method.fullName.replace(  "${value.receiverClassName}::", "${method.parentClass.name}::")
-            val signature = value.methodSignature.replace( "${value.receiverClassName}.", "${method.parentClass.name}.")
+            val referenceTargetName =
+                method.fullName.replace("${value.receiverClassName}::", "${method.parentClass.name}::")
+            val signature = value.methodSignature.replace("${value.receiverClassName}.", "${method.parentClass.name}.")
 
             value.receiverClassName = method.parentClass.name
 
