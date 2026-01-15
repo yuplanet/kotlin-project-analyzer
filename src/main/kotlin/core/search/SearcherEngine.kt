@@ -329,12 +329,12 @@ class SearcherEngine: IProjectSearchEngine {
             val result = mutableListOf<ClassMethod>()
 
             for (cls in allClasses) {
-                for (method in cls.functionCalls) {
+                for (classMethod in cls.functionCalls) {
 
-                    for (expr in method.fullExpressions) {
+                    for (expr in classMethod.fullExpressions) {
 
                         if (isCallOf(expr.target, method) || isCallOf(expr.source, method)) {
-                            result.add(method)
+                            result.add(classMethod)
                             break
                         }
                     }

@@ -152,8 +152,8 @@ class GraphBuilder() {
             //feature + logs
             referenceBuilder.bindAll(featureClasses, featSearchEngine)
 
-            LogManager.logClassAllMethodExpression(developClasses, "$logFolder/expressions/feature")
-            LogManager.logClassAllCalls(developClasses, "$logFolder/calls/feature")
+            LogManager.logClassAllMethodExpression(featureClasses, "$logFolder/expressions/feature")
+            LogManager.logClassAllCalls(featureClasses, "$logFolder/calls/feature")
 
             logStatus(buildStepLogFile, "Project binding success", 1)
 
