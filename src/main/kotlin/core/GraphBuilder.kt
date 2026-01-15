@@ -90,7 +90,7 @@ class GraphBuilder() {
 
             val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
 
-            resultPresenter.writeCallChainToFile(callChain)
+            var code = resultPresenter.writeCallChainToFile(callChain)
 
             logStatus(buildStepLogFile, "Output success")
 

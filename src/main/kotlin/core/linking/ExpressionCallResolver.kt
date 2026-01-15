@@ -58,8 +58,6 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
         value: MethodValue,
         callerMethod: ClassMethod,
     ) {
-        if(value.methodName.contains("normalizePhoneNumberOrThrow"))
-            print(1)
 
         var callingMethod = searchEngine.findMethodByClassNameAndMethodNameAndParams(
             className = value.receiverClassName,
