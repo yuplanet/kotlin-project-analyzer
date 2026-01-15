@@ -313,7 +313,9 @@ class SearcherEngine: IProjectSearchEngine {
         fun isCallOf(expr: ExpressionValue?, target: ClassMethod): Boolean {
             val mv = expr as? MethodValue ?: return false
 
-            if(mv.methodSignature.hashCode() != method.signature.hashCode()) return false
+            val mvHash = mv.methodSignature.hashCode()
+            val methodHash = method.signature.hashCode()
+            if(mvHash != methodHash) return false
             // проверка имени метода
 
             if (mv.methodName == target.name

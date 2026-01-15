@@ -40,7 +40,7 @@ data class MethodValue (
         get() = methodReturnType
 
     var methodSignature: String = ""
-        get() = "$receiverClassName.$methodName(${getParameterSignatures()})"
+        get() = "$receiverClassName.$methodName(${getParameterSignatures()}):$methodReturnType"
 
 
     private fun getRawParameters(): String {

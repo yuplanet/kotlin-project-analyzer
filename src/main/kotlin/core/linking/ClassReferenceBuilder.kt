@@ -15,6 +15,9 @@ class ClassReferenceBuilder (): IClassReferenceBuilder {
         // process of expressions inside class
         collectExpressions(projectClasses)
 
+        //
+        searchEngine.updateMethodsHashes()
+
         // process of collect calls from history
         collectCallsFromExpressions(projectClasses)
     }

@@ -57,7 +57,7 @@ data class ClassMethod(
     var originalReturnType: String = returnType.replace("?","")
     val originalParameterTypeNames: List<String> = parameterTypeNames.map { it.replace("?","") }
     val signature: String
-        get() = "${parentClass.fullName}.$name(${originalParameterTypeNames.joinToString(",")}):$originalReturnType"
+        get() = "${parentClass.name}.$name(${parameterTypeNames.joinToString(",")}):$returnType"
 
     private fun initMethodApiData() {
         // сразу из KtNamedFunction
@@ -80,15 +80,6 @@ data class ClassMethod(
         print(apiUrl)
     }
 
-    private fun extractPath(annotation: String): String? {
-        // "..." аргумент без имени
-        Regex("\"([^\"]+)\"").find(annotation)?.let { return it.groupValues[1] }
-
-        // value = "..."
-        Regex("value\\s*=\\s*\"([^\"]+)\"").find(annotation)?.let { return it.groupValues[1] }
-
-        return null
-    }
     companion object {
         private val API_ANNOTATIONS_SHORT = listOf(
             "GetMapping", "PostMapping", "PutMapping", "DeleteMapping", "PatchMapping", "RequestMapping",
