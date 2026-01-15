@@ -8,7 +8,7 @@ import org.example.data.symbol.expression.MethodValue
 interface IProjectSearchEngine {
 
     fun init(projectClasses: List<KotlinClass>)
-
+    fun updateMethodsHashes()
 
     //==== fields Properties
     fun findFieldRefByClassNameAndFieldName(className: String, fieldName: String): FieldReference?
@@ -71,4 +71,7 @@ interface IProjectSearchEngine {
      * поиск по Class.Method(params):type
      */
     fun findAllMethodByClassNameAndFullMethodName(className: String, methodFullName: String): List<ClassMethod>
+
+
+    fun findCallerMethodsByMethod(method:ClassMethod):List<ClassMethod>
 }

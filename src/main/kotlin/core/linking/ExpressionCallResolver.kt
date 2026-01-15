@@ -24,6 +24,19 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
                         resolveExpression(expression.source, method)
                     }
                 }
+
+               // for (property in cls.propertyReferences) {
+               //     for (expression in property.fullExpressions) {
+               //         resolveExpression(expression.target, property)
+               //         resolveExpression(expression.source, property)
+               //     }
+               // }
+               // for (parameter in cls.parameterReferences) {
+               //     for (expression in parameter.fullExpressions) {
+               //         resolveExpression(expression.target, parameter)
+               //         resolveExpression(expression.source, parameter)
+               //     }
+               // }
             }
         } catch (ex: Exception) {
             ex.printStackTrace()
@@ -77,7 +90,7 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
 
             callerMethod.callRecords.add(reference)
 
-            val callers = findMethodsCalling(callingMethod)
+            val callers = searchEngine.findCallerMethodsByMethod(callingMethod)
 
             for (caller in callers) {
                 val reverseReference = MethodReference(
@@ -135,46 +148,5 @@ class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
             }
         }
         return  callee
-    }
-
-    fun findMethodsCalling(
-        target: ClassMethod
-    ): List<ClassMethod> {
-
-        val result = mutableListOf<ClassMethod>()
-
-        for (cls in _projectClasses) {
-            for (method in cls.functionCalls) {
-
-                for (expr in method.fullExpressions) {
-
-                    if (isCallOf(expr.target, target) || isCallOf(expr.source, target)) {
-                        result.add(method)
-                        break
-                    }
-                }
-            }
-        }
-
-        return result
-    }
-
-
-    private fun isCallOf(
-        expr: ExpressionValue?,
-        target: ClassMethod
-    ): Boolean {
-        val mv = expr as? MethodValue ?: return false
-
-        // проверка имени метода
-        if (mv.methodName != target.name) return false
-
-        // проверка класса-получателя (receiver)
-        if (mv.receiverClassName != target.parentClass.name) return false
-
-        // количество параметров
-        if (mv.parameters.size != target.parameters.size) return false
-
-        return true
     }
 }

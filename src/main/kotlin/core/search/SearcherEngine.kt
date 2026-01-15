@@ -5,6 +5,8 @@ import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.enum.ObjectType
+import org.example.data.symbol.expression.ExpressionValue
+import org.example.data.symbol.expression.MethodValue
 import org.jetbrains.kotlin.builtins.DefaultBuiltIns
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.types.KotlinType
@@ -21,7 +23,7 @@ class SearcherEngine: IProjectSearchEngine {
 
     //key - full name for method: name+args+return type
     private var methodFullNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
-    private var methodSimpleNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
+    private val methodSignatureHashDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
 
     override fun init(projectClasses: List<KotlinClass>) {
         allClasses = projectClasses
@@ -40,12 +42,16 @@ class SearcherEngine: IProjectSearchEngine {
         // Инициализация methodDictionary
         for (method in allMethods) {
             //ApiKeyManagementController::getApiKeyClients():ResponseEntity<List<ApiKeyClientResponseDto>>
-            val key = method.fullName.hashCode() // метод, который возвращает hashCode fullName
+            val key = method.signature.hashCode() // метод, который возвращает hashCode fullName
             methodFullNameDictionary.computeIfAbsent(key) { mutableListOf() }.add(method)
+        }
+    }
 
-            //getApiKeyClients
-            val nkey = method.name.hashCode() // метод, который возвращает hashCode fullName
-            methodSimpleNameDictionary.computeIfAbsent(nkey) { mutableListOf() }.add(method)
+    override fun updateMethodsHashes() {
+        for (method in allMethods) {
+            // пересчитываем hash сигнатуры
+            val key = method.fullName.hashCode()
+            methodSignatureHashDictionary.computeIfAbsent(key) { mutableListOf() }.add(method)
         }
     }
 
@@ -300,6 +306,40 @@ class SearcherEngine: IProjectSearchEngine {
         }
 
         return calls
+    }
+
+    override fun findCallerMethodsByMethod(method: ClassMethod): List<ClassMethod> {
+
+        fun isCallOf(expr: ExpressionValue?, target: ClassMethod): Boolean {
+            val mv = expr as? MethodValue ?: return false
+
+            if(mv.methodSignature.hashCode() != method.signature.hashCode()) return false
+            // проверка имени метода
+
+            if (mv.methodName == target.name
+                && mv.receiverClassName == target.parentClass.name
+                && areParamsEqual(mv.parameters.map { it.valueType }, target.parameterTypeNames))
+                return true
+
+            return false
+        }
+
+            val result = mutableListOf<ClassMethod>()
+
+            for (cls in allClasses) {
+                for (method in cls.functionCalls) {
+
+                    for (expr in method.fullExpressions) {
+
+                        if (isCallOf(expr.target, method) || isCallOf(expr.source, method)) {
+                            result.add(method)
+                            break
+                        }
+                    }
+                }
+            }
+
+            return result
     }
 
     // utils

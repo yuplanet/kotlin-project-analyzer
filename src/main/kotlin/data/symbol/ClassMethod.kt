@@ -56,7 +56,8 @@ data class ClassMethod(
 
     var originalReturnType: String = returnType.replace("?","")
     val originalParameterTypeNames: List<String> = parameterTypeNames.map { it.replace("?","") }
-
+    val signature: String
+        get() = "${parentClass.fullName}.$name(${originalParameterTypeNames.joinToString(",")}):$originalReturnType"
 
     private fun initMethodApiData() {
         // сразу из KtNamedFunction
