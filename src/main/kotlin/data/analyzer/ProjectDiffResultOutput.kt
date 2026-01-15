@@ -6,4 +6,6 @@ data class ProjectDiffResultOutput (
     var changedMethods: List<MethodCallNode> = mutableListOf(),
     var addedMethods: List<MethodCallNode> = mutableListOf(),
     var removedMethods: List<MethodCallNode> = mutableListOf(),
+
+    var apiChain: List<MethodCallNode> = mutableListOf(),
 )

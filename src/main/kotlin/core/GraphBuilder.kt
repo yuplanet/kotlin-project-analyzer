@@ -26,12 +26,12 @@ class GraphBuilder() {
     private var callChain = ProjectDiffResultOutput()
 
     //logs files
-    private val buildStepLogFile =              "logs/build_process.txt"
-    private val projectDifferenceLogFile =      "logs/project_differences.txt"
+    private val buildStepLogFile = "logs/build_process.txt"
+    private val projectDifferenceLogFile = "logs/project_differences.txt"
 
     //log directories
     //имена идут от шагов
-    private val loadedProjectFolder =           "logs/loaded_project" //log for claases
+    private val loadedProjectFolder = "logs/loaded_project" //log for claases
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
@@ -90,8 +90,9 @@ class GraphBuilder() {
 
             val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
 
-            var code = resultPresenter.writeCallChainToFile(callChain)
-
+            resultPresenter.writeCallChainToFile(callChain)
+            resultPresenter.writeApiCallChainToFile(callChain.apiChain)
+            // записываем в файл
             logStatus(buildStepLogFile, "Output success")
 
         } catch (ex: Exception) {
@@ -107,6 +108,9 @@ class GraphBuilder() {
             dependencyChainBuilder = DependencyChainBuilder(featSearchEngine)
             val changed = dependencyChainBuilder.generateChangedMethodChains(diffResult.changedMethods, featureClasses)
             callChain.changedMethods = changed
+
+            val apiChain = dependencyChainBuilder.generateApiCallChain(changed)
+            callChain.apiChain = apiChain
 
             logStatus(buildStepLogFile, "Generating chains error success", 1)
 
@@ -192,8 +196,8 @@ class GraphBuilder() {
             KtFileMapper.linkSuperClasses(developClasses)
             KtFileMapper.linkSuperClasses(featureClasses)
 
-            LogManager.logLoadedProject(loadedProjectFolder+"/develop", developClasses)
-            LogManager.logLoadedProject(loadedProjectFolder+"/feature",featureClasses)
+            LogManager.logLoadedProject(loadedProjectFolder + "/develop", developClasses)
+            LogManager.logLoadedProject(loadedProjectFolder + "/feature", featureClasses)
 
             logStatus(buildStepLogFile, "Project loading success", 1)
         } catch (ex: Exception) {
@@ -209,6 +213,4 @@ class GraphBuilder() {
         // Пишем в файл с отступом
         File(filename).appendText(indent + content + System.lineSeparator())
     }
-
-
 }

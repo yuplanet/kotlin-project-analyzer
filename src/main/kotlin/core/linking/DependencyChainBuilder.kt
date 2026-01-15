@@ -19,6 +19,80 @@ class DependencyChainBuilder(
             collectChains(method)
         }
 
+    override fun generateApiCallChain(callChainList: List<MethodCallNode>): List<MethodCallNode> {
+        val result = mutableListOf<MethodCallNode>()
+
+        callChainList.forEach { startNode ->
+
+            // вниз по calls
+            collectToApiByCalls(
+                node = startNode,
+                result = result,
+                visited = mutableSetOf()
+            )
+
+            // вверх по reverseCalls
+            collectToApiByReverseCalls(
+                node = startNode,
+                result = result,
+                visited = mutableSetOf()
+            )
+        }
+
+        return result.distinctBy { it.fullName }
+    }
+
+    private fun collectToApiByCalls(
+        node: MethodCallNode,
+        result: MutableList<MethodCallNode>,
+        visited: MutableSet<String>
+    ): Boolean {
+
+        if (!visited.add(node.fullName)) return false
+
+        if(node.method.parentClass.ktClassObjectType == ObjectType.Interface)
+            return false
+
+        var isApiChain = node.method.isApi
+
+        for (child in node.calls) {
+            val isApi = collectToApiByCalls(child, result, visited)
+            if (isApi)
+                isApiChain = true
+        }
+
+        if (isApiChain)
+            result.add(node)
+
+        return isApiChain
+    }
+
+    private fun collectToApiByReverseCalls(
+        node: MethodCallNode,
+        result: MutableList<MethodCallNode>,
+        visited: MutableSet<String>
+    ): Boolean {
+
+        if (!visited.add(node.fullName)) return false
+        if(node.method.parentClass.ktClassObjectType == ObjectType.Interface)
+            return false
+        
+        var isApiChain = node.method.isApi
+
+        for (parent in node.reverseCalls) {
+            if (collectToApiByReverseCalls(parent, result, visited)) {
+                isApiChain = true
+            }
+        }
+
+        if (isApiChain)
+            result.add(node)
+
+        return isApiChain
+    }
+
+
+
     fun collectChains(method: ClassMethod): MethodCallNode {
 
         val node = MethodCallNode(
@@ -57,6 +131,10 @@ class DependencyChainBuilder(
             val target = searchEngine.findMethodByFullName(call.referenceTargetName)
                     ?: continue
 
+            //skip interface
+            if(target.parentClass.ktClassObjectType == ObjectType.Interface)
+                continue
+
             val child = MethodCallNode(
                 fullName = target.fullName,
                 function = target.function,
@@ -92,6 +170,10 @@ class DependencyChainBuilder(
 
             val target =searchEngine.findMethodByFullName(call.referenceTargetName)
                     ?: continue
+
+            //skip interface
+            if(target.parentClass.ktClassObjectType == ObjectType.Interface)
+                continue
 
             val child = MethodCallNode(
                 fullName = target.fullName,
