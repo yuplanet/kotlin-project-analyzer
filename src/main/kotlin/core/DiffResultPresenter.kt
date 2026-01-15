@@ -3,6 +3,7 @@ package org.example.core
 import org.example.core.interfaces.IDiffResultPresenter
 import org.example.data.analyzer.ProjectDiffResultOutput
 import org.example.data.chain.MethodCallNode
+import org.example.data.symbol.ClassMethod
 import java.io.File
 
 class DiffResultPresenter : IDiffResultPresenter {
@@ -55,42 +56,55 @@ class DiffResultPresenter : IDiffResultPresenter {
         File("changed_methods_paths.txt").writeText(pathLike.toString())
     }
 
-    override fun writeApiCallChainToFile(apiChain: List<MethodCallNode>) {
+    override fun writeApiCallChainToFile(apiChain: List<MethodCallNode>, allMethods: List<ClassMethod>) {
         val outputDir = File("logs/api_call_chain_files")
-        if(outputDir.exists())
-            outputDir.delete()
+        if (outputDir.exists()) outputDir.deleteRecursively()
+        outputDir.mkdirs()
 
-        if (!outputDir.exists()) outputDir.mkdirs()
+        // Map<FullName, ClassMethod> для быстрого поиска оригинала
+        val originalMethodsMap = allMethods.associateBy { it.fullName }
 
-// apiNodes — уже собранные API ноды
-        writeApiChainsByCalls(apiChain, outputDir)
-        writeApiChainsByReverseCalls(apiChain, outputDir)
-
+        // прямой обход
+        writeApiChainsByCalls(apiChain, outputDir, originalMethodsMap)
+        // обратный обход
+        writeApiChainsByReverseCalls(apiChain, outputDir, originalMethodsMap)
     }
-    private fun writeApiChainsByCalls(apiNodes: List<MethodCallNode>, outputDir: File) {
+
+    private fun writeApiChainsByCalls(
+        apiNodes: List<MethodCallNode>,
+        outputDir: File,
+        originalMethods: Map<String, ClassMethod>
+    ) {
         fun dfs(node: MethodCallNode, path: MutableList<MethodCallNode>, visited: MutableSet<String>) {
             if (!visited.add(node.fullName)) return
 
             path.add(node)
 
-            // создаём файл если нода API
             if (node.method.isApi) {
                 val start = path.first().fullName.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
                 val end = node.fullName.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
-                val file = File(outputDir, "${start}_to_${end}_calls.txt")
 
+                // обычная цепочка
+                val file = File(outputDir, "${start}_to_${end}_calls.txt")
                 file.bufferedWriter().use { writer ->
                     path.forEach { n ->
                         writer.write("${n.fullName} <-\n")
                         writer.write(n.function.text + "\n\n")
                     }
                 }
+
+                // цепочка с оригиналом
+                val originalFile = File(outputDir, "${start}_to_${end}_calls_original.txt")
+                originalFile.bufferedWriter().use { writer ->
+                    path.forEach { n ->
+                        writer.write("${n.fullName} <-\n")
+                        val original = originalMethods[n.fullName]
+                        writer.write(original?.function?.text + "\n\n")
+                    }
+                }
             }
 
-            // рекурсивно идём по всем вызовам даже после API
-            node.calls.forEach { child ->
-                dfs(child, path, visited)
-            }
+            node.calls.forEach { child -> dfs(child, path, visited) }
 
             path.removeLast()
             visited.remove(node.fullName)
@@ -99,8 +113,11 @@ class DiffResultPresenter : IDiffResultPresenter {
         apiNodes.forEach { dfs(it, mutableListOf(), mutableSetOf()) }
     }
 
-
-    private fun writeApiChainsByReverseCalls(apiNodes: List<MethodCallNode>, outputDir: File) {
+    private fun writeApiChainsByReverseCalls(
+        apiNodes: List<MethodCallNode>,
+        outputDir: File,
+        originalMethods: Map<String, ClassMethod>
+    ) {
         fun dfs(node: MethodCallNode, path: MutableList<MethodCallNode>, visited: MutableSet<String>) {
             if (!visited.add(node.fullName)) return
 
@@ -109,18 +126,27 @@ class DiffResultPresenter : IDiffResultPresenter {
             if (node.method.isApi) {
                 val start = path.first().fullName.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
                 val end = node.fullName.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
-                val file = File(outputDir, "${start}_to_${end}_reverse.txt")
 
+                // обычная цепочка обратного обхода
+                val file = File(outputDir, "${start}_to_${end}_reverse.txt")
                 file.bufferedWriter().use { writer ->
                     path.forEach { n ->
                         writer.write("${n.fullName} ->\n")
                         writer.write(n.function.text + "\n\n")
                     }
                 }
-            } else {
-                node.reverseCalls.forEach { parent ->
-                    dfs(parent, path, visited)
+
+                // цепочка с оригиналом
+                val originalFile = File(outputDir, "${start}_to_${end}_reverse_original.txt")
+                originalFile.bufferedWriter().use { writer ->
+                    path.forEach { n ->
+                        writer.write("${n.fullName} ->\n")
+                        val original = originalMethods[n.fullName]
+                        writer.write(original?.function?.text + "\n\n")
+                    }
                 }
+            } else {
+                node.reverseCalls.forEach { parent -> dfs(parent, path, visited) }
             }
 
             path.removeLast()

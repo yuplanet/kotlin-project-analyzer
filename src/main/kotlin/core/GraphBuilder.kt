@@ -91,7 +91,7 @@ class GraphBuilder() {
             val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
 
             resultPresenter.writeCallChainToFile(callChain)
-            resultPresenter.writeApiCallChainToFile(callChain.apiChain)
+            resultPresenter.writeApiCallChainToFile(callChain.apiChain, devSearchEngine.getAllMethods())
             // записываем в файл
             logStatus(buildStepLogFile, "Output success")
 

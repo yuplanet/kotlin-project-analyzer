@@ -3,9 +3,10 @@ package org.example.core.interfaces
 import org.example.data.symbol.ClassMethod
 import org.example.data.symbol.FieldReference
 import org.example.data.symbol.KotlinClass
-import org.example.data.symbol.expression.MethodValue
 
 interface IProjectSearchEngine {
+
+    fun getAllMethods(): List<ClassMethod>
 
     fun init(projectClasses: List<KotlinClass>)
     fun updateMethodsHashes()

@@ -25,6 +25,10 @@ class SearcherEngine: IProjectSearchEngine {
     private var methodFullNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
     private val methodSignatureHashDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
 
+    override fun getAllMethods(): List<ClassMethod> {
+        return allMethods
+    }
+
     override fun init(projectClasses: List<KotlinClass>) {
         allClasses = projectClasses
         allMethods = allClasses.flatMap { it.functionCalls }
