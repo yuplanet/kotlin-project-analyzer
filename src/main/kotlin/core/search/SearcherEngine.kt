@@ -152,7 +152,7 @@ class SearcherEngine: IProjectSearchEngine {
 
         val key = methodName.hashCode()
 
-        val candidates = methodSignatureDictionary[key] ?: emptyList()
+        val candidates = methodSignatureDictionary[key] ?: methodOriginalSignatureDictionary[key] ?: emptyList()
 
         val result = candidates.firstOrNull { method ->
             // проверяем класс
@@ -210,6 +210,7 @@ class SearcherEngine: IProjectSearchEngine {
         return result
     }
 
+    ///118
     override fun findMethodByClassNameAndMethodNameAndParams(className: String, methodName: String, params: List<String>): ClassMethod? {
 
         val candidates = findByClassNameAndMethodName(className, methodName)
@@ -219,11 +220,7 @@ class SearcherEngine: IProjectSearchEngine {
         return result
     }
 
-    override fun findAllMethodByClassNameAndMethodNameAndParams(
-        className: String,
-        methodName: String,
-        params: List<String>
-    ): List<ClassMethod> {
+    override fun findAllMethodByClassNameAndMethodNameAndParams(className: String, methodName: String, params: List<String>): List<ClassMethod> {
 
         val methods = mutableListOf<ClassMethod>()
 
@@ -395,29 +392,26 @@ class SearcherEngine: IProjectSearchEngine {
     ): Set<String> {
         val currentClass = findByClassName(className) ?: return parents
 
-        if (!parents.add(currentClass.name)) {
+        if (!parents.add(currentClass.name))
             return parents // уже были — защита от циклов
-        }
 
-        for (parent in currentClass.superClasses) {
+        for (parent in currentClass.superClasses)
             getParentClasses(parent.name, parents)
-        }
 
         return parents
     }
+
     private fun getChildClasses(
         className: String,
         children: MutableSet<String> = mutableSetOf()
     ): Set<String> {
         val currentClass = findByClassName(className) ?: return children
 
-        if (!children.add(currentClass.name)) {
+        if (!children.add(currentClass.name))
             return children // уже были — защита от циклов
-        }
 
-        for (child in currentClass.subClasses) {
+        for (child in currentClass.subClasses)
             getChildClasses(child.name, children)
-        }
 
         return children
     }
