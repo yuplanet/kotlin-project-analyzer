@@ -9,7 +9,7 @@ import org.example.data.symbol.expression.FieldValue
 import org.example.data.symbol.expression.MethodValue
 import org.example.data.symbol.expression.VariableValue
 
-class ExpressionCallResolver( private val searchEngine: IProjectSearchEngine) {
+class ExpressionCallResolver(private val searchEngine: IProjectSearchEngine) {
 
     var _projectClasses = listOf<KotlinClass>()
 

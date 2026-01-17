@@ -7,8 +7,10 @@ import org.example.data.symbol.KotlinClass
 interface IProjectSearchEngine {
 
     fun getAllMethods(): List<ClassMethod>
-
+    fun getAllClasses(): List<KotlinClass>
     fun init(projectClasses: List<KotlinClass>)
+
+
     fun updateMethodsHashes()
 
     //==== fields Properties

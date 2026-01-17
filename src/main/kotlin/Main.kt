@@ -6,7 +6,7 @@ fun main() {
     try {
         val repoPath = "C:\\Users\\UlugbekYunusov\\Desktop\\a2s-reloaded"
         val mainCommit = "develop"
-        val branchCommit = "feature/xxxx2"
+        val branchCommit = "feature/xxxx4"
 
         val diffGraphBuilder = GraphBuilder()
         diffGraphBuilder.BuildGraph(repoPath = repoPath, mainCommit = mainCommit, branchCommit = branchCommit)

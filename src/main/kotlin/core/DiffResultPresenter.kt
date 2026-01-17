@@ -166,6 +166,7 @@ class DiffResultPresenter : IDiffResultPresenter {
         // только если нода API
         if (node.method.isApi) {
             codeBuilder.appendLine("// Код функции: ${node.fullName}")
+            codeBuilder.appendLine("     ${node.method.apiUri}")
             codeBuilder.appendLine() // пустая строка между функциями
         }
 

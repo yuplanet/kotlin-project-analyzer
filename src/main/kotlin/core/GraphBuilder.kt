@@ -3,6 +3,10 @@ package org.example.core
 import org.example.core.interfaces.*
 import org.example.core.linking.ClassReferenceBuilder
 import org.example.core.linking.DependencyChainBuilder
+import org.example.core.logs.ClassCallsLogger
+import org.example.core.logs.ClassExpressionsLogger
+import org.example.core.logs.ClassLogger
+import org.example.core.logs.logsPath
 import org.example.core.psi.KtFileExtractor
 import org.example.core.search.SearcherEngine
 import org.example.core.utils.KtFileMapper
@@ -12,13 +16,14 @@ import org.example.data.symbol.KotlinClass
 import java.io.File
 
 class GraphBuilder() {
+
     //state
     private var developClasses: List<KotlinClass> = listOf()
     private var featureClasses: List<KotlinClass> = listOf()
 
     //separate search engine
-    private lateinit var devSearchEngine: IProjectSearchEngine
-    private lateinit var featSearchEngine: IProjectSearchEngine
+    private val devSearchEngine: IProjectSearchEngine = SearcherEngine()
+    private val featSearchEngine: IProjectSearchEngine = SearcherEngine()
     private lateinit var dependencyChainBuilder: IDependencyChainBuilder
 
     //output
@@ -26,12 +31,9 @@ class GraphBuilder() {
     private var callChain = ProjectDiffResultOutput()
 
     //logs files
-    private val buildStepLogFile = "logs/build_process.txt"
+    private val logFile = logsPath.processSteplogFile
     private val projectDifferenceLogFile = "logs/project_differences.txt"
 
-    //log directories
-    //имена идут от шагов
-    private val loadedProjectFolder = "logs/loaded_project" //log for claases
 
     fun BuildGraph(repoPath: String, mainCommit: String, branchCommit: String) {
 
@@ -45,15 +47,13 @@ class GraphBuilder() {
         // 6 output
 
         //1 load
+        //2 init search engine
         loadProject(repoPath, mainCommit, branchCommit)
 
-
-        //2 init search engine
-        initSearchEngine()
         //3
         buildClassReferences()
 
-        //4 analizy
+        //4 analizy // to do correct
         analyzeDifference()
 
         //5 generate chains
@@ -64,28 +64,18 @@ class GraphBuilder() {
     }
 
     private fun clearFile() {
-        LogManager.clearLogFile(buildStepLogFile)
-    }
+        val dir = File(logFile)
 
-    private fun initSearchEngine() {
-        logStatus(buildStepLogFile, "Step 2: initialize engines")
+        if (dir.exists())
+            dir.deleteRecursively()
 
-        try {
-            devSearchEngine = SearcherEngine()
-            devSearchEngine.init(developClasses)
+        dir.mkdirs()
 
-            featSearchEngine = SearcherEngine()
-            featSearchEngine.init(featureClasses)
-
-            logStatus(buildStepLogFile, "Initialize engines success", 1)
-        } catch (ex: Exception) {
-            logStatus(buildStepLogFile, "Initialize engines error ${ex.message}", 1)
-            throw ex
-        }
+        logStatus("***log folder generated")
     }
 
     private fun output() {
-        logStatus(buildStepLogFile, "Step 6: output")
+        logStatus( "Step 6: output")
         try {
 
             val resultPresenter: IDiffResultPresenter = DiffResultPresenter()
@@ -93,17 +83,17 @@ class GraphBuilder() {
             resultPresenter.writeCallChainToFile(callChain)
             resultPresenter.writeApiCallChainToFile(callChain.apiChain, devSearchEngine.getAllMethods())
             // записываем в файл
-            logStatus(buildStepLogFile, "Output success")
+            logStatus( "Output success")
 
         } catch (ex: Exception) {
-            logStatus(buildStepLogFile, "Output error ${ex.message}", 1)
+            logStatus( "Output error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun generateChains() {
 
-        logStatus(buildStepLogFile, "Step 5: generating chains")
+        logStatus( "Step 5: generating chains")
         try {
             dependencyChainBuilder = DependencyChainBuilder(featSearchEngine)
             val changed = dependencyChainBuilder.generateChangedMethodChains(diffResult.changedMethods, featureClasses)
@@ -112,16 +102,16 @@ class GraphBuilder() {
             val apiChain = dependencyChainBuilder.generateApiCallChain(changed)
             callChain.apiChain = apiChain
 
-            logStatus(buildStepLogFile, "Generating chains error success", 1)
+            logStatus( "Generating chains error success", 1)
 
         } catch (ex: Exception) {
-            logStatus(buildStepLogFile, "Generating chains error ${ex.message}", 1)
+            logStatus( "Generating chains error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun analyzeDifference() {
-        logStatus(buildStepLogFile, "Step 4: analyzing difference")
+        logStatus( "Step 4: analyzing difference")
 
         try {
             val differenceAnalyzer: IProjectDifferenceAnalyzer = DifferenceAnalyzer()
@@ -130,46 +120,46 @@ class GraphBuilder() {
 
             LogManager.writeProjectDiffToFile(diffResult, projectDifferenceLogFile)
 
-            logStatus(buildStepLogFile, "Analyzing difference success", 1)
+            logStatus( "Analyzing difference success", 1)
 
         } catch (ex: Exception) {
-            logStatus(buildStepLogFile, "Analyzing difference error ${ex.message}", 1)
+            logStatus( "Analyzing difference error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun buildClassReferences() {
 
-        logStatus(buildStepLogFile, "Step 3: project binding")
-
         try {
             val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
-            val logFolder = "logs/class_reference/"
 
             //develop + logs
-            referenceBuilder.bindAll(developClasses, devSearchEngine)
+            referenceBuilder.init(devSearchEngine)
+            referenceBuilder.collectExpressions()
+            referenceBuilder.collectCallsFromExpressions()
 
-            LogManager.logClassAllMethodExpression(developClasses, "$logFolder/expressions/develop")
-            LogManager.logClassAllCalls(developClasses, "$logFolder/calls/develop")
-
+            ClassCallsLogger.logAllCalls(logsPath.classesCallsFolder + "/develop", developClasses)
+            ClassExpressionsLogger.logAllExpressions(logsPath.classesExpressionsFolder + "/develop", developClasses)
 
             //feature + logs
-            referenceBuilder.bindAll(featureClasses, featSearchEngine)
+            referenceBuilder.init(featSearchEngine)
+            referenceBuilder.collectExpressions()
+            referenceBuilder.collectCallsFromExpressions()
 
-            LogManager.logClassAllMethodExpression(featureClasses, "$logFolder/expressions/feature")
-            LogManager.logClassAllCalls(featureClasses, "$logFolder/calls/feature")
+            ClassCallsLogger.logAllCalls(logsPath.classesCallsFolder + "/feature", featureClasses)
+            ClassExpressionsLogger.logAllExpressions(logsPath.classesExpressionsFolder + "/feature", featureClasses)
 
-            logStatus(buildStepLogFile, "Project binding success", 1)
+            logStatus("Project binding success", 1)
 
         } catch (ex: Exception) {
-            logStatus(buildStepLogFile, "Project binding error ${ex.message}", 1)
+            logStatus("Project binding error ${ex.message}", 1)
             throw ex
         }
     }
 
     private fun loadProject(repoPath: String, mainCommit: String, branchCommit: String) {
 
-        logStatus(buildStepLogFile, "Step 1: project loading")
+        logStatus("Step 1: project loading")
 
         try {
             val projectLoader: IProjectLoader = GitLoader()
@@ -196,21 +186,28 @@ class GraphBuilder() {
             KtFileMapper.linkSuperClasses(developClasses)
             KtFileMapper.linkSuperClasses(featureClasses)
 
-            LogManager.logLoadedProject(loadedProjectFolder + "/develop", developClasses)
-            LogManager.logLoadedProject(loadedProjectFolder + "/feature", featureClasses)
+            logStatus("Step 2: initialize engines")
 
-            logStatus(buildStepLogFile, "Project loading success", 1)
+            devSearchEngine.init(developClasses)
+            featSearchEngine.init(featureClasses)
+
+            logStatus("Initialize engines success", 1)
+
+            ClassLogger.logProjectClasses(logsPath.loadedProjectFolder + "/develop", developClasses)
+            ClassLogger.logProjectClasses(logsPath.loadedProjectFolder + "/feature", featureClasses)
+
+            logStatus("Project loading success")
         } catch (ex: Exception) {
-            logStatus(buildStepLogFile, "Project loading error ${ex.message}", 1)
+            logStatus("Project loading error ${ex.message}")
             throw ex
         }
     }
 
-    private fun logStatus(filename: String, content: String, indentLevel: Int = 0) {
+    private fun logStatus(logContent: String, indentLevel: Int = 0) {
         // Создаём отступ: 4 пробела на каждый уровень
         val indent = "    ".repeat(indentLevel)
 
         // Пишем в файл с отступом
-        File(filename).appendText(indent + content + System.lineSeparator())
+        File(logFile).appendText(indent + logContent + System.lineSeparator())
     }
 }

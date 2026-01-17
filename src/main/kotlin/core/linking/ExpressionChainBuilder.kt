@@ -14,20 +14,26 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 
 class ExpressionChainBuilder(
-    private val currentMethod: ClassMethod,
     private val searchEngine: IProjectSearchEngine
 ) {
-    private val mainClass: KotlinClass = currentMethod.parentClass
-    private var typeResolver: IExpressionTypeResolver = ExpressionTypeResolver(searchEngine, mainClass, currentMethod)
+
+    private lateinit var currentMethod: ClassMethod
+    private lateinit var mainClass: KotlinClass
+    private lateinit var typeResolver: IExpressionTypeResolver
     private val variableStorage: ITemporaryVariableStorage = ExpressionValueStorage()
 
     val unknownType = "unknown"
 
-    fun collectAllExpressions() {
+    fun collectAllExpressions(method: ClassMethod) {
 
-        val block = currentMethod.function.bodyBlockExpression ?: return
+        //init dependies
+        typeResolver = ExpressionTypeResolver(searchEngine, mainClass, method)
+        mainClass = method.parentClass
+        currentMethod = method
 
-        for (param in currentMethod.function.valueParameters) {
+        val block = method.function.bodyBlockExpression ?: return
+
+        for (param in method.function.valueParameters) {
             handlePsiElement(param)
         }
 
