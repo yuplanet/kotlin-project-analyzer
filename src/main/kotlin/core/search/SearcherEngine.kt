@@ -29,10 +29,13 @@ class SearcherEngine: IProjectSearchEngine {
         return allMethods
     }
 
+    override fun getAllClasses(): List<KotlinClass> {
+       return allClasses
+    }
+
     override fun init(projectClasses: List<KotlinClass>) {
         allClasses = projectClasses
         allMethods = allClasses.flatMap { it.functionCalls }
-
 
         // Инициализация classDictionary
         for (cls in allClasses) {

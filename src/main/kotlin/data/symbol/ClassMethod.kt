@@ -12,25 +12,39 @@ data class ClassMethod(
      * getApiKeyClients
      */
     val name: String,
+    /**
+     * Class::Method( Params ): ReturnType
+     * ApiKeyManagementController::getApiKeyClients():Boolean
+     */
+    val fullName: String,
+
+    /**
+     * Class.Method( Params ): ReturnType
+     * ApiKeyManagementController::getApiKeyClients():Boolean
+     */
+    var signature: String = fullName,
+
+    /**
+     * Class.Method( Params ): ReturnType
+     * ApiKeyManagementController::getApiKeyClients():Boolean
+     */
+    var originalSignature: String = fullName,
+
+    val function: KtNamedFunction,
 
     /**
      * type
      * Int or Unit
      */
     val returnType: String,
-
-    /**
-     * Class::Method( Params ): ReturnType
-     * ApiKeyManagementController::getApiKeyClients():Boolean
-     */
-    val fullName: String,
-    val function: KtNamedFunction,
+    var originalReturnType: String = returnType,
 
     /**
      * List<param Typ>
      * List<Int,Int,Int>
      */
-    val parameterTypeNames: List<String>,
+    var parameterTypeNames: List<String>,
+    var originalParameterTypeNames: List<String> = parameterTypeNames,
 
     var annotations: List<String> = emptyList(),
 
@@ -48,16 +62,10 @@ data class ClassMethod(
     //refs
     val callRecords: MutableList<ObjectReference> = mutableListOf(), // target method
     val reverseCallRecords: MutableList<ObjectReference> = mutableListOf(),
-)
-{
+) {
     var isApi: Boolean = false
     var apiUrl: String = ""
     var apiUri: String = ""
-
-    var originalReturnType: String = returnType.replace("?","")
-    val originalParameterTypeNames: List<String> = parameterTypeNames.map { it.replace("?","") }
-    val signature: String
-        get() = "${parentClass.name}.$name(${parameterTypeNames.joinToString(",")}):$returnType"
 
     private fun initMethodApiData() {
         // сразу из KtNamedFunction
@@ -71,13 +79,11 @@ data class ClassMethod(
         isApi = true
 
         // путь метода — из первой аннотации с аргументом
-        apiUrl = apiAnno.mapNotNull { entry ->
+        apiUrl = apiAnno.firstNotNullOfOrNull { entry ->
             entry.valueArguments.firstOrNull()?.getArgumentExpression()?.text?.trim('"')
-        }.firstOrNull() ?: ""
+        } ?: ""
 
         apiUri = parentClass.apiUrl + apiUrl
-
-        print(apiUrl)
     }
 
     companion object {
@@ -86,7 +92,18 @@ data class ClassMethod(
             "GET", "POST", "PUT", "DELETE", "PATCH", "Path"
         )
     }
+
     init {
+        syncData()
         initMethodApiData()
+    }
+
+    fun syncData() {
+        originalReturnType = returnType.replace("?", "")
+        originalParameterTypeNames = parameterTypeNames.map { it.replace("?", "") }
+
+        signature = "${parentClass.name}.$name(${parameterTypeNames.joinToString(",")}):$returnType"
+        originalSignature =
+            "${parentClass.name}.$name(${originalParameterTypeNames.joinToString(",")}):$originalReturnType"
     }
 }

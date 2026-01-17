@@ -3,6 +3,7 @@ package org.example.core.logs
 object logsPath {
 
 
+    val logFoler = "logs"
     val processSteplogFile = "logs/build_process.txt"
 
     val loadedProjectFolder = "logs/loaded_project"

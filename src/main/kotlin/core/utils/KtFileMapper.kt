@@ -42,7 +42,7 @@ object KtFileMapper {
         return "__top_level__"
     }
 
-    fun getEntityType(cl : KtClassOrObject): ObjectType {
+    fun getEntityType(cl: KtClassOrObject): ObjectType {
         return when (cl) {
             is KtClass -> when {
                 cl.isInterface() -> ObjectType.Interface
@@ -60,7 +60,7 @@ object KtFileMapper {
         }
     }
 
-    fun getAnnotations(cl : KtClassOrObject): List<String> {
+    fun getAnnotations(cl: KtClassOrObject): List<String> {
         return cl.annotationEntries.map { entry ->
             // Получаем текст аннотации, например "@Serializable"
             entry.shortName?.asString() ?: entry.text
@@ -99,16 +99,30 @@ object KtFileMapper {
 
             // Создаем property и parameter references
             ktClass.propertyReferences.addAll(ktClass.ktProperties.map {
-                ClassProperty(it.name ?: "__no_name__", it.typeReference?.text ?: "_", it, ktClass)
+
+                val property = ClassProperty(
+                    name = it.name ?: "__no_name__",
+                    property = it,
+                    parentClass = ktClass,
+                    it.typeReference?.text ?: "_"
+                )
+                property
             })
+
             ktClass.parameterReferences.addAll(ktClass.ktParameters.map {
-                ClassParameter(it.name ?: "__no_name__", it.typeReference?.text ?: "_", it, ktClass)
+                val parameter = ClassParameter(
+                    name = it.name ?: "__no_name__",
+                    property = it,
+                    parentClass = ktClass,
+                    it.typeReference?.text ?: "_"
+                )
+                parameter
             })
 
             // Создаем функции с параметрами
             ktClass.functionCalls.addAll(
                 ktClass.ktFunctions.map {
-                    ClassMethod(
+                    val method = ClassMethod(
                         name = it.name ?: "__no_name__",
                         fullName = getFullFunctionName(it),
                         returnType = it.typeReference?.text ?: "Unit",
@@ -117,6 +131,8 @@ object KtFileMapper {
                         parentClass = ktClass,
                         annotations = getFunctionAnnotations(it)
                     )
+
+                    method
                 }
             )
             kotlinClasses.add(ktClass)
@@ -148,7 +164,7 @@ object KtFileMapper {
 
     /**
      * аннотации методов
-    * */
+     * */
     fun getFunctionAnnotations(ktFunction: KtNamedFunction): List<String> {
         val result = mutableListOf<String>()
 

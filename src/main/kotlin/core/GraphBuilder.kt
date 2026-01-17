@@ -64,12 +64,11 @@ class GraphBuilder() {
     }
 
     private fun clearFile() {
-        val dir = File(logFile)
 
-        if (dir.exists())
-            dir.deleteRecursively()
-
-        dir.mkdirs()
+        val dir = File(logsPath.logFoler)
+        if (dir.exists() && dir.isDirectory) {
+            dir.listFiles()?.forEach { it.deleteRecursively() }
+        }
 
         logStatus("***log folder generated")
     }
@@ -130,6 +129,8 @@ class GraphBuilder() {
 
     private fun buildClassReferences() {
 
+        logStatus("Step 3: project binding")
+
         try {
             val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
 
@@ -149,10 +150,10 @@ class GraphBuilder() {
             ClassCallsLogger.logAllCalls(logsPath.classesCallsFolder + "/feature", featureClasses)
             ClassExpressionsLogger.logAllExpressions(logsPath.classesExpressionsFolder + "/feature", featureClasses)
 
-            logStatus("Project binding success", 1)
+            logStatus("Project bind success", 1)
 
         } catch (ex: Exception) {
-            logStatus("Project binding error ${ex.message}", 1)
+            logStatus("Project bind error ${ex.message}", 1)
             throw ex
         }
     }
@@ -186,6 +187,8 @@ class GraphBuilder() {
             KtFileMapper.linkSuperClasses(developClasses)
             KtFileMapper.linkSuperClasses(featureClasses)
 
+            logStatus("Project loaded success", 1)
+
             logStatus("Step 2: initialize engines")
 
             devSearchEngine.init(developClasses)
@@ -195,10 +198,8 @@ class GraphBuilder() {
 
             ClassLogger.logProjectClasses(logsPath.loadedProjectFolder + "/develop", developClasses)
             ClassLogger.logProjectClasses(logsPath.loadedProjectFolder + "/feature", featureClasses)
-
-            logStatus("Project loading success")
         } catch (ex: Exception) {
-            logStatus("Project loading error ${ex.message}")
+            logStatus("Project loading error ${ex.message}", 1)
             throw ex
         }
     }

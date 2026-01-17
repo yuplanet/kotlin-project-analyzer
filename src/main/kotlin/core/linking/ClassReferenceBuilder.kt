@@ -29,6 +29,6 @@ class ClassReferenceBuilder ( ): IClassReferenceBuilder {
 
     override fun collectCallsFromExpressions() {
         val callResolver = ExpressionCallResolver(searchEngine) //CallResolverWithLogs(searchEngine)//
-        callResolver.collect(projectClasses)
+         callResolver.collect(projectClasses)
     }
 }

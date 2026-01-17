@@ -3,16 +3,15 @@ package org.example.core.linking
 import org.example.core.interfaces.IExpressionTypeResolver
 import org.example.core.interfaces.IProjectSearchEngine
 import org.example.data.symbol.ClassMethod
-import org.example.data.symbol.KotlinClass
 import org.example.data.symbol.enum.ObjectType
 import org.example.data.symbol.expression.*
 import org.jetbrains.kotlin.psi.KtFile
 
 class ExpressionTypeResolver(
     private val searchEngine: IProjectSearchEngine,
-    private val currentClass: KotlinClass,
     private val currentMethod: ClassMethod): IExpressionTypeResolver {
 
+    private var currentClass = currentMethod.parentClass
     private val ktFile: KtFile = currentClass.ktFile
 
     private var expressions: List<AssignmentExpression> = currentMethod.fullExpressions

@@ -16,7 +16,6 @@ import org.jetbrains.kotlin.psi.*
 class ExpressionChainBuilder(
     private val searchEngine: IProjectSearchEngine
 ) {
-
     private lateinit var currentMethod: ClassMethod
     private lateinit var mainClass: KotlinClass
     private lateinit var typeResolver: IExpressionTypeResolver
@@ -27,7 +26,7 @@ class ExpressionChainBuilder(
     fun collectAllExpressions(method: ClassMethod) {
 
         //init dependies
-        typeResolver = ExpressionTypeResolver(searchEngine, mainClass, method)
+        typeResolver = ExpressionTypeResolver(searchEngine, method)
         mainClass = method.parentClass
         currentMethod = method
 
@@ -164,7 +163,12 @@ class ExpressionChainBuilder(
                     normalizeTypes(target, source)
                 }
 
-                val property = ClassProperty(name, type, element, mainClass)
+                val property = ClassProperty(
+                    name = name,
+                    property = element,
+                    type = type,
+                    parentClass = mainClass)
+
                 currentMethod.properties.add(property)
 
                 addExpression(target, source,)
@@ -189,7 +193,12 @@ class ExpressionChainBuilder(
                     normalizeTypes(target, source)
                 }
 
-                val parameter = ClassParameter(target.variableName, target.variableType, element, mainClass)
+                val parameter = ClassParameter(
+                    name = target.variableName,
+                    property = element,
+                    type = target.variableType,
+                    parentClass = mainClass)
+
                 currentMethod.parameters.add(parameter)
                 addExpression(target, source,)
                 return target

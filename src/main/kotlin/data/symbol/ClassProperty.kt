@@ -6,19 +6,19 @@ import org.jetbrains.kotlin.psi.KtProperty
 data class ClassProperty (
 
     var name: String,
-    var type: String,
     var property: KtProperty,
-
     val parentClass: KotlinClass,
 
-    var fullExpressions: MutableList<AssignmentExpression> = mutableListOf(),
+    var type: String,
+    var originalType: String = type.replace("?","")
+) {
+    var fullExpressions: MutableList<AssignmentExpression> = mutableListOf()
 
-    var callRecords: MutableList<ObjectReference> = mutableListOf(),
-    var reverseCallRecords: MutableList<ObjectReference> = mutableListOf(),
-){
-    var originalType: String
+    //refs
+    val callRecords: MutableList<ObjectReference> = mutableListOf() // target method
+    val reverseCallRecords: MutableList<ObjectReference> = mutableListOf()
 
-    init {
-        originalType = type.replace("?","")
+    fun syncData() {
+        originalType = type.replace("?", "")
     }
 }

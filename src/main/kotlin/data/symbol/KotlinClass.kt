@@ -1,19 +1,14 @@
 package org.example.data.symbol
 
 import org.example.data.symbol.enum.ObjectType
-import org.jetbrains.kotlin.psi.KtClassOrObject
-import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.*
 
 class KotlinClass(
-
     /**
-     * path / name /.kt
-     * src/main/kotlin/de/axxessio/a2sre/A2sreApplication.kt
+     *  name
+     * /A2sreApplication
      */
-    var path: String,
+    var name: String,
 
     /**
      * path / name
@@ -22,14 +17,16 @@ class KotlinClass(
     val fullName: String,
 
     /**
-     *  name
-     * /A2sreApplication
+     * path / name /.kt
+     * src/main/kotlin/de/axxessio/a2sre/A2sreApplication.kt
      */
-    var name: String,
-    var ktFile: KtFile,
+    var path: String,
 
+    var ktFile: KtFile,
     var ktClassObjectType: ObjectType,
+
     var annotations: List<String> = emptyList(),
+
     val ktClassObject: KtClassOrObject,
 
 
@@ -43,7 +40,7 @@ class KotlinClass(
 
     var subClasses: MutableList<KotlinClass> = mutableListOf(),
     var superClasses: MutableList<KotlinClass> = mutableListOf(),
-){
+) {
 
     var isApi: Boolean = false
     var apiUrl: String = ""
@@ -69,11 +66,9 @@ class KotlinClass(
         isApi = true
 
         // путь — из первой найденной аннотации с аргументом
-        apiUrl = apiAnno.mapNotNull { entry ->
+        apiUrl = apiAnno.firstNotNullOfOrNull { entry ->
             entry.valueArguments.firstOrNull()?.getArgumentExpression()?.text?.trim('"')
-        }.firstOrNull() ?: ""
-
-        print(apiUrl)
+        } ?: ""
     }
 
     init {
