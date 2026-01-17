@@ -22,8 +22,8 @@ class SearcherEngine: IProjectSearchEngine {
     private var classSimpleNameDictionary: MutableMap<Int, MutableList<KotlinClass>> = mutableMapOf()
 
     //key - full name for method: name+args+return type
-    private var methodFullNameDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
-    private val methodSignatureHashDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
+    private var methodSignatureDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
+    private var methodOriginalSignatureDictionary: MutableMap<Int, MutableList<ClassMethod>> = mutableMapOf()
 
     override fun getAllMethods(): List<ClassMethod> {
         return allMethods
@@ -37,28 +37,31 @@ class SearcherEngine: IProjectSearchEngine {
         allClasses = projectClasses
         allMethods = allClasses.flatMap { it.functionCalls }
 
-        // Инициализация classDictionary
-        for (cls in allClasses) {
-            val key = cls.path.hashCode() // метод, который возвращает hashCode fullName
-            classFullNameDictionary.computeIfAbsent(key) { mutableListOf() }.add(cls)
+        updateClassesHashes()
 
-            val nameKey = cls.name.hashCode()
-            classSimpleNameDictionary.computeIfAbsent(nameKey) { mutableListOf() }.add(cls)
-        }
+        updateMethodsHashes()
+    }
 
+    override fun updateMethodsHashes() {
         // Инициализация methodDictionary
         for (method in allMethods) {
             //ApiKeyManagementController::getApiKeyClients():ResponseEntity<List<ApiKeyClientResponseDto>>
             val key = method.signature.hashCode() // метод, который возвращает hashCode fullName
-            methodFullNameDictionary.computeIfAbsent(key) { mutableListOf() }.add(method)
+            methodSignatureDictionary.computeIfAbsent(key) { mutableListOf() }.add(method)
+
+            val orKey = method.originalSignature.hashCode() // метод, который возвращает hashCode fullName
+            methodOriginalSignatureDictionary.computeIfAbsent(orKey) { mutableListOf() }.add(method)
         }
     }
 
-    override fun updateMethodsHashes() {
-        for (method in allMethods) {
-            // пересчитываем hash сигнатуры
-            val key = method.fullName.hashCode()
-            methodSignatureHashDictionary.computeIfAbsent(key) { mutableListOf() }.add(method)
+    override fun updateClassesHashes() {
+        // Инициализация classDictionary
+        for (cls in allClasses) {
+            val key = cls.fullName.hashCode() // метод, который возвращает hashCode fullName
+            classFullNameDictionary.computeIfAbsent(key) { mutableListOf() }.add(cls)
+
+            val nameKey = cls.name.hashCode()
+            classSimpleNameDictionary.computeIfAbsent(nameKey) { mutableListOf() }.add(cls)
         }
     }
 
@@ -149,7 +152,7 @@ class SearcherEngine: IProjectSearchEngine {
 
         val key = methodName.hashCode()
 
-        val candidates = methodFullNameDictionary[key] ?: emptyList()
+        val candidates = methodSignatureDictionary[key] ?: emptyList()
 
         val result = candidates.firstOrNull { method ->
             // проверяем класс

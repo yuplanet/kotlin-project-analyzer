@@ -8,10 +8,11 @@ interface IProjectSearchEngine {
 
     fun getAllMethods(): List<ClassMethod>
     fun getAllClasses(): List<KotlinClass>
+
     fun init(projectClasses: List<KotlinClass>)
 
-
     fun updateMethodsHashes()
+    fun updateClassesHashes()
 
     //==== fields Properties
     fun findFieldRefByClassNameAndFieldName(className: String, fieldName: String): FieldReference?
