@@ -25,17 +25,19 @@ class ExpressionChainBuilder(
 
     fun collectAllExpressions(method: ClassMethod) {
 
-        //init dependies
+        //init dependencies
         typeResolver = ExpressionTypeResolver(searchEngine, method)
         mainClass = method.parentClass
         currentMethod = method
 
         val block = method.function.bodyBlockExpression ?: return
 
+        // резолвим сначала параметры
         for (param in method.function.valueParameters) {
             handlePsiElement(param)
         }
 
+        //потом тело
         for (statement in block.statements) {
             handlePsiElement(statement)
         }

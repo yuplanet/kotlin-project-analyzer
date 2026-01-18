@@ -47,11 +47,13 @@ class GraphBuilder() {
         // 6 output
 
         //1 load
-        //2 init search engine
         loadProject(repoPath, mainCommit, branchCommit)
 
+        //2 init search engine
+        initEngines()
+
         //3
-        buildClassReferences()
+        collectProjectCallsAndExpressions()
 
         //4 analizy // to do correct
         analyzeDifference()
@@ -71,6 +73,59 @@ class GraphBuilder() {
         }
 
         logStatus("***log folder generated")
+    }
+
+
+    private fun loadProject(repoPath: String, mainCommit: String, branchCommit: String) {
+
+        logStatus("Step 1: project loading")
+
+        try {
+            val projectLoader: IProjectLoader = GitLoader()
+
+            val developFiles = projectLoader.loadProjectFilesFromCommit(repoPath, mainCommit)
+                .filterKeys { !it.startsWith("src/test") }
+
+            val featureFiles = projectLoader.loadProjectFilesFromCommit(repoPath, branchCommit)
+                .filterKeys { !it.startsWith("src/test") }
+
+            val project = KtFileExtractor.createProject()
+
+            val developKtFiles = developFiles.entries.map { (name, content) ->
+                KtFileExtractor.createPsiFile(project, name, content)
+            }
+
+            val featureKtFiles = featureFiles.entries.map { (name, content) ->
+                KtFileExtractor.createPsiFile(project, name, content)
+            }
+
+            developClasses = KtFileMapper.mapKtFilesToClassList(developKtFiles)
+            featureClasses = KtFileMapper.mapKtFilesToClassList(featureKtFiles)
+
+            KtFileMapper.linkSuperClasses(developClasses)
+            KtFileMapper.linkSuperClasses(featureClasses)
+
+            logStatus("Project loaded success", 1)
+
+            ClassLogger.logProjectClasses(logsPath.loadedProjectFolder + "/develop", developClasses)
+            ClassLogger.logProjectClasses(logsPath.loadedProjectFolder + "/feature", featureClasses)
+        } catch (ex: Exception) {
+            logStatus("Project loading error ${ex.message}", 1)
+            throw ex
+        }
+    }
+
+    private fun initEngines() {
+        logStatus("Step 2: initialize engines")
+        try {
+            devSearchEngine.init(developClasses)
+            featSearchEngine.init(featureClasses)
+
+            logStatus("Initialize engines success", 1)
+        } catch (ex: Exception) {
+            logStatus("Initialize engines error ${ex.message}", 1)
+            throw ex
+        }
     }
 
     private fun output() {
@@ -109,6 +164,7 @@ class GraphBuilder() {
         }
     }
 
+
     private fun analyzeDifference() {
         logStatus( "Step 4: analyzing difference")
 
@@ -127,9 +183,9 @@ class GraphBuilder() {
         }
     }
 
-    private fun buildClassReferences() {
+    private fun collectProjectCallsAndExpressions() {
 
-        logStatus("Step 3: project binding")
+        logStatus("Step 3: project refs collecting")
 
         try {
             val referenceBuilder: IClassReferenceBuilder = ClassReferenceBuilder()
@@ -150,7 +206,7 @@ class GraphBuilder() {
             ClassCallsLogger.logAllCalls(logsPath.classesCallsFolder + "/feature", featureClasses)
             ClassExpressionsLogger.logAllExpressions(logsPath.classesExpressionsFolder + "/feature", featureClasses)
 
-            logStatus("Project bind success", 1)
+            logStatus("project refs collected success", 1)
 
         } catch (ex: Exception) {
             logStatus("Project bind error ${ex.message}", 1)
@@ -158,51 +214,6 @@ class GraphBuilder() {
         }
     }
 
-    private fun loadProject(repoPath: String, mainCommit: String, branchCommit: String) {
-
-        logStatus("Step 1: project loading")
-
-        try {
-            val projectLoader: IProjectLoader = GitLoader()
-
-            val developFiles = projectLoader.loadProjectFilesFromCommit(repoPath, mainCommit)
-                .filterKeys { !it.startsWith("src/test") }
-
-            val featureFiles = projectLoader.loadProjectFilesFromCommit(repoPath, branchCommit)
-                .filterKeys { !it.startsWith("src/test") }
-
-            val project = KtFileExtractor.createProject()
-
-            val developKtFiles = developFiles.entries.map { (name, content) ->
-                KtFileExtractor.createPsiFile(project, name, content)
-            }
-
-            val featureKtFiles = featureFiles.entries.map { (name, content) ->
-                KtFileExtractor.createPsiFile(project, name, content)
-            }
-
-            developClasses = KtFileMapper.mapKtFilesToClassList(developKtFiles)
-            featureClasses = KtFileMapper.mapKtFilesToClassList(featureKtFiles)
-
-            KtFileMapper.linkSuperClasses(developClasses)
-            KtFileMapper.linkSuperClasses(featureClasses)
-
-            logStatus("Project loaded success", 1)
-
-            logStatus("Step 2: initialize engines")
-
-            devSearchEngine.init(developClasses)
-            featSearchEngine.init(featureClasses)
-
-            logStatus("Initialize engines success", 1)
-
-            ClassLogger.logProjectClasses(logsPath.loadedProjectFolder + "/develop", developClasses)
-            ClassLogger.logProjectClasses(logsPath.loadedProjectFolder + "/feature", featureClasses)
-        } catch (ex: Exception) {
-            logStatus("Project loading error ${ex.message}", 1)
-            throw ex
-        }
-    }
 
     private fun logStatus(logContent: String, indentLevel: Int = 0) {
         // Создаём отступ: 4 пробела на каждый уровень
