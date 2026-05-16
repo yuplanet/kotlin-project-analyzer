@@ -68,7 +68,7 @@ class GraphBuilder() {
     private fun clearFile() {
 
         val dir = File(logsPath.logFoler)
-        if (dir.exists() && dir.isDirectory) {
+        if (dir.mkdirs() || dir.isDirectory) {
             dir.listFiles()?.forEach { it.deleteRecursively() }
         }
 
