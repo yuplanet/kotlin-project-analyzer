@@ -4,7 +4,7 @@ import org.example.core.GraphBuilder
 
 fun main() {
     try {
-        val repoPath = "C:\\Users\\UlugbekYunusov\\Desktop\\a2s-reloaded"
+        val repoPath = "repo_path"
         val mainCommit = "develop"
         val branchCommit = "feature/xxxx4"
 

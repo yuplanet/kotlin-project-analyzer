@@ -1,47 +1,31 @@
-.gradle
+# Gradle & Build Artifacts
+.gradle/
 build/
+# Папка sandbox/кэша IntelliJ Platform Gradle Plugin v2+
+.intellijPlatform/
 !gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+# Локальные логи плагина (добавлено по запросу)
+logs/
 
-### Kotlin ###
-.kotlin
+# Текстовые отчеты сравнения методов (чтобы не засирать репозиторий локальными запусками)
+changed_methods_*.txt
 
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+# Kotlin
+.kotlin/
+kotlin-daemon-embedable-*.jar
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
-.vscode/
-
-### Mac OS ###
+# macOS
 .DS_Store
-/.idea
-/.intellijPlatform
+
+# IntelliJ IDEA
+# Скрываем локальные рабочие пространства и кэши
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/shelf/
+.idea/caches/
+.idea/libraries/
+# Файл модуля (на скриншоте это project-analyzer.imI)
+*.iml
+*.iws
+out/
